@@ -1,0 +1,27 @@
+package com.stylemind.notification.openapi;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+public class OpenApiConfiguration {
+
+    @Bean
+    OpenAPI styleMindOpenApi() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("StyleMind Notification API")
+                        .description("Notification service API")
+                        .version("v1"))
+                .components(new Components().addSecuritySchemes("bearerAuth",
+                        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT"))
+                        .addSecuritySchemes("serviceToken", new SecurityScheme().type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.HEADER).name("X-StyleMind-Service-Token")))
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+    }
+}

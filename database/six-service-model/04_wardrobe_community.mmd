@@ -1,0 +1,101 @@
+erDiagram
+    %% Wardrobe sharing and friend chat have the same data owner.
+    %% WARDROBE_REQUIREMENT persistence is PROPOSED; it is retained from the CDM.
+    %% Protected visibility and chat participant limits remain TBD.
+    WARDROBE {
+        uuid wardrobe_id PK
+        uuid owner_user_id "REF identity.ACCOUNT.account_id"
+        string name
+        text description "NULL"
+        string visibility "PRIVATE, PROTECTED or PUBLIC; access rules TBD"
+    }
+    WARDROBE_ITEM {
+        uuid wardrobe_item_id PK
+        uuid wardrobe_id FK
+        string name
+        string brand_label "NULL; personal item metadata"
+        string category_label "NULL; vocabulary TBD"
+        string primary_color "NULL"
+        string occasion "NULL"
+        string style_context "NULL"
+        string image_url "NULL"
+        string image_storage_key "NULL"
+        uuid origin_shop_variant_id "REF commerce.PRODUCT_VARIANT.variant_id; NULL"
+        boolean is_favorite "PROPOSED from prototype"
+    }
+    WARDROBE_REQUIREMENT {
+        uuid wardrobe_id PK, FK
+        string occasion "NULL"
+        string intended_use "NULL"
+        string style_context "NULL"
+        text general_weather_context "NULL; entered by customer"
+        bigint max_budget_vnd "NULL; whether hard or soft must be explicit"
+        boolean budget_is_hard "False when no maximum budget is supplied"
+        text criteria_notes "NULL"
+        datetime configured_at
+    }
+    FRIENDSHIP {
+        uuid friendship_id PK
+        uuid user_a_id "REF identity.ACCOUNT.account_id"
+        uuid user_b_id "REF identity.ACCOUNT.account_id; canonical ordered pair UQ"
+        string friendship_status "Lifecycle TBD"
+        datetime established_at "NULL until relationship established"
+    }
+    WARDROBE_SHARE {
+        uuid wardrobe_id PK, FK
+        uuid recipient_user_id PK "REF identity.ACCOUNT.account_id"
+        uuid friendship_id FK
+        datetime granted_at
+        datetime revoked_at "NULL"
+    }
+    OUTFIT {
+        uuid outfit_id PK
+        uuid wardrobe_id FK
+        uuid source_recommendation_id "REF stylist.WARDROBE_RECOMMENDATION.recommendation_id; NULL"
+        string name
+        string occasion "NULL"
+        text description "NULL"
+        datetime saved_at
+    }
+    OUTFIT_ITEM {
+        uuid outfit_item_id PK
+        uuid outfit_id FK
+        string source_type "OWNED_WARDROBE or SHOP_VARIANT"
+        uuid wardrobe_item_id FK "NULL; exclusive with shop_variant_id"
+        uuid shop_variant_id "REF commerce.PRODUCT_VARIANT.variant_id; NULL"
+        string slot_name "Vocabulary TBD"
+        int display_order
+    }
+    CHAT_SESSION {
+        uuid chat_session_id PK
+        uuid wardrobe_id FK "Shared wardrobe context from CDM"
+        uuid created_by_user_id "REF identity.ACCOUNT.account_id"
+        string title "NULL"
+        datetime opened_at
+        datetime closed_at "NULL"
+    }
+    CHAT_PARTICIPANT {
+        uuid chat_session_id PK, FK
+        uuid user_id PK "REF identity.ACCOUNT.account_id"
+        datetime joined_at
+        datetime left_at "NULL"
+    }
+    CHAT_MESSAGE {
+        uuid message_id PK
+        uuid chat_session_id FK
+        uuid sender_user_id FK "Local composite FK to CHAT_PARTICIPANT.user_id"
+        text body
+        datetime sent_at
+    }
+
+    WARDROBE ||--o{ WARDROBE_ITEM : contains_owned_items
+    WARDROBE ||--o| WARDROBE_REQUIREMENT : may_store_criteria
+    WARDROBE ||--o{ WARDROBE_SHARE : shares_with_friends
+    FRIENDSHIP ||--o{ WARDROBE_SHARE : supports_recipient_relationship
+    WARDROBE ||--o{ OUTFIT : keeps_saved_outfits
+    OUTFIT ||--|{ OUTFIT_ITEM : combines_items
+    WARDROBE_ITEM o|--o{ OUTFIT_ITEM : reuses_owned_item
+    WARDROBE ||--o{ CHAT_SESSION : provides_shared_context
+    CHAT_SESSION ||--|{ CHAT_PARTICIPANT : has_participants
+    CHAT_SESSION ||--o{ CHAT_MESSAGE : stores_messages
+    CHAT_PARTICIPANT ||--o{ CHAT_MESSAGE : sends_as_member
