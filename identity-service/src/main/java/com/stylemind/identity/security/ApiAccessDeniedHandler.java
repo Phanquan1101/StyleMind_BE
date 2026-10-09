@@ -31,12 +31,19 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
         String requestUri = request.getRequestURI();
         if ("/api/v1/auth/login".equals(requestUri)
                 || "/api/v1/auth/refresh".equals(requestUri)
-                || "/api/v1/auth/logout".equals(requestUri)) {
+                || "/api/v1/auth/logout".equals(requestUri)
+                || isManageUsersEndpoint(request)) {
             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         }
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(response.getOutputStream(), ApiProblemDetails.create(
                 status, status.getReasonPhrase(), "Access is denied", "ACCESS_DENIED", request));
+    }
+
+    private boolean isManageUsersEndpoint(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return "/api/v1/admin/users".equals(path) || path.startsWith("/api/v1/admin/users/")
+                || request.getRequestURI().startsWith("/api/v1/admin/users");
     }
 }

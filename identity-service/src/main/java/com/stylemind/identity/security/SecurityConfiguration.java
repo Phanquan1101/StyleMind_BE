@@ -37,7 +37,12 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/verify-password-reset").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
+                        .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**")
+                        .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/me", "/api/v1/me/style-profile")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/me/addresses", "/api/v1/me/addresses/*",
+                                "/api/v1/locations/provinces", "/api/v1/locations/provinces/*/wards")
                         .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/me/addresses", "/api/v1/me/addresses/*",
                                 "/api/v1/locations/provinces", "/api/v1/locations/provinces/*/wards")

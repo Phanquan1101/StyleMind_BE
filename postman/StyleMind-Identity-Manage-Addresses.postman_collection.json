@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "3af28048-73f7-4cec-b170-020600000006",
     "name": "StyleMind Identity — Manage Addresses US-02.06",
-    "description": "Address lifecycle, ownership, validation, lookup, auth and cleanup. Use dedicated fresh verified CUSTOMER accounts. No secrets or tokens are stored in this collection. Direct local Identity at {{baseUrl}}; no API Gateway.",
+    "description": "Address lifecycle, ownership, validation, lookup, auth and cleanup. Use dedicated fresh verified CUSTOMER accounts. No secrets or tokens are stored in this collection. Direct local Identity at {{baseUrl}}; no API Gateway. Authenticated requests set Authorization from run-scoped collection tokens in pre-request scripts, so an older environment token cannot override account A/B.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [],
@@ -119,6 +119,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -145,6 +154,15 @@
             "url": "{{baseUrl}}/api/v1/me"
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -175,6 +193,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -203,6 +230,15 @@
             "url": "{{baseUrl}}/api/v1/me/addresses"
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -237,6 +273,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -266,6 +311,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -316,6 +370,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -360,6 +423,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -388,13 +460,22 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
                   "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
-                  "const xs=pm.response.json().addresses; pm.test(\"two addresses; one default first\",()=>{pm.expect(xs).to.have.length(2);pm.expect(xs[0].address_id).to.eql(pm.collectionVariables.get(\"addressA1\"));pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);}); pm.collectionVariables.set(\"addressBaseline\",JSON.stringify(xs));"
+                  "const xs=pm.response.json().addresses; pm.test(\"two addresses; one default first\",()=>{pm.expect(xs).to.have.length(2);pm.expect(xs[0].address_id).to.eql(pm.collectionVariables.get(\"addressA1\"));pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);});"
                 ]
               }
             }
@@ -415,6 +496,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -458,6 +548,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -485,6 +584,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -514,6 +622,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -521,6 +638,40 @@
                   "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
                   "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
                   "pm.test(\"repeat is idempotent\",()=>pm.expect(pm.response.json().is_default).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture A state before delete-default conflict",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"snapshot has expected owner state\",()=>{pm.response.to.have.status(200);const xs=canonical(pm.response.json().addresses);pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);pm.expect(xs.find(x=>x.address_id===pm.collectionVariables.get(\"addressA2\")).is_default).to.eql(true);pm.collectionVariables.set(\"addressConflictSnapshot\",JSON.stringify(xs));});"
                 ]
               }
             }
@@ -541,6 +692,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -568,13 +728,20 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
-                  "const xs=pm.response.json().addresses; pm.test(\"conflict left two rows and exactly one default\",()=>{pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);pm.expect(xs.find(x=>x.address_id===pm.collectionVariables.get(\"addressA2\")).is_default).to.eql(true);});"
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"delete-default conflict preserved every Address field including nulls\",()=>{pm.response.to.have.status(200);const actual=canonical(pm.response.json().addresses);const expected=JSON.parse(pm.collectionVariables.get(\"addressConflictSnapshot\")||\"null\");pm.expect(expected,\"baseline snapshot missing\").not.to.eql(null);pm.expect(actual).to.eql(expected);pm.expect(actual).to.have.length(2);});"
                 ]
               }
             }
@@ -600,6 +767,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -641,6 +817,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -666,6 +851,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -693,6 +887,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -704,7 +907,75 @@
           ]
         },
         {
-          "name": "A and B state remains isolated",
+          "name": "Capture A state before foreign-owner attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"snapshot has expected owner state\",()=>{pm.response.to.have.status(200);const xs=canonical(pm.response.json().addresses);pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);pm.expect(xs.find(x=>x.address_id===pm.collectionVariables.get(\"addressA2\")).is_default).to.eql(true);pm.collectionVariables.set(\"addressBeforeForeignA\",JSON.stringify(xs));});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture B state before foreign-owner attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"snapshot has expected owner state\",()=>{pm.response.to.have.status(200);const xs=canonical(pm.response.json().addresses);pm.expect(xs).to.have.length(0);pm.expect(xs.filter(x=>x.is_default)).to.have.length(0);pm.collectionVariables.set(\"addressBeforeForeignB\",JSON.stringify(xs));});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B remains unchanged after foreign-owner attempts",
           "request": {
             "method": "GET",
             "header": [
@@ -719,13 +990,20 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
-                  "pm.test(\"B remains empty\",()=>pm.expect(pm.response.json().addresses).to.eql([]));"
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"B full Address state unchanged after A-targeted requests\",()=>{pm.response.to.have.status(200);const actual=canonical(pm.response.json().addresses);const expected=JSON.parse(pm.collectionVariables.get(\"addressBeforeForeignB\")||\"null\");pm.expect(expected,\"baseline snapshot missing\").not.to.eql(null);pm.expect(actual).to.eql(expected);pm.expect(actual).to.have.length(0);});"
                 ]
               }
             }
@@ -747,13 +1025,20 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
-                  "const xs=pm.response.json().addresses; pm.test(\"A unchanged by B attempts\",()=>{pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);pm.expect(xs.find(x=>x.address_id===pm.collectionVariables.get(\"addressA2\")).is_default).to.eql(true);});"
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"A full Address state unchanged after B foreign-owner attempts\",()=>{pm.response.to.have.status(200);const actual=canonical(pm.response.json().addresses);const expected=JSON.parse(pm.collectionVariables.get(\"addressBeforeForeignA\")||\"null\");pm.expect(expected,\"baseline snapshot missing\").not.to.eql(null);pm.expect(actual).to.eql(expected);pm.expect(actual).to.have.length(2);});"
                 ]
               }
             }
@@ -780,11 +1065,88 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"owner override rejected\",()=>pm.response.to.have.status(400)); pm.test(\"code and correlation\",()=>{pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\");pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok;});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture A state before invalid-input attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"snapshot has expected owner state\",()=>{pm.response.to.have.status(200);const xs=canonical(pm.response.json().addresses);pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);pm.expect(xs.find(x=>x.address_id===pm.collectionVariables.get(\"addressA2\")).is_default).to.eql(true);pm.collectionVariables.set(\"addressBeforeInvalidA\",JSON.stringify(xs));});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture B state before invalid-input attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"snapshot has expected owner state\",()=>{pm.response.to.have.status(200);const xs=canonical(pm.response.json().addresses);pm.expect(xs).to.have.length(0);pm.expect(xs.filter(x=>x.is_default)).to.have.length(0);pm.collectionVariables.set(\"addressBeforeInvalidB\",JSON.stringify(xs));});"
                 ]
               }
             }
@@ -819,6 +1181,15 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -860,6 +1231,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -900,6 +1280,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -926,13 +1315,54 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"correlation id returned\", function () { pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.be.ok; });",
-                  "const xs=pm.response.json().addresses; pm.test(\"two prior rows still exist; one default\",()=>{pm.expect(xs).to.have.length(2);pm.expect(xs.filter(x=>x.is_default)).to.have.length(1);});"
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"A full Address state unchanged after rejected input and owner override\",()=>{pm.response.to.have.status(200);const actual=canonical(pm.response.json().addresses);const expected=JSON.parse(pm.collectionVariables.get(\"addressBeforeInvalidA\")||\"null\");pm.expect(expected,\"baseline snapshot missing\").not.to.eql(null);pm.expect(actual).to.eql(expected);pm.expect(actual).to.have.length(2);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B remains unchanged after invalid-input attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/addresses"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenB\");if(!runToken)throw new Error(\"Missing run-scoped tokenB; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function canonical(rows){pm.expect(rows).to.be.an(\"array\");return rows.map(x=>{const y={};[\"address_id\",\"label\",\"recipient_name\",\"recipient_phone\",\"address_line\",\"ward_code\",\"is_default\"].forEach(k=>{pm.expect(Object.prototype.hasOwnProperty.call(x,k),\"response omitted \"+k).to.eql(true);y[k]=x[k];});return y;}).sort((a,b)=>a.address_id.localeCompare(b.address_id));}\npm.test(\"B full Address state unchanged after attempted owner override\",()=>{pm.response.to.have.status(200);const actual=canonical(pm.response.json().addresses);const expected=JSON.parse(pm.collectionVariables.get(\"addressBeforeInvalidB\")||\"null\");pm.expect(expected,\"baseline snapshot missing\").not.to.eql(null);pm.expect(actual).to.eql(expected);pm.expect(actual).to.have.length(0);});"
                 ]
               }
             }
@@ -958,6 +1388,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -985,6 +1424,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -1010,6 +1458,15 @@
             "description": "Local Identity service; no API Gateway."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const runToken=pm.collectionVariables.get(\"tokenA\");if(!runToken)throw new Error(\"Missing run-scoped tokenA; run Login A/B first.\");pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+runToken});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {

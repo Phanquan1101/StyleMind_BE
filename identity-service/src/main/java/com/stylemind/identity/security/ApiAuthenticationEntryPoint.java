@@ -36,7 +36,8 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
         String requestUri = request.getRequestURI();
         if ("/api/v1/auth/login".equals(requestUri)
                 || "/api/v1/auth/refresh".equals(requestUri)
-                || "/api/v1/auth/logout".equals(requestUri)) {
+                || "/api/v1/auth/logout".equals(requestUri)
+                || isManageUsersEndpoint(request)) {
             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         }
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
@@ -44,5 +45,11 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         objectMapper.writeValue(response.getOutputStream(),
                 ApiProblemDetails.create(status, status.getReasonPhrase(), detail, code, request));
+    }
+
+    private boolean isManageUsersEndpoint(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return "/api/v1/admin/users".equals(path) || path.startsWith("/api/v1/admin/users/")
+                || request.getRequestURI().startsWith("/api/v1/admin/users");
     }
 }

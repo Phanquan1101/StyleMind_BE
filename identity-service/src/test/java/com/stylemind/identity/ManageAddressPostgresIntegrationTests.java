@@ -3,7 +3,8 @@ package com.stylemind.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.reset;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,6 +15,7 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.stylemind.identity.repository.AddressRepository;
+import com.stylemind.identity.service.ManageAddressService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -69,10 +71,12 @@ class ManageAddressPostgresIntegrationTests {
     @Autowired private ObjectMapper mapper;
     @LocalServerPort private int port;
     @MockitoSpyBean private AddressRepository repository;
+    @MockitoSpyBean private ManageAddressService addressService;
 
     @BeforeEach
     void clearDisposableAddressRows() {
         reset(repository);
+        reset(addressService);
         jdbc.update("DELETE FROM public.customer_address");
     }
 
@@ -174,6 +178,95 @@ class ManageAddressPostgresIntegrationTests {
     }
 
     @Test
+    void headUsesTheSameRoleAndAuthenticationGateAsGet() throws Exception {
+        UUID owner = account("CUSTOMER");
+        UUID other = account("CUSTOMER");
+        UUID addressId = rawAddress(owner, true, "Head");
+        String customer = token(owner, "CUSTOMER");
+        String admin = token(owner, "ADMIN");
+        String otherCustomer = token(other, "CUSTOMER");
+        String unsupportedRole = token(owner, "STYLIST");
+        String valid = token(owner, "CUSTOMER");
+        String[] parts = valid.split("\\.");
+        parts[2] = (parts[2].charAt(0) == 'A' ? "B" : "A") + parts[2].substring(1);
+        String badSignature = String.join(".", parts);
+        String expired = token(owner, "CUSTOMER", JwtTestSupport.ISSUER, JwtTestSupport.AUDIENCE,
+                Instant.now().minusSeconds(1));
+        String ownerStateBefore = state(owner);
+        List<String> paths = List.of(ADDRESSES, ADDRESSES + "/" + addressId,
+                "/api/v1/locations/provinces", "/api/v1/locations/provinces/01/wards");
+
+        clearInvocations(addressService);
+        AtomicInteger unsupportedRoleHandlerCalls = new AtomicInteger();
+        doAnswer(invocation -> { unsupportedRoleHandlerCalls.incrementAndGet(); return invocation.callRealMethod(); })
+                .when(addressService).list(org.mockito.ArgumentMatchers.any());
+        doAnswer(invocation -> { unsupportedRoleHandlerCalls.incrementAndGet(); return invocation.callRealMethod(); })
+                .when(addressService).get(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        doAnswer(invocation -> { unsupportedRoleHandlerCalls.incrementAndGet(); return invocation.callRealMethod(); })
+                .when(addressService).provinces();
+        doAnswer(invocation -> { unsupportedRoleHandlerCalls.incrementAndGet(); return invocation.callRealMethod(); })
+                .when(addressService).wards(org.mockito.ArgumentMatchers.any());
+        List<String> unsupportedRoleResults = new java.util.ArrayList<>();
+        for (String path : paths) {
+            assertThat(sendHead(path, null).statusCode()).as("missing JWT HEAD %s", path).isEqualTo(401);
+            assertThat(sendHead(path, "not-a-jwt").statusCode()).as("malformed JWT HEAD %s", path).isEqualTo(401);
+            assertThat(sendHead(path, badSignature).statusCode()).as("bad signature HEAD %s", path).isEqualTo(401);
+            assertThat(sendHead(path, expired).statusCode()).as("expired JWT HEAD %s", path).isEqualTo(401);
+            unsupportedRoleResults.add(path + "=" + sendHead(path, unsupportedRole).statusCode());
+        }
+        assertThat(unsupportedRoleResults).as("unsupported-role HEAD outcomes; Address handler calls="
+                + unsupportedRoleHandlerCalls.get()).containsOnly(paths.stream().map(path -> path + "=403").toArray(String[]::new));
+        assertThat(unsupportedRoleHandlerCalls).as("unsupported role must not reach a business handler").hasValue(0);
+        verifyNoInteractions(addressService);
+
+        for (String path : paths) {
+            assertThat(sendHead(path, customer).statusCode()).as("CUSTOMER HEAD %s", path).isEqualTo(200);
+            assertThat(sendHead(path, admin).statusCode()).as("ADMIN HEAD %s", path).isEqualTo(200);
+        }
+        assertThat(sendHead(ADDRESSES + "/" + addressId, otherCustomer).statusCode())
+                .as("CUSTOMER HEAD respects resource ownership").isEqualTo(404);
+        assertThat(send("GET", ADDRESSES + "/" + addressId, otherCustomer, null).statusCode())
+                .as("HEAD ownership outcome matches GET").isEqualTo(404);
+        assertThat(state(owner)).as("HEAD requests do not mutate Address rows").isEqualTo(ownerStateBefore);
+        assertThat(count(owner)).isEqualTo(1);
+        assertThat(defaultCount(owner)).isEqualTo(1);
+    }
+
+    @Test
+    void unsupportedMethodAndOptionsKeepFrameworkAndCorsBehavior() throws Exception {
+        UUID owner = account("CUSTOMER");
+        String customer = token(owner, "CUSTOMER");
+        clearInvocations(addressService);
+
+        HttpResponse<String> unsupported = send("PATCH", "/api/v1/locations/provinces", customer, "{}");
+        assertThat(unsupported.statusCode()).isEqualTo(405);
+        assertThat(send("PATCH", "/api/v1/locations/provinces", null, "{}").statusCode()).isEqualTo(401);
+
+        HttpRequest optionsRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
+                        + "/api/v1/locations/provinces"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Authorization", "Bearer " + customer)
+                .header("Origin", "https://postman.example.test")
+                .header("Access-Control-Request-Method", "GET")
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build();
+        HttpResponse<String> options = HttpClient.newHttpClient().send(optionsRequest,
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(options.statusCode()).isEqualTo(403);
+        assertThat(options.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
+        HttpRequest unauthenticatedOptionsRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
+                        + "/api/v1/locations/provinces"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Origin", "https://postman.example.test")
+                .header("Access-Control-Request-Method", "GET")
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build();
+        HttpResponse<String> unauthenticatedOptions = HttpClient.newHttpClient().send(unauthenticatedOptionsRequest,
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(unauthenticatedOptions.statusCode()).isEqualTo(401);
+        assertThat(unauthenticatedOptions.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
+        verifyNoInteractions(addressService);
+    }
+
+    @Test
     void rejectsMalformedAndSensitivePayloadsWithoutChangingRowsAndProvidesAuthenticatedLookups() throws Exception {
         UUID owner = account("CUSTOMER");
         String bearer = token(owner, "CUSTOMER");
@@ -250,32 +343,15 @@ class ManageAddressPostgresIntegrationTests {
     void concurrentFirstCreatesSerializeOnTheDatabaseOwnerRow() throws Exception {
         UUID owner = account("CUSTOMER");
         String bearer = token(owner, "CUSTOMER");
-        CountDownLatch firstHasOwnerLock = new CountDownLatch(1);
-        CountDownLatch allowFirstToContinue = new CountDownLatch(1);
-        AtomicInteger reads = new AtomicInteger();
-        doAnswer(invocation -> {
-            if (reads.incrementAndGet() == 1) {
-                firstHasOwnerLock.countDown();
-                if (!allowFirstToContinue.await(10, TimeUnit.SECONDS)) {
-                    throw new AssertionError("Test did not release the address transaction");
-                }
-            }
-            return invocation.callRealMethod();
-        }).when(repository).findAll(eq(owner));
-        CompletableFuture<HttpResponse<String>> a = CompletableFuture.supplyAsync(() -> uncheckedSend("POST", ADDRESSES,
-                bearer, body("A", "A", "0912345678", "A", null)));
-        assertThat(firstHasOwnerLock.await(10, TimeUnit.SECONDS)).isTrue();
-        CompletableFuture<HttpResponse<String>> b = CompletableFuture.supplyAsync(() -> uncheckedSend("POST", ADDRESSES,
-                bearer, body("B", "B", "0912345678", "B", null)));
-        try {
-            awaitOwnerRowLockWait();
-        } finally {
-            allowFirstToContinue.countDown();
-        }
-        assertThat(a.get(20, TimeUnit.SECONDS).statusCode()).isEqualTo(201);
-        assertThat(b.get(20, TimeUnit.SECONDS).statusCode()).isEqualTo(201);
+        RaceResult race = runContendedPair(bearer, "POST", ADDRESSES, body("A", "A", "0912345678", "A", null),
+                "POST", ADDRESSES, body("B", "B", "0912345678", "B", null));
+        assertThat(race.a().statusCode()).isEqualTo(201);
+        assertThat(race.b().statusCode()).isEqualTo(201);
+        assertThat(json(race.a()).path("is_default").asBoolean()
+                ^ json(race.b()).path("is_default").asBoolean()).isTrue();
         assertThat(count(owner)).isEqualTo(2);
         assertThat(defaultCount(owner)).isEqualTo(1);
+        assertThat(addressIds(owner)).hasSize(2);
     }
 
     @Test
@@ -284,20 +360,30 @@ class ManageAddressPostgresIntegrationTests {
         String bearer = token(owner, "CUSTOMER");
         UUID first = create(owner, bearer, "A");
         UUID second = create(owner, bearer, "B");
-        runPair(bearer, "PUT", ADDRESSES + "/" + first + "/default", null,
+        RaceResult defaults = runContendedPair(bearer, "PUT", ADDRESSES + "/" + first + "/default", null,
                 "PUT", ADDRESSES + "/" + second + "/default", null);
+        assertThat(defaults.a().statusCode()).isEqualTo(200);
+        assertThat(defaults.b().statusCode()).isEqualTo(200);
+        assertThat(json(defaults.a()).path("is_default").asBoolean()).isTrue();
+        assertThat(json(defaults.b()).path("is_default").asBoolean()).isTrue();
         assertThat(defaultCount(owner)).isEqualTo(1);
         assertThat(count(owner)).isEqualTo(2);
+        assertThat(addressIds(owner)).containsExactlyInAnyOrder(first, second);
 
         // Race deletion of current default with selecting its alternative. Either serial order is valid.
         UUID current = defaultAddress(owner);
         UUID alternative = current.equals(first) ? second : first;
-        var result = runPair(bearer, "DELETE", ADDRESSES + "/" + current, null,
+        RaceResult deletion = runContendedPair(bearer, "DELETE", ADDRESSES + "/" + current, null,
                 "PUT", ADDRESSES + "/" + alternative + "/default", null);
-        assertThat(List.of(204, 409)).contains(result[0]);
-        assertThat(result[1]).isEqualTo(200);
+        assertThat(List.of(204, 409)).contains(deletion.a().statusCode());
+        assertThat(deletion.b().statusCode()).isEqualTo(200);
+        assertThat(json(deletion.b()).path("is_default").asBoolean()).isTrue();
         assertThat(defaultCount(owner)).isEqualTo(1);
-        assertThat(count(owner)).isGreaterThanOrEqualTo(1);
+        if (deletion.a().statusCode() == 204) {
+            assertThat(addressIds(owner)).containsExactly(alternative);
+        } else {
+            assertThat(addressIds(owner)).containsExactlyInAnyOrder(current, alternative);
+        }
     }
 
     @Test
@@ -306,21 +392,36 @@ class ManageAddressPostgresIntegrationTests {
         String bearer = token(owner, "CUSTOMER");
         UUID first = create(owner, bearer, "A");
         UUID second = create(owner, bearer, "B");
-        var result = runPair(bearer, "PATCH", ADDRESSES + "/" + second, "{\"label\":\"Updated\"}",
+        String firstBefore = addressState(owner, first);
+        RaceResult patchDelete = runContendedPair(bearer, "PATCH", ADDRESSES + "/" + second,
+                "{\"label\":\"Updated\"}",
                 "DELETE", ADDRESSES + "/" + second, null);
-        assertThat(List.of(200, 404)).contains(result[0]);
-        assertThat(result[1]).isEqualTo(204);
+        assertThat(List.of(200, 404)).contains(patchDelete.a().statusCode());
+        assertThat(patchDelete.b().statusCode()).isEqualTo(204);
         assertThat(send("GET", ADDRESSES + "/" + second, bearer, null).statusCode()).isEqualTo(404);
+        assertThat(addressIds(owner)).containsExactly(first);
+        assertThat(addressState(owner, first)).isEqualTo(firstBefore);
         assertThat(defaultCount(owner)).isEqualTo(1);
 
         UUID remainingDefault = defaultAddress(owner);
         String createBody = body(null, "C", "0912345678", "C", null);
-        var deleteCreate = runPair(bearer, "DELETE", ADDRESSES + "/" + remainingDefault, null,
+        String remainingBefore = addressState(owner, remainingDefault);
+        RaceResult deleteCreate = runContendedPair(bearer, "DELETE", ADDRESSES + "/" + remainingDefault, null,
                 "POST", ADDRESSES, createBody);
-        assertThat(List.of(204, 409)).contains(deleteCreate[0]);
-        assertThat(deleteCreate[1]).isEqualTo(201);
+        assertThat(List.of(204, 409)).contains(deleteCreate.a().statusCode());
+        assertThat(deleteCreate.b().statusCode()).isEqualTo(201);
+        UUID created = UUID.fromString(json(deleteCreate.b()).path("address_id").asText());
         assertThat(defaultCount(owner)).isEqualTo(1);
-        assertThat(count(owner)).isBetween(1, 2);
+        if (deleteCreate.a().statusCode() == 204) {
+            assertThat(count(owner)).isEqualTo(1);
+            assertThat(addressIds(owner)).containsExactly(created);
+            assertThat(addressState(owner, created)).contains(":true");
+        } else {
+            assertThat(count(owner)).isEqualTo(2);
+            assertThat(addressIds(owner)).containsExactlyInAnyOrder(remainingDefault, created);
+            assertThat(addressState(owner, remainingDefault)).isEqualTo(remainingBefore);
+            assertThat(addressState(owner, created)).contains(":false");
+        }
         assertThat(first).isNotEqualTo(second);
     }
 
@@ -357,39 +458,51 @@ class ManageAddressPostgresIntegrationTests {
         assertThat(send("GET", ADDRESSES, tampered, null).statusCode()).isEqualTo(401);
     }
 
-    private CompletableFuture<HttpResponse<String>> concurrentPost(String bearer, String label,
-            CountDownLatch ready, CountDownLatch start) {
-        return CompletableFuture.supplyAsync(() -> {
-            ready.countDown();
-            try {
-                if (!start.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("start barrier timeout");
-                return send("POST", ADDRESSES, bearer, body(label, "A", "0912345678", label, null));
-            } catch (Exception exception) { throw new RuntimeException(exception); }
-        });
-    }
-
-    private void awaitOwnerRowLockWait() throws Exception {
+    private int awaitOwnerRowLockWait() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
             Integer waiting = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity "
-                    + "WHERE datname = current_database() AND state = 'active' AND wait_event_type = 'Lock' "
+                    + "WHERE pid <> pg_backend_pid() AND datname = current_database() "
+                    + "AND state = 'active' AND wait_event_type = 'Lock' "
                     + "AND query ILIKE '%public.account%' AND query ILIKE '%FOR UPDATE%'", Integer.class);
-            if (waiting != null && waiting > 0) return;
+            if (waiting != null && waiting > 0) return waiting;
             Thread.sleep(10);
         }
         throw new AssertionError("Second write did not wait for the PostgreSQL owner row lock");
     }
 
-    private int[] runPair(String bearer, String methodA, String pathA, String bodyA,
+    private RaceResult runContendedPair(String bearer, String methodA, String pathA, String bodyA,
             String methodB, String pathB, String bodyB) throws Exception {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch transactionHoldingOwnerLock = new CountDownLatch(1);
+        CountDownLatch releaseTransaction = new CountDownLatch(1);
+        AtomicInteger findAllCalls = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (findAllCalls.incrementAndGet() == 1) {
+                transactionHoldingOwnerLock.countDown();
+                if (!releaseTransaction.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting to release the first address transaction");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(repository).findAll(org.mockito.ArgumentMatchers.any());
         CompletableFuture<HttpResponse<String>> a = concurrentRequest(bearer, methodA, pathA, bodyA, ready, start);
         CompletableFuture<HttpResponse<String>> b = concurrentRequest(bearer, methodB, pathB, bodyB, ready, start);
-        assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
-        start.countDown();
-        return new int[] {a.get(20, TimeUnit.SECONDS).statusCode(), b.get(20, TimeUnit.SECONDS).statusCode()};
+        try {
+            assertThat(ready.await(5, TimeUnit.SECONDS)).as("both requests reach the start barrier").isTrue();
+            start.countDown();
+            assertThat(transactionHoldingOwnerLock.await(10, TimeUnit.SECONDS))
+                    .as("one transaction holds the owner lock before reading addresses").isTrue();
+            assertThat(awaitOwnerRowLockWait()).as("PostgreSQL reports the competing transaction waiting").isGreaterThan(0);
+        } finally {
+            start.countDown();
+            releaseTransaction.countDown();
+        }
+        return new RaceResult(a.get(20, TimeUnit.SECONDS), b.get(20, TimeUnit.SECONDS));
     }
+
+    private record RaceResult(HttpResponse<String> a, HttpResponse<String> b) { }
 
     private CompletableFuture<HttpResponse<String>> concurrentRequest(String bearer, String method, String path,
             String body, CountDownLatch ready, CountDownLatch start) {
@@ -413,6 +526,18 @@ class ManageAddressPostgresIntegrationTests {
                 + " || ':' || recipient_phone || ':' || address_line || ':' || coalesce(ward_code,'<null>')"
                 + " || ':' || is_default FROM public.customer_address WHERE account_id = ? ORDER BY address_id",
                 (rs, row) -> rs.getString(1), owner));
+    }
+
+    private String addressState(UUID owner, UUID addressId) {
+        return jdbc.queryForObject("SELECT address_id || ':' || coalesce(label,'<null>') || ':' || recipient_name"
+                + " || ':' || recipient_phone || ':' || address_line || ':' || coalesce(ward_code,'<null>')"
+                + " || ':' || is_default FROM public.customer_address WHERE account_id = ? AND address_id = ?",
+                String.class, owner, addressId);
+    }
+
+    private List<UUID> addressIds(UUID owner) {
+        return jdbc.query("SELECT address_id FROM public.customer_address WHERE account_id = ? ORDER BY address_id",
+                (rs, row) -> rs.getObject(1, UUID.class), owner);
     }
 
     private int count(UUID owner) {
@@ -485,6 +610,15 @@ class ManageAddressPostgresIntegrationTests {
     private HttpResponse<String> send(String method, String path, String bearer, String body) throws Exception {
         return send(method, path, bearer, body, "");
     }
+
+    private HttpResponse<String> sendHead(String path, String bearer) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(Duration.ofSeconds(20)).header("X-Correlation-Id", "address-head-test-" + UUID.randomUUID());
+        if (bearer != null) request.header("Authorization", "Bearer " + bearer);
+        return HttpClient.newHttpClient().send(request.method("HEAD", HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> send(String method, String path, String bearer, String body, String query) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path + query))
                 .timeout(Duration.ofSeconds(20)).header("X-Correlation-Id", "address-test-" + UUID.randomUUID());

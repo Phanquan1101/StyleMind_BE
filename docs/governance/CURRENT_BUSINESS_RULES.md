@@ -81,6 +81,21 @@ This approval is scoped to US-02.05. Historical `OPEN-*` entries retain their or
 - Lookup uses a pinned local projection of the Vietnam administrative dataset; no runtime network lookup, map/geocoding, address rewriting or automatic code remapping. Do not send email/SMS/OTP, verify phone ownership, call Commerce/Order, add deduplication/idempotency, soft deletion, history or audit data. Identical POST content may create separate addresses.
 - Address responses expose only address response fields, include nullable values, and use `Cache-Control: no-store`. Do not log address/phone values or secrets. The exact implementation contract and local verification state are in [the US-02.06 contract](../planning/identity/US-02.06_MANAGE_ADDRESSES_CONTRACT.md) and [implementation report](../qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md). These rules are scoped to this story and do not close unrelated `OPEN-*` decisions.
 
+## Manage Users — US-02.07
+
+**CONFIRMED owner rules from the explicit US-02.07 approval:**
+
+- Manage Users consists only of `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/{account_id}/status`, and `PUT /api/v1/admin/users/{account_id}/roles`, backed by Identity `account` and `account_role`; no migration or cross-service read is added.
+- Every route requires a valid JWT with `ROLE_ADMIN` and a live actor account that still exists, is `ACTIVE`, verified, and currently has `ADMIN` in the database. This live-state check is scoped only to these routes.
+- Listing supports status/role/email filters and bounded stable pagination. Responses expose safe account fields and the complete role set, never password hash, session/token hash, challenge or profile/address data.
+- Admin status writes only support `ACTIVE` ↔ `SUSPENDED`; no other lifecycle state or verification timestamp can be changed. Reactivation requires an already verified account. Suspension does not delete data or revoke sessions.
+- Role replacement is a nonempty complete set of `CUSTOMER` and/or `ADMIN`; both may coexist. No public role assignment or role hierarchy is added.
+- Actual changes to the caller’s own status/roles are rejected; no-op self requests are allowed without writes. Suspending or removing the role from the last qualifying Admin is prevented. Writes serialize across Identity instances before rechecking actor/target state and applying the guard.
+- Status/role changes do not revoke refresh sessions. Login/Refresh continue to check current database state/roles; old access JWTs remain valid until `exp`, while Manage Users rechecks its actor live.
+- First Admin provisioning is operator-controlled only. This task does not provision an Admin in persistent local data.
+
+The complete owner-approved contract and local verification evidence are in [US-02.07 contract](../planning/identity/US-02.07_MANAGE_USERS_CONTRACT.md) and [implementation report](../qa/identity-users/US-02.07_IMPLEMENTATION_REPORT.md). This scope does not settle unrelated decisions.
+
 ## Notification delivery contract
 
 **CONFIRMED owner rules:**
