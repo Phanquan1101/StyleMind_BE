@@ -39,6 +39,17 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
                         .requestMatchers("/api/v1/me", "/api/v1/me/style-profile")
                         .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/me/addresses", "/api/v1/me/addresses/*",
+                                "/api/v1/locations/provinces", "/api/v1/locations/provinces/*/wards")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/me/addresses")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/me/addresses/*")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/me/addresses/*/default")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/me/addresses/*")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions

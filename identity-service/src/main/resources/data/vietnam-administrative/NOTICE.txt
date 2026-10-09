@@ -1,0 +1,15 @@
+Dataset provenance for US-02.06
+
+Dataset: vietnamese-provinces-database v5.2.0
+Pinned tag commit: 62b1abdfe39625289c37a58ef6678e9db3d37f84
+Source: https://github.com/thanglequoc/vietnamese-provinces-database/tree/v5.2.0
+Source JSON: json/full_json_generated_data_vn_units.json
+Source SHA-256: 965C9A2AD85481E18ED2464FD87666EDA311856B86A72A87F1130C27376B8D2F
+Metadata SHA-256: 14F7815413702837918E9AA0961308B072E0D75B2BDF5B5865FC4A23CDD8EDA4
+Projected resource: locations-v5.2.0.json
+Projection SHA-256: FD77C4DC52FE2BDAFB900CB8230EB46BDB253F64CD9132738629CF916723772B
+License: MIT; see LICENSE (source license SHA-256 0173D3551F805EE7FABAD1948B1219E79DCA42F5F93A1B07D4F9A12F9CBFB8DA).
+
+The checked-in projection contains only province code/full name and ward code/full name/province code, plus dataset metadata. No source scripts are included or executed. Startup loads this classpath resource only and fails fast on malformed data. It never calls the source repository or a live administrative API.
+
+The upstream README traces the administrative data to the National Statistics Office. The dataset metadata identifies decree 388/NQ-UBTVQH16 and was generated 2026-09-20, when the v5.2.0 release was current for the effective date used in this implementation.

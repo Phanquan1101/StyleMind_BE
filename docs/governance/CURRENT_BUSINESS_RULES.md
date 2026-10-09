@@ -70,6 +70,17 @@ V3 was explicitly approved, and the owner separately approved the reset transact
 
 This approval is scoped to US-02.05. Historical `OPEN-*` entries retain their original archival meaning; this rule set does not globally close or rewrite unrelated questions. See the [US-02.05 implementation report](../qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md) for local verification evidence when complete.
 
+## Manage Addresses — US-02.06
+
+**CONFIRMED owner rules from the US-02.06 implementation instruction:**
+
+- All eight Address/location APIs require a valid JWT with `CUSTOMER` or `ADMIN`. Address ownership is self-only and comes exclusively from JWT `sub`; both roles are self-only. A missing subject account returns 404. A foreign or missing address shares `404 RESOURCE_NOT_FOUND`. Do not add a new account-status gate.
+- Use only the existing `public.customer_address` columns from V1. Do not add or edit migrations/schema. Every write locks the matching `public.account` row first, checks the current owner state, and applies changes in one database transaction. Account with no addresses has no default; first created address is default, later addresses are not. Writes through this service preserve exactly one default while addresses exist. This is an application invariant only, not a database constraint and not protection against direct SQL/other writers. Do not repair anomalous legacy data.
+- POST and PATCH accept only `label`, `recipient_name`, `recipient_phone`, `address_line`, `ward_code`. PATCH merges supplied fields after the owner lock; omitted fields stay unchanged, explicit null clears only `label`/`ward_code`, and `{}` is invalid. Owner/default/role/status fields and all unknown properties are rejected. Phone is validated as a Vietnamese number and stored as E.164. Supplied ward codes must be exact strings from the pinned local directory; codes remain strings. Address text is Unicode-trimmed and bounded by the story contract.
+- `GET /api/v1/me/addresses` sorts default first then UUID; detail is owner-scoped. `POST` returns 201/Location. `PUT /api/v1/me/addresses/{address_id}/default` atomically switches the default and is repeatable. Deleting a default with alternatives returns `409 DEFAULT_ADDRESS_CHANGE_REQUIRED`; deletion never silently selects a replacement. Deleting a non-default or the sole address is allowed.
+- Lookup uses a pinned local projection of the Vietnam administrative dataset; no runtime network lookup, map/geocoding, address rewriting or automatic code remapping. Do not send email/SMS/OTP, verify phone ownership, call Commerce/Order, add deduplication/idempotency, soft deletion, history or audit data. Identical POST content may create separate addresses.
+- Address responses expose only address response fields, include nullable values, and use `Cache-Control: no-store`. Do not log address/phone values or secrets. The exact implementation contract and local verification state are in [the US-02.06 contract](../planning/identity/US-02.06_MANAGE_ADDRESSES_CONTRACT.md) and [implementation report](../qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md). These rules are scoped to this story and do not close unrelated `OPEN-*` decisions.
+
 ## Notification delivery contract
 
 **CONFIRMED owner rules:**

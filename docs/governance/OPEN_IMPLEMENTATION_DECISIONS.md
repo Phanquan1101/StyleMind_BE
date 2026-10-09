@@ -12,7 +12,11 @@ Approved validation uses Unicode trimming/code-point limits for names and free-f
 
 The approved aggregate write contract locks `account` first, then upserts and replaces all preference rows in one transaction; GET style uses a consistent read snapshot. Concurrent writes serialize with last serialized writer wins. Local implementation and verification evidence is recorded in [the implementation report](../qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md). Historical `OPEN-035/036/037/038/046/051` identifiers and archived records are retained unchanged; this US-scoped approval is not a global closure of those historical questions.
 
-## Current cross-story decisions — not US-02.05 blockers
+## US-02.06 — Manage Addresses
+
+The owner provided a story-specific implementation contract for US-02.06. It authorizes the existing `customer_address` table only, self-only JWT-sub ownership for CUSTOMER/ADMIN, account-row locking for writes, the default-address rules, the eight API routes, request validation, pinned local Vietnam administrative data, and Vietnamese phone validation. The full behavior is captured in [the US-02.06 contract](../planning/identity/US-02.06_MANAGE_ADDRESSES_CONTRACT.md). This approval adds no migration/schema and does not close or reinterpret other open decisions. Current verification and any remaining gates are recorded in [the implementation report](../qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md).
+
+## Current cross-story decisions — not US-02.05 or US-02.06 blockers
 
 - Cancellation of an already-paid Order when current model excludes refund, and handling late/mismatched/duplicate payment exceptions remain TBD under the current owner scope. Historical references include `OPEN-018`, `OPEN-019` and `OPEN-021`; see [the archived register](../archive/legacy-baseline/20261008T0855Z/docs/discovery/06_OPEN_QUESTIONS.md). A cancellation record does not itself authorize changing Order state or moving money.
 - Production database topology, key provisioning/rotation, service authentication, abuse controls and email delivery provider/operations remain TBD. Local Mailpit and owner-provided workstation SMTP configuration are not production approval or external-delivery evidence. No identifier is added for these questions.

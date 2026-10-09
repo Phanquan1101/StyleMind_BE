@@ -89,7 +89,7 @@ public class ApiExceptionHandler {
             problem.setProperty("next_action", "RESEND_EMAIL_VERIFICATION");
         }
         ResponseEntity.BodyBuilder response = ResponseEntity.status(exception.status());
-        if (isTokenEndpoint(request)) {
+        if (isTokenEndpoint(request) || isAddressEndpoint(request)) {
             response.header("Cache-Control", "no-store");
         }
         if (exception.retryAfterSeconds() > 0) {
@@ -118,7 +118,7 @@ public class ApiExceptionHandler {
             String code,
             HttpServletRequest request) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
-        if (isTokenEndpoint(request)) {
+        if (isTokenEndpoint(request) || isAddressEndpoint(request)) {
             response.header("Cache-Control", "no-store");
         }
         return response.body(ApiProblemDetails.create(status, title, detail, code, request));
@@ -132,5 +132,11 @@ public class ApiExceptionHandler {
                 || "/api/v1/auth/forgot-password".equals(requestUri)
                 || "/api/v1/auth/verify-password-reset".equals(requestUri)
                 || "/api/v1/auth/reset-password".equals(requestUri);
+    }
+
+    private boolean isAddressEndpoint(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        return requestUri.startsWith("/api/v1/me/addresses")
+                || requestUri.startsWith("/api/v1/locations/");
     }
 }

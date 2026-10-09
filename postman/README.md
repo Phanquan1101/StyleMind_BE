@@ -1,5 +1,15 @@
 # Manage Profile Postman Guide
 
+## Manage Addresses — US-02.06
+
+Import [the Manage Addresses Collection v2.1](StyleMind-Identity-Manage-Addresses.postman_collection.json) and use the existing [local example environment](StyleMind-Local.postman_environment.example.json). The collection calls Identity directly at `http://localhost:8081`; the repository has no API Gateway. It exercises the eight US-02.06 routes, real Login for A/B, pinned province/ward lookup, default-address transitions, validation, no-store responses, owner isolation and cleanup of only IDs created by that run.
+
+For Address runs, `emailA` and `emailB` must be two distinct, verified, dedicated local CUSTOMER accounts whose Address list is empty. The collection stops after the first preflight if the accounts are not distinct/empty. Do not use a personal account or delete existing addresses to satisfy this precondition. Fill `passwordA` and `passwordB` in Postman's local environment only; the shared example keeps them blank. Login is performed at run time. Access tokens and account IDs exist only in collection variables during the current run; never export a populated collection/environment.
+
+Run collection folders in order. Folder 02 chooses the first province and a ward from the live response returned by the pinned local dataset. Folder 03 creates A1/A2, reads and patches A2, switches default, proves deleting a default with alternatives conflicts without mutation, then deletes the two IDs created by this run and checks the list is empty. Folders 04–05 can be run before cleanup to exercise A/B and negative inputs. Folder 07 checks missing/malformed authentication. Do not run cleanup against any IDs except the collection variables set by this run. If a token expires, start a new run so Login supplies fresh tokens.
+
+The collection does not register or verify accounts, invent OTPs, call email, issue SQL cleanup, or use a gateway. It calls the existing authenticated GET /api/v1/me once for each account to prove their account IDs differ; Identity still verifies each signed token on every API call. Collection schema/script validation is a structural check; it is not proof of runtime HTTP success. The Postman collection is separate from Java Testcontainers/HTTP verification, whose result is recorded in the [US-02.06 implementation report](../docs/qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md).
+
 This importable Postman Collection v2.1 exercises the approved local Identity Manage Profile contract. The local repository has no API Gateway: use the Identity service at http://localhost:8081, not port 8080.
 
 ## Import and configure

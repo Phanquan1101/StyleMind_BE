@@ -1,10 +1,10 @@
-# Identity — EP-02 / Register, Login, Refresh/Logout and Forgot Password
+# Identity — EP-02 / Register, Login, Refresh/Logout, Forgot Password and Profile
 
 US-02.01 Register, US-02.02 Login, US-02.03 Refresh/Logout, US-02.04 Forgot Password, and US-02.05 Manage Profile are implemented in this repository's local Identity scope. Register includes transactional account/role/challenge creation, SMTP email verification, resend limits, expiry, temporary OTP lockout, and PostgreSQL-backed integration tests. Login validates credentials and eligibility, signs access JWTs, and stores opaque refresh-token digests in `refresh_session`. Refresh rotates one refresh session at a time; Logout idempotently revokes only the session identified by its supplied refresh token. Forgot Password uses a separate challenge and changes the password transactionally with revocation of all active refresh sessions. Manage Profile reads and updates only the JWT-subject account using existing V1 tables. This is local scope evidence, not a production-readiness claim.
 
 ## Status and scope
 
-The implementation and local verification status for US-02.01–US-02.04 is supported by the [Identity release audit](../docs/qa/identity-audit/20261008T1144-0700/IDENTITY_RELEASE_READINESS_AUDIT.md) and [follow-up](../docs/qa/identity-audit/20261008T1144-0700/IDENTITY_AUDIT_FOLLOW_UP.md). US-02.05 Manage Profile follows the owner's explicit A/B/C approval and its verification evidence is in the [implementation report](../docs/qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md). This is local evidence, not a production-readiness sign-off. The supplied workbook still records the EP-02 rows as `To Do` and was not changed. US-02.06 Manage Addresses and US-02.07 Manage Users are outside this change; EP-02 must not be reported complete.
+The implementation and local verification status for US-02.01–US-02.04 is supported by the [Identity release audit](../docs/qa/identity-audit/20261008T1144-0700/IDENTITY_RELEASE_READINESS_AUDIT.md) and [follow-up](../docs/qa/identity-audit/20261008T1144-0700/IDENTITY_AUDIT_FOLLOW_UP.md). US-02.05 Manage Profile follows the owner's explicit A/B/C approval and its verification evidence is in the [implementation report](../docs/qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md). US-02.06 Manage Addresses is **DONE in local scope** from the story-specific owner contract; see the [contract](../docs/planning/identity/US-02.06_MANAGE_ADDRESSES_CONTRACT.md), [Postman collection](../postman/StyleMind-Identity-Manage-Addresses.postman_collection.json), [Postman run guide](../postman/README.md#manage-addresses--us-0206) and [implementation report](../docs/qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md). The supplied workbook still records the EP-02 rows as `To Do` and is not changed. US-02.07 Manage Users is outside this scope; EP-02 must not be reported complete.
 
 The current decision labels and open profile questions are maintained in the [project context](../docs/governance/CURRENT_PROJECT_CONTEXT.md), [business rules](../docs/governance/CURRENT_BUSINESS_RULES.md) and [open implementation decisions](../docs/governance/OPEN_IMPLEMENTATION_DECISIONS.md). This README describes the current local implementation contract; the source of approval is the project owner's explicit instruction history, not code behavior alone.
 
@@ -38,6 +38,23 @@ All four profile routes require a valid bearer JWT with `CUSTOMER` or `ADMIN` au
 Fit/style/color codes are syntax-validated using `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`, trimmed and stored uppercase; no finite vocabulary is defined. Height is an exact decimal number from 50 through 250 cm with at most one fractional digit. Optional size labels are trimmed free-form text of 1–32 code points. Each collection allows up to 50 unique values. Unknown fields, wrong JSON types, omitted required fields and canonical duplicates are rejected with `400 INVALID_REQUEST`.
 
 Brand preferences accept hyphenated UUIDs and are stored in `profile_brand.brand_id` as logical Commerce references only. Identity does not call Commerce or verify that a UUID exists or is active. Valid syntax is not existence verification. Profile APIs use existing V1 tables only; no migration or cross-service FK is added. Writes lock the account row first, serialize concurrent updates, and replace all style collections in one transaction. Register does not create profile placeholders.
+
+### Manage Addresses — US-02.06
+
+The Address API is implemented in local scope under the explicit US-02.06 contract. All routes require a signed JWT with `CUSTOMER` or `ADMIN`; Address ownership is always the JWT `sub` and remains self-only for both roles. Identity uses the existing `public.customer_address` table only. It does not add a migration or schema object. Address writes lock the owning `public.account` row and update under one transaction. The unique-default behavior is an application invariant for writes through this service, not a database constraint and not protection from direct SQL or another writer.
+
+| Route | Behavior |
+| --- | --- |
+| `GET /api/v1/me/addresses` | Owner-only list, default first then UUID. |
+| `GET /api/v1/me/addresses/{address_id}` | Owner-only detail; foreign and missing addresses share 404. |
+| `POST /api/v1/me/addresses` | Create; first address becomes default; returns 201 and Location. |
+| `PATCH /api/v1/me/addresses/{address_id}` | Merge supplied fields under the owner lock; nullable label/ward can be cleared. |
+| `PUT /api/v1/me/addresses/{address_id}/default` | Atomically select the default; repeat is successful. |
+| `DELETE /api/v1/me/addresses/{address_id}` | Deletes non-default or sole address; default with alternatives returns 409. |
+| `GET /api/v1/locations/provinces` | Authenticated lookup from pinned local reference data. |
+| `GET /api/v1/locations/provinces/{province_code}/wards` | Authenticated wards lookup scoped to a known province. |
+
+The pinned dataset is v5.2.0 and has no runtime network fallback. Vietnam phone values are validated locally with pinned libphonenumber and stored in E.164 form. Address responses use `Cache-Control: no-store` and contain no account/credential/session fields. No email/SMS/OTP, map, checkout, Commerce call, soft delete, or idempotency behavior is part of this story. Identical POSTs may create separate rows. US-02.06 is DONE in local scope; evidence and limits are in the implementation report.
 
 Register retains its existing response fields. If SMTP reports a definite failure, Register returns `503 EMAIL_DELIVERY_FAILED`; if the result is unknown, it returns `504 EMAIL_DELIVERY_UNKNOWN`. Those Problem Details include `account_created: true`, `account_status: PENDING_VERIFICATION`, and `next_action: RESEND_EMAIL_VERIFICATION`. The committed account is retained. Resend delivery failures return the same delivery code without the Register-only `account_created` flag.
 
