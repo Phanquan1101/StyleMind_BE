@@ -1,5 +1,7 @@
 # StyleMind Backend
 
+For service boundaries, code-layer responsibilities and the current folder tree of all six services, see [Service Architecture and Folder Layout](docs/architecture/SERVICE_ARCHITECTURE_AND_LAYOUT.md).
+
 Six independent Spring Boot applications form the backend. Local PostgreSQL connectivity is configured for each service. Identity has Flyway migrations V1–V3 and implements EP-02 Register, Login, Refresh/Logout, and Forgot Password flows. Other business APIs remain outside this scope.
 
 Use [the current project context](docs/governance/CURRENT_PROJECT_CONTEXT.md), [approved business rules](docs/governance/CURRENT_BUSINESS_RULES.md), and [open implementation decisions](docs/governance/OPEN_IMPLEMENTATION_DECISIONS.md) as the active working baseline. Earlier specification packs are preserved under [the legacy archive](docs/archive/legacy-baseline/20261008T0855Z/README.md). Identity regression evidence is in [the release audit](docs/qa/identity-audit/20261008T1144-0700/IDENTITY_RELEASE_READINESS_AUDIT.md) and [its follow-up](docs/qa/identity-audit/20261008T1144-0700/IDENTITY_AUDIT_FOLLOW_UP.md).
