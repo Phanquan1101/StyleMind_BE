@@ -2,13 +2,12 @@ package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.directory.VietnamAdministrativeDirectory;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.validation.AddressRequestValidator;
-import com.stylemind.identity.validation.VietnamPhoneValidator;
+import com.stylemind.identity.validation.address.AddressRequestValidator;
+import com.stylemind.identity.validation.address.VietnamPhoneValidator;
 import org.junit.jupiter.api.Test;
 
 class AddressRequestValidationTests {

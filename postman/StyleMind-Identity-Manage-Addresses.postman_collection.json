@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "3af28048-73f7-4cec-b170-020600000006",
     "name": "StyleMind Identity — Manage Addresses US-02.06",
-    "description": "Address lifecycle, ownership, validation, lookup, auth and cleanup. Use dedicated fresh verified CUSTOMER accounts. No secrets or tokens are stored in this collection. Direct local Identity at {{baseUrl}}; no API Gateway. Authenticated requests set Authorization from run-scoped collection tokens in pre-request scripts, so an older environment token cannot override account A/B.",
+    "description": "Address lifecycle, ownership, validation, lookup, auth and cleanup. Use dedicated fresh verified CUSTOMER accounts. No secrets or tokens are stored in this collection. Requests go through the local API Gateway at {{baseUrl}}. Authenticated requests set Authorization from run-scoped collection tokens in pre-request scripts, so an older environment token cannot override account A/B.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [],
@@ -22,7 +22,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"email\":\"{{emailA}}\",\"password\":\"{{passwordA}}\"}",
@@ -69,7 +69,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"email\":\"{{emailB}}\",\"password\":\"{{passwordB}}\"}",
@@ -189,7 +189,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -269,7 +269,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/locations/provinces",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -308,7 +308,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/locations/provinces/{{provinceCode}}/wards",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -357,7 +357,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"label\":\"Home\",\"recipient_name\":\"Nguyen An\",\"recipient_phone\":\"0912 345 678\",\"address_line\":\"12 Duong A\",\"ward_code\":\"{{wardCode}}\"}",
@@ -410,7 +410,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"label\":\"Work\",\"recipient_name\":\"Tran Binh\",\"recipient_phone\":\"+84 (912) 345-678\",\"address_line\":\"25 Ngo B\",\"ward_code\":null}",
@@ -456,7 +456,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -493,7 +493,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -535,7 +535,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"label\":null,\"address_line\":\"  Can 2  \",\"ward_code\":null}",
@@ -581,7 +581,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}/default",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -618,7 +618,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}/default",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -689,7 +689,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -724,7 +724,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -764,7 +764,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA1}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -804,7 +804,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"label\":\"Intrusion\"}",
@@ -848,7 +848,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}/default",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -883,7 +883,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA1}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -986,7 +986,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1021,7 +1021,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1061,7 +1061,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses?account_id={{accountIdB}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1169,7 +1169,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"account_id\":\"{{accountIdB}}\",\"recipient_name\":\"A\",\"recipient_phone\":\"0912345678\",\"address_line\":\"X\",\"is_default\":true}",
@@ -1218,7 +1218,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{\"recipient_name\":\"A\",\"recipient_phone\":\"0912345678\",\"address_line\":\"X\",\"ward_code\":\"999999\"}",
@@ -1267,7 +1267,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway.",
+            "description": "Local API Gateway forwarding to Identity.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1311,7 +1311,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1385,7 +1385,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA1}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1420,7 +1420,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses/{{addressA2}}",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1455,7 +1455,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1491,7 +1491,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {
@@ -1511,7 +1511,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/v1/me/addresses",
-            "description": "Local Identity service; no API Gateway."
+            "description": "Local API Gateway forwarding to Identity."
           },
           "event": [
             {

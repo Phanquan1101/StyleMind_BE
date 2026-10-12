@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "98d687a6-8d3d-4c7d-b034-5e0f735460de",
     "name": "StyleMind Identity - Complete Auth Flow",
-    "description": "Manual end-to-end collection for the Identity auth APIs in this repository: Register, email verification, Login, refresh/logout, and Forgot Password. No API Gateway exists in the current Compose/source, so baseUrl targets Identity directly at http://localhost:8081. Use a new, reachable mailbox for each registration run. The collection deliberately does not auto-generate an email or OTP. Register and Forgot Password send real mail through the configured SMTP provider. Run requests in order and pause to copy each OTP from email into the matching collection variable. Do not share/export a populated collection because it captures tokens and test credentials.",
+    "description": "Manual end-to-end collection for the Identity auth APIs in this repository: Register, email verification, Login, refresh/logout, and Forgot Password. Client-facing requests use the local API Gateway at http://localhost:8080, which proxies the current Identity APIs without changing their paths. Internal Notification endpoints are not routed through the Gateway. Use a new, reachable mailbox for each registration run. The collection deliberately does not auto-generate an email or OTP. Register and Forgot Password send real mail through the configured SMTP provider. Run requests in order and pause to copy each OTP from email into the matching collection variable. Do not share/export a populated collection because it captures tokens and test credentials.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -708,7 +708,7 @@
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8081", "type": "string", "description": "Identity directly; no Gateway/8080 exists in this repo yet." },
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string", "description": "Local API Gateway; requests retain the Identity API path." },
     { "key": "email", "value": "", "type": "string", "description": "Use a new reachable email for Register. The address must be unique for each complete registration run." },
     { "key": "unknownEmail", "value": "", "type": "string", "description": "An email address known not to have an account, for the generic Forgot Password response check." },
     { "key": "password", "value": "", "type": "string", "description": "Registration/current password; set a value matching the Identity policy." },

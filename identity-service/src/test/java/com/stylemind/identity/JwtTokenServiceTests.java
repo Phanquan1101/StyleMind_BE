@@ -1,15 +1,14 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
-import com.stylemind.identity.model.IssuedLoginTokens;
+import com.stylemind.identity.model.login.IssuedLoginTokens;
 import com.stylemind.identity.security.JwtKeyMaterial;
 import com.stylemind.identity.security.JwtProperties;
-import com.stylemind.identity.service.JwtTokenService;
+import com.stylemind.identity.security.JwtTokenService;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;

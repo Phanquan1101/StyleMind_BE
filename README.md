@@ -1,8 +1,8 @@
 # StyleMind Backend
 
-For service boundaries, code-layer responsibilities and the current folder tree of all six services, see [Service Architecture and Folder Layout](docs/architecture/SERVICE_ARCHITECTURE_AND_LAYOUT.md).
+For service boundaries, code-layer responsibilities and the current folder tree of all six services plus API Gateway, see [Service Architecture and Folder Layout](docs/architecture/SERVICE_ARCHITECTURE_AND_LAYOUT.md).
 
-Six independent Spring Boot applications form the backend. Local PostgreSQL connectivity is configured for each service. Identity has Flyway migrations V1–V3 and implements EP-02 Register, Login, Refresh/Logout, and Forgot Password flows. Other business APIs remain outside this scope.
+Six independent Spring Boot services form the backend. Client-facing requests use the API Gateway at `http://localhost:8080`. The Gateway forwards currently implemented public Identity routes without changing their contracts; Identity calls Notification internally through Spring Cloud OpenFeign. Identity has Flyway migrations V1–V3 and implements EP-02 Register, Login, Refresh/Logout, Forgot Password, Profile, Address, and Manage Users flows. Other business APIs remain outside this scope.
 
 Use [the current project context](docs/governance/CURRENT_PROJECT_CONTEXT.md), [approved business rules](docs/governance/CURRENT_BUSINESS_RULES.md), and [open implementation decisions](docs/governance/OPEN_IMPLEMENTATION_DECISIONS.md) as the active working baseline. Earlier specification packs are preserved under [the legacy archive](docs/archive/legacy-baseline/20261008T0855Z/README.md). Identity regression evidence is in [the release audit](docs/qa/identity-audit/20261008T1144-0700/IDENTITY_RELEASE_READINESS_AUDIT.md) and [its follow-up](docs/qa/identity-audit/20261008T1144-0700/IDENTITY_AUDIT_FOLLOW_UP.md).
 
@@ -12,6 +12,7 @@ The current task source is `C:\Users\FPTSHOP\Desktop\StyleMind_Task.xlsx`, sheet
 
 | Service | Responsibility | Port |
 | --- | --- | ---: |
+| `api-gateway` | Client-facing routing to implemented public APIs | 8080 |
 | `identity-service` | Accounts and identity | 8081 |
 | `commerce-service` | Catalog, cart, checkout, and order logic | 8082 |
 | `payment-service` | Payment processing | 8083 |
@@ -29,6 +30,7 @@ The current task source is `C:\Users\FPTSHOP\Desktop\StyleMind_Task.xlsx`, sheet
 Each service has its own Maven project. From the repository root, run `mvn -f <service>/pom.xml verify` for each service. For example:
 
 ```powershell
+mvn -f api-gateway/pom.xml verify
 mvn -f notification-service/pom.xml verify
 mvn -f identity-service/pom.xml verify
 mvn -f commerce-service/pom.xml verify
@@ -42,6 +44,7 @@ mvn -f stylist-service/pom.xml verify
 From the repository root, run the command for the service you want to start:
 
 ```powershell
+mvn -f api-gateway/pom.xml spring-boot:run
 mvn -f identity-service/pom.xml spring-boot:run
 mvn -f commerce-service/pom.xml spring-boot:run
 mvn -f payment-service/pom.xml spring-boot:run
@@ -50,7 +53,7 @@ mvn -f stylist-service/pom.xml spring-boot:run
 mvn -f notification-service/pom.xml spring-boot:run
 ```
 
-Run only one command per terminal session. Each service binds to its assigned port in the table above.
+Run one application per terminal session. Each application binds to its assigned port in the table above. When running apps from IntelliJ or `spring-boot:run`, set the Gateway target to Identity at `http://localhost:8081`; client and Postman requests use `http://localhost:8080`. Identity calls Notification internally at `http://localhost:8086` through Feign.
 Host-run services need the matching `STYLEMIND_<SERVICE>_DB_URL`, `_DB_USERNAME`, and `_DB_PASSWORD` values and a PostgreSQL server reachable from the host. The Compose database is intentionally not published on a host port.
 
 ## Runtime configuration
@@ -59,6 +62,7 @@ All services accept the standard `SERVER_PORT` environment variable. When it is 
 
 | Service | Default port | Port override | Example run command |
 | --- | ---: | --- | --- |
+| `api-gateway` | 8080 | `SERVER_PORT` | `mvn -f api-gateway/pom.xml spring-boot:run` |
 | `identity-service` | 8081 | `SERVER_PORT` | `mvn -f identity-service/pom.xml spring-boot:run` |
 | `commerce-service` | 8082 | `SERVER_PORT` | `mvn -f commerce-service/pom.xml spring-boot:run` |
 | `payment-service` | 8083 | `SERVER_PORT` | `mvn -f payment-service/pom.xml spring-boot:run` |
@@ -78,7 +82,7 @@ mvn -f identity-service/pom.xml spring-boot:run
 Remove-Item Env:SERVER_PORT
 ```
 
-Verify a running service at `http://localhost:<port>/actuator/health`. A healthy application returns HTTP 200 with `{"status":"UP"}`.
+Verify Gateway at `http://localhost:8080/actuator/health`. In Compose, backend service ports stay private; `scripts/verify-local-database-connectivity.ps1` uses a temporary curl container on the private Compose network to check each service's health and database component. If running a service directly from IntelliJ, its `/actuator/health` is available on its default port. A healthy application returns HTTP 200 with `{"status":"UP"}`.
 
 ## Run with Docker Compose
 
@@ -97,6 +101,14 @@ docker compose --project-name stylemind-task4 ps
 
 Compose starts one PostgreSQL 18 container and creates one database and login role for each service. Each application receives only its own database URL and credentials. The PostgreSQL port is internal to the Compose network; host-run applications need their own reachable PostgreSQL URL and the matching service-specific credentials. The production database topology remains undecided.
 
+Compose also starts `api-gateway` on `127.0.0.1:8080` and routes current public Identity API, JWKS and OpenAPI paths to Identity. Postman uses `http://localhost:8080`; backend service ports are not published to the host. Identity reaches Notification using the Compose service name through its Feign client. Notification's `/internal/**` routes are deliberately not exposed by the Gateway.
+
+To start only the current Auth/API runtime instead of every scaffold:
+
+```powershell
+docker compose --project-name stylemind-task4 up -d --build postgres mailpit notification-service identity-service api-gateway
+```
+
 The initialization SQL runs only when PostgreSQL first initializes an empty volume. `docker compose down` stops this Compose project but preserves its database volume. Do not remove the volume if you need to keep its local data.
 
 To verify a restart, run `docker compose --project-name stylemind-task4 restart`, then repeat the health check script. Stop this stack and remove its containers and default network with:
@@ -113,12 +125,12 @@ Register and Forgot Password integration tests use Mailpit. The repository Compo
 
 ## API security, errors, and documentation
 
-**Observed local security configuration:** APIs under `/api/**` require a valid bearer JWT, except the exact POST routes for Register, email verification, Forgot Password, Login, Refresh and Logout. Identity's exact profile routes `/api/v1/me` and `/api/v1/me/style-profile` also require `CUSTOMER` or `ADMIN`; the resource owner is JWT `sub`. Notification's exact POST routes `/internal/v1/email-verifications` and `/internal/v1/password-resets` require `X-StyleMind-Service-Token`. Other application paths are denied. `/actuator/health` and `/v3/api-docs` are public. Register and password reset do not issue JWTs. There is no API Gateway in the local Compose stack; call the service on its own port.
+**Observed local security configuration:** Gateway forwards `/api/**`, `/.well-known/jwks.json`, and `/v3/api-docs` paths to Identity while preserving method, URL path, headers, and body. Gateway does not replace Identity security: protected `/api/**` routes still require the existing bearer JWT; only the configured public auth routes remain public. Identity's profile routes also require `CUSTOMER` or `ADMIN`, with ownership from JWT `sub`. Notification's exact POST routes `/internal/v1/email-verifications` and `/internal/v1/password-resets` require `X-StyleMind-Service-Token`, and the Gateway does not route them. Register and password reset do not issue JWTs.
 
 Identity signs RS256 access JWTs and validates the signature, expiry/issued-at, configured issuer and audience, UUID subject/token ID, and role claims. Defaults are issuer `https://identity.stylemind.local`, audience `stylemind-api`, 15-minute access TTL and 7-day refresh TTL; signing uses the external key configured by `STYLEMIND_JWT_PRIVATE_KEY_PATH`. Its public key endpoint is `/.well-known/jwks.json`. The other resource services still use their configured JWK-set URI/algorithm and do not yet have Identity-equivalent issuer/audience validation or `roles`-to-authority mapping. These are observed implementation facts, not evidence that authorization is complete across all services.
 
 Errors use `application/problem+json` with a stable `code`, `timestamp`, and `correlationId`; unexpected failures return a generic detail. Request logging uses `X-Correlation-Id` (safe incoming values are preserved, otherwise one is generated) and records service, method, path, status, and duration. Request bodies, authorization headers, and tokens are not logged.
 
-Each service publishes OpenAPI JSON at `http://localhost:<port>/v3/api-docs`, with service-specific security schemes. Swagger UI is not included. The shared internal token is a local configuration choice; production service authentication and topology remain TBD.
+Identity OpenAPI JSON is available through Gateway at `http://localhost:8080/v3/api-docs`. Backend service OpenAPI and health endpoints remain inside the Compose network; the diagnostic script checks service health without publishing backend ports. Swagger UI is not included. The shared internal token is a local configuration choice; production service authentication and topology remain TBD.
 
 Production key provisioning/rotation, service-to-service trust, deployment topology and provider operations remain TBD. The local issuer/audience defaults and JWKS network address are documented in the Identity README; they do not decide production topology.

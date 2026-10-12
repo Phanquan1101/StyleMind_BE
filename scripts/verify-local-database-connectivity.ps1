@@ -27,30 +27,47 @@ $expectedServices = @(
 )
 
 $runningServices = Invoke-Compose -Arguments @('ps', '--services', '--filter', 'status=running')
-foreach ($service in @('postgres') + @($expectedServices | ForEach-Object { $_.Name })) {
+foreach ($service in @('postgres', 'api-gateway') + @($expectedServices | ForEach-Object { $_.Name })) {
     if ($runningServices -notcontains $service) {
         throw "Required Compose service is not running: $service"
     }
 }
 
+$gatewayHealthy = $false
+$gatewayDeadline = (Get-Date).AddSeconds($TimeoutSeconds)
+do {
+    try {
+        $gatewayResponse = Invoke-WebRequest -Uri 'http://localhost:8080/actuator/health' -TimeoutSec 5 -UseBasicParsing
+        $gatewayHealth = $gatewayResponse.Content | ConvertFrom-Json
+        if ([int]$gatewayResponse.StatusCode -eq 200 -and $gatewayHealth.status -eq 'UP') {
+            $gatewayHealthy = $true
+            break
+        }
+    } catch {
+        # Gateway may still be starting after its Identity dependency.
+    }
+    Start-Sleep -Seconds 2
+} while ((Get-Date) -lt $gatewayDeadline)
+
+if (-not $gatewayHealthy) {
+    throw 'API Gateway did not report HTTP 200 and overall UP at http://localhost:8080/actuator/health'
+}
+Write-Output 'api-gateway: HTTP 200, overall UP'
+
 foreach ($service in $expectedServices) {
-    $uri = "http://localhost:$($service.Port)/actuator/health"
+    $uri = "http://$($service.Name):$($service.Port)/actuator/health"
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $healthy = $false
 
     do {
         try {
-            $response = Invoke-WebRequest -Uri $uri -TimeoutSec 5 -UseBasicParsing
-            if ([int]$response.StatusCode -eq 200) {
-                $content = $response.Content
-                if ($content -is [byte[]]) {
-                    $content = [System.Text.Encoding]::UTF8.GetString($content)
-                }
-                $health = $content | ConvertFrom-Json
-                if ($health.status -eq 'UP' -and $health.components.db.status -eq 'UP') {
-                    $healthy = $true
-                    break
-                }
+            $content = Invoke-Compose -Arguments @(
+                'run', '--rm', '--no-deps', 'health-probe', '--fail', '--silent', '--show-error', $uri
+            )
+            $health = ($content -join "`n") | ConvertFrom-Json
+            if ($health.status -eq 'UP' -and $health.components.db.status -eq 'UP') {
+                $healthy = $true
+                break
             }
         } catch {
             # The services may still be starting or waiting for PostgreSQL.
@@ -59,7 +76,7 @@ foreach ($service in $expectedServices) {
     } while ((Get-Date) -lt $deadline)
 
     if (-not $healthy) {
-        throw "Health check did not report HTTP 200, overall UP, and db UP for $($service.Name) at $uri"
+        throw "Health check did not report HTTP 200, overall UP, and db UP for $($service.Name) at internal URL $uri"
     }
 
     Write-Output "$($service.Name): HTTP 200, overall UP, db UP"

@@ -1,7 +1,6 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.stylemind.identity.security.VerificationCodeService;
 import java.security.SecureRandom;
 import java.util.Base64;

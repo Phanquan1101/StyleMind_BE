@@ -10363,7 +10363,7 @@
       "key": "baseUrl",
       "value": "",
       "type": "string",
-      "description": "Set locally; example http://localhost:8081 (Identity direct, no Gateway)."
+      "description": "Local API Gateway base URL; default is http://localhost:8080."
     },
     {
       "key": "emailA",

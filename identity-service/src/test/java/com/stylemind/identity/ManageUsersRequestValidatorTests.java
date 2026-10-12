@@ -4,12 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.ManageUserListCriteria;
-import com.stylemind.identity.validation.ManageUsersRequestValidator;
+import com.stylemind.identity.model.users.ManageUserListCriteria;
+import com.stylemind.identity.validation.users.ManageUsersRequestValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;

@@ -5,13 +5,13 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.stylemind.identity.dto.RegisterRequest;
-import com.stylemind.identity.dto.RegisterResponse;
-import com.stylemind.identity.service.EmailDispatch;
-import com.stylemind.identity.service.EmailVerificationPersistence;
-import com.stylemind.identity.service.NotificationEmailClient;
-import com.stylemind.identity.service.RegisterService;
-import com.stylemind.identity.service.RegistrationCommit;
+import com.stylemind.identity.client.notification.NotificationEmailClient;
+import com.stylemind.identity.client.notification.payload.EmailDispatch;
+import com.stylemind.identity.dto.register.RegisterRequest;
+import com.stylemind.identity.dto.register.RegisterResponse;
+import com.stylemind.identity.model.register.RegistrationCommit;
+import com.stylemind.identity.service.emailverification.internal.EmailVerificationPersistence;
+import com.stylemind.identity.service.register.impl.RegisterServiceImpl;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -29,7 +29,7 @@ class RegisterServiceTests {
                 new EmailDispatch("customer@example.com", "012345"));
         when(persistence.createRegistration(request)).thenReturn(committed);
 
-        RegisterResponse response = new RegisterService(persistence, sender).register(request);
+        RegisterResponse response = new RegisterServiceImpl(persistence, sender).register(request);
 
         InOrder order = inOrder(persistence, sender);
         order.verify(persistence).createRegistration(request);
