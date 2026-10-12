@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -20,10 +19,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.stylemind.identity.errors.ApiExceptionHandler;
 import com.stylemind.identity.logging.CorrelationIdFilter;
-import com.stylemind.identity.model.LoginAccount;
-import com.stylemind.identity.repository.AccountRepository;
-import com.stylemind.identity.repository.RefreshSessionRepository;
-import com.stylemind.identity.service.JwtTokenService;
+import com.stylemind.identity.model.login.LoginAccount;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.session.RefreshSessionRepository;
+import com.stylemind.identity.security.JwtTokenService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;

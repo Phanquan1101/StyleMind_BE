@@ -2,14 +2,13 @@ package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.dto.PatchMyProfileRequest;
-import com.stylemind.identity.dto.ReplaceStyleProfileRequest;
+import com.stylemind.identity.dto.profile.PatchMyProfileRequest;
+import com.stylemind.identity.dto.profile.ReplaceStyleProfileRequest;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.StyleProfileCommand;
-import com.stylemind.identity.validation.ProfileRequestValidator;
+import com.stylemind.identity.model.profile.StyleProfileCommand;
+import com.stylemind.identity.validation.profile.ProfileRequestValidator;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

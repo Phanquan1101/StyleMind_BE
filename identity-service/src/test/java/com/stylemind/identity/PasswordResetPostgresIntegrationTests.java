@@ -5,12 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.repository.AccountRepository;
-import com.stylemind.identity.repository.PasswordResetRepository;
-import com.stylemind.identity.repository.RefreshSessionRepository;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.passwordreset.PasswordResetRepository;
+import com.stylemind.identity.repository.session.RefreshSessionRepository;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

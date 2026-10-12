@@ -1,5 +1,6 @@
 package com.stylemind.identity;
 
+import com.stylemind.identity.dto.login.LoginRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
@@ -7,13 +8,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import com.stylemind.identity.dto.RegisterRequest;
-import com.stylemind.identity.service.EmailVerificationService;
-import com.stylemind.identity.service.LoginService;
-import com.stylemind.identity.service.PasswordResetService;
-import com.stylemind.identity.service.RefreshSessionService;
-import com.stylemind.identity.service.RegisterService;
+import com.stylemind.identity.dto.register.RegisterRequest;
+import com.stylemind.identity.service.emailverification.EmailVerificationService;
+import com.stylemind.identity.service.login.LoginService;
+import com.stylemind.identity.service.passwordreset.PasswordResetService;
+import com.stylemind.identity.service.session.RefreshSessionService;
+import com.stylemind.identity.service.register.RegisterService;
 import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -280,7 +280,7 @@ class IdentityRequestValidationMatrixTests {
         mockMvc.perform(post(ROOT + "/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + A + "\",\"password\":\"" + loginPassword + "\"}"))
                 .andExpect(status().isOk());
-        var login = org.mockito.ArgumentCaptor.forClass(com.stylemind.identity.dto.LoginRequest.class);
+        var login = org.mockito.ArgumentCaptor.forClass(com.stylemind.identity.dto.login.LoginRequest.class);
         verify(loginService).login(login.capture());
         assertThat(login.getValue().password()).isEqualTo(loginPassword);
 

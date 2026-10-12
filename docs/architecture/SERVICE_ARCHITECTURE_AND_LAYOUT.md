@@ -2,15 +2,16 @@
 
 **Purpose:** Give contributors one repository reference for service ownership, the common code-layer convention, and the current source tree of each service.
 
-**Observed source snapshot:** commit `6f3d30a` (2026-10-10). Trees below describe tracked source at that snapshot. They record what exists; a scaffold is not evidence that its business APIs are implemented.
+**Observed local architecture:** working tree as of 2026-10-12. Trees record what exists; a scaffold is not evidence that its business APIs are implemented.
 
 ## 1. Architecture at a glance
 
-StyleMind is organized as six independently built Spring Boot applications. Each service owns its logical database and service code. The local Compose setup runs the applications directly; there is no API Gateway, so local clients call a service on its own port.
+StyleMind is organized as six independently built Spring Boot business services plus a separate API Gateway application. Each business service owns its logical database and service code. Local client/Postman traffic enters through the Gateway on port 8080; Identity-to-Notification email calls use Spring Cloud OpenFeign on the internal Compose network. The Gateway preserves Identity's existing API paths and does not expose Notification's internal routes.
 
 ```mermaid
 flowchart LR
-    Client[Local client / Postman]
+    Client[Local client / Postman<br/>localhost:8080]
+    Gateway[api-gateway<br/>Spring Cloud Gateway]
     Identity[identity-service<br/>8081]
     Commerce[commerce-service<br/>8082]
     Payment[payment-service<br/>8083]
@@ -25,24 +26,21 @@ flowchart LR
     DbN[(stylemind_notification)]
     Mail[SMTP / local Mailpit]
 
-    Client --> Identity
-    Client --> Commerce
-    Client --> Payment
-    Client --> Wardrobe
-    Client --> Stylist
-    Client --> Notification
+    Client --> Gateway
+    Gateway -->|current public API paths| Identity
     Identity --> DbI
     Commerce --> DbC
     Payment --> DbP
     Wardrobe --> DbW
     Stylist --> DbS
     Notification --> DbN
-    Identity -. approved internal email calls .-> Notification
+    Identity -. Spring Cloud OpenFeign<br/>internal email calls .-> Notification
     Notification --> Mail
 ```
 
 | Service | Database | Responsibility | Local port |
 | --- | --- | --- | ---: |
+| `api-gateway` | None | Client-facing routing; no business persistence | 8080 |
 | `identity-service` | `stylemind_identity` | Accounts, authentication, Identity-owned profile and address data | 8081 |
 | `commerce-service` | `stylemind_commerce` | Catalog, Cart, Checkout and Order | 8082 |
 | `payment-service` | `stylemind_payment` | Payment and reconciliation exceptions | 8083 |
@@ -50,9 +48,9 @@ flowchart LR
 | `stylist-service` | `stylemind_stylist` | AI Stylist sessions, requests and recommendations | 8085 |
 | `notification-service` | `stylemind_notification` | Notification delivery | 8086 |
 
-The local PostgreSQL container provisions the six databases; each service receives credentials for its own database. A service must not read or mutate another service's database, and cross-service foreign keys are not used. Cross-service behavior needs an approved API/event contract. Production topology and deployment are TBD; this local diagram is not a production design.
+The local PostgreSQL container provisions the six databases; each business service receives credentials for its own database. The Gateway owns no database. Compose publishes only the Gateway at `127.0.0.1:8080`; backend ports stay on the private Compose network. A service must not read or mutate another service's database, and cross-service foreign keys are not used. Cross-service behavior needs an approved API/event contract. The current Identity-to-Notification call uses Spring Cloud OpenFeign for the existing internal email contracts; it carries the service token and does not retry delivery. Production topology and deployment are TBD; this local diagram is not a production design.
 
-The repository uses Java 21, Spring Boot 3.5.16, Spring MVC REST and Spring JDBC. Each service has its own Maven `pom.xml`, application entry point, configuration and tests. Identity currently has the most complete business feature structure. Notification has its email-delivery feature. Commerce, Payment, Wardrobe Community and Stylist currently contain application/security/observability scaffolding rather than completed business APIs.
+The repository uses Java 21 and Spring Boot 3.5.16. Business services use Spring MVC REST and Spring JDBC. The Gateway is a separate Spring Cloud Gateway WebFlux application. Each application has its own Maven `pom.xml`, entry point, configuration and tests. Identity currently has the most complete business feature structure. Notification has its email-delivery feature. Commerce, Payment, Wardrobe Community and Stylist currently contain application/security/observability scaffolding rather than completed business APIs; no Gateway routes for business APIs in those services are invented before those APIs exist.
 
 ## 2. Request and persistence layers
 
@@ -110,7 +108,7 @@ Tests belong under `src/test/java` in the matching service package. Use unit tes
 
 ## 4. Current source trees
 
-These compact trees reflect tracked source at the snapshot above. `...` means multiple files exist; it is not an instruction to add every package to every service.
+These compact trees reflect the current local package layout. `...` means multiple files exist; it is not an instruction to add every package to every service.
 
 ### `identity-service`
 
@@ -124,17 +122,19 @@ identity-service/
     ├── main/
     │   ├── java/com/stylemind/identity/
     │   │   ├── IdentityServiceApplication.java
-    │   │   ├── controller/       # Register, Login, Profile, Address, Users, etc.
+    │   │   ├── client/notification/ # Notification HTTP adapter
+    │   │   │   └── payload/         # Private dispatch payloads; not API DTOs or domain models
+    │   │   ├── controller/       # auth, profile, address, users, jwks
     │   │   ├── directory/        # pinned Vietnam administrative reference data
-    │   │   ├── dto/
+    │   │   ├── dto/              # request/response DTOs grouped by feature
     │   │   ├── errors/
     │   │   ├── logging/
-    │   │   ├── model/
+    │   │   ├── model/            # JDBC/use-case values grouped by feature
     │   │   ├── openapi/
-    │   │   ├── repository/       # Spring JDBC
+    │   │   ├── repository/       # concrete Spring JDBC repositories by feature
     │   │   ├── security/
-    │   │   ├── service/
-    │   │   └── validation/
+    │   │   ├── service/          # feature interfaces and impl/ + internal/ beans
+    │   │   └── validation/       # common, auth, profile, address, users
     │   └── resources/
     │       ├── application.properties
     │       ├── data/vietnam-administrative/
@@ -145,6 +145,21 @@ identity-service/
         │   └── directory/
         └── resources/db/verify-identity-schema.sql
 ```
+
+### `api-gateway`
+
+```text
+api-gateway/
+├── Dockerfile
+├── pom.xml
+└── src/
+    ├── main/
+    │   ├── java/com/stylemind/gateway/ApiGatewayApplication.java
+    │   └── resources/application.properties # Identity public paths; no internal Notification route
+    └── test/java/com/stylemind/gateway/GatewayRoutingTests.java
+```
+
+The current route forwards `/api/**`, `/.well-known/jwks.json`, and `/v3/api-docs` to Identity without path rewriting. Identity remains responsible for its JWT and role policy. Gateway health is local at `/actuator/health`; no API key/JWT policy is duplicated at the Gateway.
 
 ### `commerce-service`
 

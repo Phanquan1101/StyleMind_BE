@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
-
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -14,8 +13,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.errors.ApiExceptionHandler;
 import com.stylemind.identity.logging.CorrelationIdFilter;
-import com.stylemind.identity.repository.RefreshSessionRepository;
-import com.stylemind.identity.service.JwtTokenService;
+import com.stylemind.identity.repository.session.RefreshSessionRepository;
+import com.stylemind.identity.security.JwtTokenService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

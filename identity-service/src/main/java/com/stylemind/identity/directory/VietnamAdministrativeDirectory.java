@@ -2,10 +2,10 @@ package com.stylemind.identity.directory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.dto.ProvinceListResponse;
-import com.stylemind.identity.dto.ProvinceResponse;
-import com.stylemind.identity.dto.WardListResponse;
-import com.stylemind.identity.dto.WardResponse;
+import com.stylemind.identity.dto.address.ProvinceListResponse;
+import com.stylemind.identity.dto.address.ProvinceResponse;
+import com.stylemind.identity.dto.address.WardListResponse;
+import com.stylemind.identity.dto.address.WardResponse;
 import com.stylemind.identity.errors.ApiOperationException;
 import java.io.IOException;
 import java.io.InputStream;

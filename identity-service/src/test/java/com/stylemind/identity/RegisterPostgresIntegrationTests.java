@@ -4,13 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.model.EmailVerificationChallenge;
-import com.stylemind.identity.repository.AccountRepository;
-import com.stylemind.identity.repository.EmailVerificationRepository;
 import com.stylemind.identity.logging.CorrelationIdFilter;
+import com.stylemind.identity.model.emailverification.EmailVerificationChallenge;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.emailverification.EmailVerificationRepository;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -98,6 +97,7 @@ class RegisterPostgresIntegrationTests {
 
     private static final MutableClock TEST_CLOCK = new MutableClock(Instant.parse("2026-10-06T00:00:00Z"));
     private static final Pattern SIX_DIGITS = Pattern.compile("(?<!\\d)(\\d{6})(?!\\d)");
+    private String emailForCurrentTest;
 
     @Autowired
     private MockMvc mockMvc;
@@ -139,6 +139,7 @@ class RegisterPostgresIntegrationTests {
         jdbcTemplate.update("DELETE FROM public.account_role");
         jdbcTemplate.update("DELETE FROM public.account");
         TEST_CLOCK.set(Instant.parse("2026-10-06T00:00:00Z"));
+        emailForCurrentTest = null;
         setMailpitChaos("{}");
     }
 
@@ -512,11 +513,50 @@ class RegisterPostgresIntegrationTests {
     private String latestEmailCode() throws Exception {
         String host = MAILPIT.getHost();
         int port = MAILPIT.getMappedPort(8025);
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + host + ":" + port + "/view/latest.txt"))
+        assertThat(emailForCurrentTest).as("test recipient is set before reading its verification email")
+                .isNotBlank();
+        HttpRequest listRequest = HttpRequest.newBuilder(URI.create(
+                "http://" + host + ":" + port + "/api/v1/messages?limit=100"))
                 .timeout(Duration.ofSeconds(5)).GET().build();
-        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
-        assertThat(response.statusCode()).isEqualTo(200);
-        Matcher matcher = SIX_DIGITS.matcher(response.body());
+        HttpResponse<String> listResponse = HttpClient.newHttpClient().send(
+                listRequest, HttpResponse.BodyHandlers.ofString());
+        assertThat(listResponse.statusCode()).isEqualTo(200);
+        JsonNode listedMessages = objectMapper.readTree(listResponse.body());
+        JsonNode messages = listedMessages.has("messages")
+                ? listedMessages.path("messages") : listedMessages.path("Messages");
+        String messageId = null;
+        Instant newestMessageAt = Instant.MIN;
+        for (JsonNode message : messages) {
+            JsonNode recipients = message.has("To") ? message.path("To") : message.path("to");
+            boolean addressedToTestAccount = false;
+            for (JsonNode recipient : recipients) {
+                String address = recipient.has("Address")
+                        ? recipient.path("Address").asText() : recipient.path("address").asText();
+                addressedToTestAccount |= emailForCurrentTest.equalsIgnoreCase(address);
+            }
+            if (!addressedToTestAccount) {
+                continue;
+            }
+            String created = message.has("Created")
+                    ? message.path("Created").asText() : message.path("created").asText();
+            Instant createdAt = Instant.parse(created);
+            if (messageId == null || createdAt.isAfter(newestMessageAt)) {
+                messageId = message.has("ID") ? message.path("ID").asText() : message.path("id").asText();
+                newestMessageAt = createdAt;
+            }
+        }
+        assertThat(messageId).as("Mailpit contains a verification email for this test account").isNotBlank();
+
+        HttpRequest messageRequest = HttpRequest.newBuilder(URI.create(
+                "http://" + host + ":" + port + "/api/v1/message/" + messageId))
+                .timeout(Duration.ofSeconds(5)).GET().build();
+        HttpResponse<String> messageResponse = HttpClient.newHttpClient().send(
+                messageRequest, HttpResponse.BodyHandlers.ofString());
+        assertThat(messageResponse.statusCode()).isEqualTo(200);
+        JsonNode message = objectMapper.readTree(messageResponse.body());
+        String text = message.path("Text").asText(message.path("text").asText());
+        String html = message.path("HTML").asText(message.path("html").asText());
+        Matcher matcher = SIX_DIGITS.matcher(text + " " + html);
         assertThat(matcher.find()).as("Mailpit must contain a real SMTP verification message").isTrue();
         return matcher.group(1);
     }
@@ -540,7 +580,8 @@ class RegisterPostgresIntegrationTests {
     }
 
     private String email() {
-        return "register-" + UUID.randomUUID() + "@example.test";
+        emailForCurrentTest = "register-" + UUID.randomUUID() + "@example.test";
+        return emailForCurrentTest;
     }
 
     private static GenericContainer<?> notificationContainer() {

@@ -1,11 +1,16 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stylemind.identity.client.notification.NotificationEmailClient;
+import com.stylemind.identity.client.notification.NotificationFeignClient;
+import com.stylemind.identity.client.notification.payload.EmailDispatch;
+import com.stylemind.identity.client.notification.payload.PasswordResetEmailDispatch;
 import com.stylemind.identity.errors.EmailDeliveryException;
-import com.stylemind.identity.service.EmailDispatch;
-import com.stylemind.identity.service.NotificationEmailClient;
-import com.stylemind.identity.service.PasswordResetEmailDispatch;
+import feign.Feign;
+import feign.Request;
+import feign.Retryer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,8 +18,16 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.cloud.openfeign.support.ResponseEntityDecoder;
+import org.springframework.cloud.openfeign.support.SpringDecoder;
+import org.springframework.cloud.openfeign.support.SpringEncoder;
+import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.beans.factory.ObjectFactory;
 
 class NotificationEmailClientTests {
 
@@ -22,6 +35,8 @@ class NotificationEmailClientTests {
     void onlyAcceptedResponseConfirmsEmailDelivery() throws Exception {
         try (HttpResponseServer server = new HttpResponseServer(202, 0)) {
             client(server, Duration.ofSeconds(2)).send(dispatch());
+            org.assertj.core.api.Assertions.assertThat(server.validServiceToken()).isTrue();
+            org.assertj.core.api.Assertions.assertThat(server.validVerificationPayload()).isTrue();
         }
     }
 
@@ -64,6 +79,8 @@ class NotificationEmailClientTests {
                     new PasswordResetEmailDispatch("reset@example.test", "012345"));
             org.assertj.core.api.Assertions.assertThat(server.requestPath())
                     .isEqualTo("/internal/v1/password-resets");
+            org.assertj.core.api.Assertions.assertThat(server.validServiceToken()).isTrue();
+            org.assertj.core.api.Assertions.assertThat(server.validResetPayload()).isTrue();
         }
         for (int status : new int[] {200, 204}) {
             try (HttpResponseServer server = new HttpResponseServer(status, 0)) {
@@ -152,8 +169,17 @@ class NotificationEmailClientTests {
     }
 
     private NotificationEmailClient client(HttpResponseServer server, Duration readTimeout) {
-        return new NotificationEmailClient("http://127.0.0.1:" + server.port(), "x".repeat(32),
-                Duration.ofSeconds(1), readTimeout);
+        HttpMessageConverters converters = new HttpMessageConverters(new MappingJackson2HttpMessageConverter());
+        ObjectFactory<HttpMessageConverters> converterFactory = () -> converters;
+        NotificationFeignClient feignClient = Feign.builder()
+                .contract(new org.springframework.cloud.openfeign.support.SpringMvcContract())
+                .encoder(new SpringEncoder(converterFactory))
+                .decoder(new ResponseEntityDecoder(new SpringDecoder(converterFactory)))
+                .options(new Request.Options(1000, TimeUnit.MILLISECONDS,
+                        readTimeout.toMillis(), TimeUnit.MILLISECONDS, false))
+                .retryer(Retryer.NEVER_RETRY)
+                .target(NotificationFeignClient.class, "http://127.0.0.1:" + server.port());
+        return new NotificationEmailClient(feignClient, "x".repeat(32));
     }
 
     private EmailDispatch dispatch() {
@@ -164,6 +190,10 @@ class NotificationEmailClientTests {
         private final ServerSocket serverSocket;
         private final Thread thread;
         private final AtomicReference<String> requestPath = new AtomicReference<>();
+        private final AtomicBoolean validServiceToken = new AtomicBoolean();
+        private final AtomicBoolean validVerificationPayload = new AtomicBoolean();
+        private final AtomicBoolean validResetPayload = new AtomicBoolean();
+        private final ObjectMapper objectMapper = new ObjectMapper();
 
         HttpResponseServer(int status, long delayMillis) throws IOException {
             serverSocket = new ServerSocket(0);
@@ -181,10 +211,22 @@ class NotificationEmailClientTests {
             return requestPath.get();
         }
 
+        boolean validServiceToken() {
+            return validServiceToken.get();
+        }
+
+        boolean validVerificationPayload() {
+            return validVerificationPayload.get();
+        }
+
+        boolean validResetPayload() {
+            return validResetPayload.get();
+        }
+
         private void respond(int status, long delayMillis) {
             try (Socket socket = serverSocket.accept()) {
                 socket.setSoTimeout(2000);
-                requestPath.set(readHeaders(socket));
+                requestPath.set(readAndInspectRequest(socket));
                 if (delayMillis > 0) {
                     Thread.sleep(delayMillis);
                 }
@@ -195,8 +237,9 @@ class NotificationEmailClientTests {
                     case 503 -> "Service Unavailable";
                     default -> "Gateway Timeout";
                 };
+                String retryAfter = status == 503 ? "Retry-After: 0\r\n" : "";
                 byte[] response = ("HTTP/1.1 " + status + " " + reason
-                        + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        + "\r\n" + retryAfter + "Content-Length: 0\r\nConnection: close\r\n\r\n")
                         .getBytes(StandardCharsets.US_ASCII);
                 socket.getOutputStream().write(response);
                 socket.getOutputStream().flush();
@@ -205,7 +248,7 @@ class NotificationEmailClientTests {
             }
         }
 
-        private String readHeaders(Socket socket) throws IOException {
+        private String readAndInspectRequest(Socket socket) throws IOException {
             ByteArrayOutputStream received = new ByteArrayOutputStream();
             int matched = 0;
             byte[] terminator = {'\r', '\n', '\r', '\n'};
@@ -219,12 +262,30 @@ class NotificationEmailClientTests {
                         : next == (terminator[0] & 0xff) ? 1 : 0;
             }
             String headers = received.toString(StandardCharsets.US_ASCII);
-            consumeRequestBody(socket, headers);
+            for (String line : headers.split("\\r\\n")) {
+                if (line.regionMatches(true, 0, "X-StyleMind-Service-Token:", 0,
+                        "X-StyleMind-Service-Token:".length())) {
+                    validServiceToken.set(line.substring("X-StyleMind-Service-Token:".length()).trim()
+                            .equals("x".repeat(32)));
+                }
+            }
+            String body = consumeRequestBody(socket, headers);
+            try {
+                JsonNode json = objectMapper.readTree(body);
+                validVerificationPayload.set(json.path("recipientEmail").asText().equals("test@example.test")
+                        && json.path("verificationCode").asText().equals("012345")
+                        && !json.has("resetCode"));
+                validResetPayload.set(json.path("recipientEmail").asText().equals("reset@example.test")
+                        && json.path("resetCode").asText().equals("012345")
+                        && !json.has("verificationCode"));
+            } catch (Exception ignored) {
+                // The test asserts only the boolean contract result, never the received body.
+            }
             String firstLine = headers.split("\\r\\n", 2)[0];
             return firstLine.split(" ", 3)[1];
         }
 
-        private void consumeRequestBody(Socket socket, String headers) throws IOException {
+        private String consumeRequestBody(Socket socket, String headers) throws IOException {
             for (String line : headers.split("\\r\\n")) {
                 if (line.regionMatches(true, 0, "Content-Length:", 0, "Content-Length:".length())) {
                     int contentLength;
@@ -236,26 +297,26 @@ class NotificationEmailClientTests {
                     if (contentLength < 0) {
                         throw new IOException("Invalid Content-Length request header");
                     }
-                    readExactly(socket, contentLength);
-                    return;
+                    return new String(readExactly(socket, contentLength), StandardCharsets.UTF_8);
                 }
                 if (line.regionMatches(true, 0, "Transfer-Encoding:", 0, "Transfer-Encoding:".length())
                         && line.toLowerCase(java.util.Locale.ROOT).contains("chunked")) {
-                    consumeChunkedBody(socket);
-                    return;
+                    return consumeChunkedBody(socket);
                 }
             }
             throw new IOException("Client request did not specify a body length");
         }
 
-        private void readExactly(Socket socket, int contentLength) throws IOException {
+        private byte[] readExactly(Socket socket, int contentLength) throws IOException {
             byte[] body = socket.getInputStream().readNBytes(contentLength);
             if (body.length != contentLength) {
                 throw new IOException("Client closed before sending the complete request body");
             }
+            return body;
         }
 
-        private void consumeChunkedBody(Socket socket) throws IOException {
+        private String consumeChunkedBody(Socket socket) throws IOException {
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
             while (true) {
                 String sizeLine = readAsciiLine(socket);
                 String sizeText = sizeLine.split(";", 2)[0].trim();
@@ -269,9 +330,9 @@ class NotificationEmailClientTests {
                     while (!readAsciiLine(socket).isEmpty()) {
                         // Ignore request trailers; this test server only needs to drain the body.
                     }
-                    return;
+                    return body.toString(StandardCharsets.UTF_8);
                 }
-                readExactly(socket, chunkSize);
+                body.write(readExactly(socket, chunkSize));
                 if (socket.getInputStream().read() != '\r' || socket.getInputStream().read() != '\n') {
                     throw new IOException("Invalid chunk terminator");
                 }

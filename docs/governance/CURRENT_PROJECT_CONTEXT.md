@@ -1,6 +1,6 @@
 # Current StyleMind Project Context
 
-**As of:** 2026-10-10<br>
+**As of:** 2026-10-12<br>
 **Workspace:** `C:\Users\FPTSHOP\Desktop\StyleMind_BE`<br>
 
 This is the active context for implementation agents in this repository. Read it with [the business rules](CURRENT_BUSINESS_RULES.md), [open implementation decisions](OPEN_IMPLEMENTATION_DECISIONS.md), and the requested rows of the workbook. Earlier discovery/specification packages are preserved under [the legacy archive](../archive/legacy-baseline/20261008T0855Z/README.md); they are not current execution baselines.
@@ -37,7 +37,7 @@ The broader women-first AI Personal Stylist, Smart Wardrobe and real-commerce di
 
 ## Observed repository and local runtime
 
-- Six Java 21 / Spring Boot 3.5.16 services use Spring MVC and Spring JDBC conventions. There is no API Gateway in the local Compose setup; services bind to ports 8081–8086 as listed in the root README. Local production topology remains TBD.
+- Six Java 21 / Spring Boot 3.5.16 business services use Spring MVC and Spring JDBC conventions. A separate Spring Cloud Gateway application listens on host-local port 8080 and currently routes implemented public Identity paths. Identity calls Notification through Spring Cloud OpenFeign over the internal Compose network. Compose does not publish backend service ports; direct ports are used only when running services from IntelliJ or `spring-boot:run`. Postman/client entry uses the Gateway. Production topology and Gateway deployment remain TBD.
 - One local PostgreSQL 18 container provisions the six databases. Host PostgreSQL publishing is not required by the Compose path. Each service uses its own database credentials.
 - Identity is the only service with business Flyway migrations: V1 creates nine tables, V2 adds `email_verification_challenge`, and V3 adds `password_reset_challenge`. The last persistent-local audit recorded V1–V3 successful for `stylemind_identity`; this documentation reconciliation did not connect to or change that database.
 - The current Identity physical schema therefore has **11 business tables**. It does not count Flyway metadata. The other five services have target logical models only and **no business-schema migrations**. Compose database creation is not schema migration.

@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -19,6 +18,21 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.stylemind.identity.logging.CorrelationIdFilter;
+import com.stylemind.identity.service.address.ManageAddressService;
+import com.stylemind.identity.service.address.internal.ManageAddressPersistenceService;
+import com.stylemind.identity.service.emailverification.EmailVerificationService;
+import com.stylemind.identity.service.emailverification.internal.EmailVerificationPersistence;
+import com.stylemind.identity.service.login.LoginService;
+import com.stylemind.identity.service.login.internal.LoginSessionService;
+import com.stylemind.identity.service.passwordreset.PasswordResetService;
+import com.stylemind.identity.service.passwordreset.internal.PasswordResetPersistence;
+import com.stylemind.identity.service.passwordreset.internal.PasswordResetTransactionService;
+import com.stylemind.identity.service.profile.ManageProfileService;
+import com.stylemind.identity.service.profile.internal.ManageProfilePersistenceService;
+import com.stylemind.identity.service.register.RegisterService;
+import com.stylemind.identity.service.session.RefreshSessionService;
+import com.stylemind.identity.service.session.internal.RefreshSessionTransactionService;
+import com.stylemind.identity.service.users.ManageUsersService;
 import io.swagger.v3.oas.annotations.Hidden;
 import java.time.Instant;
 import java.util.List;
@@ -31,10 +45,12 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -89,6 +105,9 @@ class IdentityServiceApplicationTests {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
     @Qualifier("jwtDecoder")
     private JwtDecoder unconfiguredProductionDecoder;
 
@@ -103,6 +122,27 @@ class IdentityServiceApplicationTests {
     @Test
     void contextLoadsWithStableTestSigningKey() {
         assertThat(unconfiguredProductionDecoder).isNotNull();
+    }
+
+    @Test
+    void businessServicesHaveSingleInterfaceBeansAndTransactionsRemainProxied() {
+        assertThat(applicationContext.getBeansOfType(RegisterService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(EmailVerificationService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(LoginService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(RefreshSessionService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(PasswordResetService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(ManageProfileService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(ManageAddressService.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(ManageUsersService.class)).hasSize(1);
+
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(EmailVerificationPersistence.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(LoginSessionService.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(RefreshSessionTransactionService.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(PasswordResetPersistence.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(PasswordResetTransactionService.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(ManageProfilePersistenceService.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(ManageAddressPersistenceService.class))).isTrue();
+        assertThat(AopUtils.isAopProxy(applicationContext.getBean(ManageUsersService.class))).isTrue();
     }
 
     @Test

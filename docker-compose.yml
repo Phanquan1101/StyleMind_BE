@@ -51,10 +51,20 @@ services:
         condition: service_healthy
       notification-service:
         condition: service_started
-    ports:
-      - "8081:8081"
     volumes:
       - ${STYLEMIND_IDENTITY_JWT_PRIVATE_KEY_FILE:-./.secrets/stylemind-identity-private.pem}:/run/secrets/stylemind-identity-private.pem:ro
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    environment:
+      SERVER_PORT: "8080"
+      STYLEMIND_IDENTITY_BASE_URL: http://identity-service:8081
+    depends_on:
+      identity-service:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
 
   commerce-service:
     build:
@@ -69,8 +79,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8082:8082"
 
   payment-service:
     build:
@@ -85,8 +93,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8083:8083"
 
   wardrobe-community-service:
     build:
@@ -101,8 +107,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8084:8084"
 
   stylist-service:
     build:
@@ -117,8 +121,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8085:8085"
 
   notification-service:
     build:
@@ -152,6 +154,10 @@ services:
     ports:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"
+
+  health-probe:
+    image: curlimages/curl:8.12.1
+    profiles: ["tools"]
 
 volumes:
   postgres-data:
