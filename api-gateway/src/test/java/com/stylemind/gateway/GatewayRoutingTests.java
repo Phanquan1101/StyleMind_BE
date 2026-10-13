@@ -133,6 +133,14 @@ class GatewayRoutingTests {
         assertThat(response.body()).contains("/identity/v3/api-docs");
         assertThat(response.body()).contains("Commerce Service");
         assertThat(response.body()).contains("/commerce/v3/api-docs");
+        assertThat(response.body()).contains("Payment Service");
+        assertThat(response.body()).contains("/payment/v3/api-docs");
+        assertThat(response.body()).contains("Wardrobe Community Service");
+        assertThat(response.body()).contains("/wardrobe-community/v3/api-docs");
+        assertThat(response.body()).contains("Stylist Service");
+        assertThat(response.body()).contains("/stylist/v3/api-docs");
+        assertThat(response.body()).contains("Notification Service");
+        assertThat(response.body()).contains("/notification/v3/api-docs");
     }
 
     @Test
@@ -162,6 +170,21 @@ class GatewayRoutingTests {
 
     @Test
     @Order(6)
+    void stripsServicePrefixBeforeForwardingCommerceApiRequests() throws Exception {
+        commerceServer().respondWith(200, "application/json", "{\"items\":[]}", Map.of());
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/commerce/api/v1/products?size=10")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("{\"items\":[]}");
+        assertThat(commerceServer().lastMethod()).isEqualTo("GET");
+        assertThat(commerceServer().lastPath()).isEqualTo("/api/v1/products?size=10");
+    }
+
+    @Test
+    @Order(7)
     void preservesProblemDetailsStatusContentTypeAndResponseHeaders() throws Exception {
         String problem = "{\"type\":\"about:blank\",\"title\":\"Conflict\",\"status\":409,"
                 + "\"code\":\"EMAIL_ALREADY_REGISTERED\"}";
@@ -187,7 +210,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(7)
+    @Order(8)
     void doesNotAddBodyTo204OrHeadResponses() throws Exception {
         identityServer().respondWith(204, "application/json", "must-not-appear", Map.of());
         HttpResponse<byte[]> noContent = HttpClient.newHttpClient().send(
@@ -209,7 +232,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     void proxiesJwksWithoutWrappingOrChangingTheDocument() throws Exception {
         String jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"gateway-test-key\","
                 + "\"use\":\"sig\",\"alg\":\"RS256\",\"n\":\"abc\",\"e\":\"AQAB\"}]}";
@@ -226,7 +249,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void internalNotificationPathsAndEncodedVariantsNeverReachIdentityRoute() throws Exception {
         String[] paths = {
             "/internal/v1/email-verifications",

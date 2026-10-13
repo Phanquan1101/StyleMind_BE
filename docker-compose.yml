@@ -46,6 +46,7 @@ services:
       STYLEMIND_JWT_PRIVATE_KEY_PATH: ${STYLEMIND_JWT_PRIVATE_KEY_PATH:-/run/secrets/stylemind-identity-private.pem}
       STYLEMIND_JWT_ACCESS_TTL: ${STYLEMIND_JWT_ACCESS_TTL:-PT15M}
       STYLEMIND_JWT_REFRESH_TTL: ${STYLEMIND_JWT_REFRESH_TTL:-P7D}
+      STYLEMIND_OPENAPI_SERVER_URL: /identity
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,10 +62,22 @@ services:
       SERVER_PORT: "8080"
       STYLEMIND_IDENTITY_BASE_URL: http://identity-service:8081
       STYLEMIND_COMMERCE_BASE_URL: http://commerce-service:8082
+      STYLEMIND_PAYMENT_BASE_URL: http://payment-service:8083
+      STYLEMIND_WARDROBE_COMMUNITY_BASE_URL: http://wardrobe-community-service:8084
+      STYLEMIND_STYLIST_BASE_URL: http://stylist-service:8085
+      STYLEMIND_NOTIFICATION_BASE_URL: http://notification-service:8086
     depends_on:
       identity-service:
         condition: service_started
       commerce-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      wardrobe-community-service:
+        condition: service_started
+      stylist-service:
+        condition: service_started
+      notification-service:
         condition: service_started
     ports:
       - "127.0.0.1:8080:8080"
@@ -79,6 +92,7 @@ services:
       STYLEMIND_COMMERCE_DB_PASSWORD: ${STYLEMIND_COMMERCE_DB_PASSWORD:?Set STYLEMIND_COMMERCE_DB_PASSWORD in .env}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /commerce
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,6 +107,7 @@ services:
       STYLEMIND_PAYMENT_DB_PASSWORD: ${STYLEMIND_PAYMENT_DB_PASSWORD:?Set STYLEMIND_PAYMENT_DB_PASSWORD in .env}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /payment
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +122,7 @@ services:
       STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD: ${STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD:?Set STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD in .env}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /wardrobe-community
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,6 +137,7 @@ services:
       STYLEMIND_STYLIST_DB_PASSWORD: ${STYLEMIND_STYLIST_DB_PASSWORD:?Set STYLEMIND_STYLIST_DB_PASSWORD in .env}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /stylist
     depends_on:
       postgres:
         condition: service_healthy
@@ -146,6 +163,7 @@ services:
       STYLEMIND_EMAIL_FROM: ${STYLEMIND_EMAIL_FROM:-no-reply@stylemind.local}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /notification
     depends_on:
       postgres:
         condition: service_healthy
