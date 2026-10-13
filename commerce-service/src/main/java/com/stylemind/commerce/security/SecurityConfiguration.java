@@ -28,9 +28,15 @@ public class SecurityConfiguration {
                         .requestMatchers("/actuator/health", "/v3/api-docs", "/v3/api-docs/**",
                                 "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/categories/*",
-                                "/api/v1/brands", "/api/v1/brands/*").authenticated()
+                                "/api/v1/brands", "/api/v1/brands/*",
+                                "/api/v1/products", "/api/v1/products/*",
+                                "/api/v1/variant-images/*/content").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/variants/batch-lookup").authenticated()
                         .requestMatchers("/api/v1/admin/categories", "/api/v1/admin/categories/**",
-                                "/api/v1/admin/brands", "/api/v1/admin/brands/**")
+                                "/api/v1/admin/brands", "/api/v1/admin/brands/**",
+                                "/api/v1/admin/products", "/api/v1/admin/products/**",
+                                "/api/v1/admin/variants", "/api/v1/admin/variants/**",
+                                "/api/v1/admin/variant-images", "/api/v1/admin/variant-images/**")
                         .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

@@ -77,6 +77,8 @@ class CatalogReferencePostgresIntegrationTests {
 
     @BeforeEach
     void clearDisposableDatabase() {
+        jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
         jdbc.update("DELETE FROM public.brand");

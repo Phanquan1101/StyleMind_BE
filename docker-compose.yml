@@ -60,8 +60,11 @@ services:
     environment:
       SERVER_PORT: "8080"
       STYLEMIND_IDENTITY_BASE_URL: http://identity-service:8081
+      STYLEMIND_COMMERCE_BASE_URL: http://commerce-service:8082
     depends_on:
       identity-service:
+        condition: service_started
+      commerce-service:
         condition: service_started
     ports:
       - "127.0.0.1:8080:8080"
