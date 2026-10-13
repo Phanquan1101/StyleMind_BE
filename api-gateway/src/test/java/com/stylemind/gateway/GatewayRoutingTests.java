@@ -99,6 +99,22 @@ class GatewayRoutingTests {
 
     @Test
     @Order(3)
+    void proxiesIdentitySwaggerUiAssets() throws Exception {
+        identityServer().respondWith(200, "text/html", "<!doctype html><title>Swagger UI</title>", Map.of());
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/swagger-ui/index.html")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Content-Type")).contains("text/html");
+        assertThat(response.body()).contains("Swagger UI");
+        assertThat(identityServer().lastMethod()).isEqualTo("GET");
+        assertThat(identityServer().lastPath()).isEqualTo("/swagger-ui/index.html");
+    }
+
+    @Test
+    @Order(4)
     void preservesProblemDetailsStatusContentTypeAndResponseHeaders() throws Exception {
         String problem = "{\"type\":\"about:blank\",\"title\":\"Conflict\",\"status\":409,"
                 + "\"code\":\"EMAIL_ALREADY_REGISTERED\"}";
@@ -124,7 +140,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     void doesNotAddBodyTo204OrHeadResponses() throws Exception {
         identityServer().respondWith(204, "application/json", "must-not-appear", Map.of());
         HttpResponse<byte[]> noContent = HttpClient.newHttpClient().send(
@@ -146,7 +162,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     void proxiesJwksWithoutWrappingOrChangingTheDocument() throws Exception {
         String jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"gateway-test-key\","
                 + "\"use\":\"sig\",\"alg\":\"RS256\",\"n\":\"abc\",\"e\":\"AQAB\"}]}";
@@ -163,7 +179,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     void internalNotificationPathsAndEncodedVariantsNeverReachIdentityRoute() throws Exception {
         String[] paths = {
             "/internal/v1/email-verifications",

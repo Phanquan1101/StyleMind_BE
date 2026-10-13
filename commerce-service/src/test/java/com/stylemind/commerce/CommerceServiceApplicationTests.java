@@ -59,7 +59,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
-        "spring.datasource.hikari.initialization-fail-timeout=-1"
+        "spring.datasource.hikari.initialization-fail-timeout=-1",
+        "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
 @Import(CommerceServiceApplicationTests.JwtTestConfiguration.class)

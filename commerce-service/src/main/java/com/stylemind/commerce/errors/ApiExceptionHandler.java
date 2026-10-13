@@ -43,6 +43,13 @@ public class ApiExceptionHandler {
                 "Request media type is not supported", "UNSUPPORTED_MEDIA_TYPE", request);
     }
 
+    @ExceptionHandler(ApiOperationException.class)
+    public ResponseEntity<ProblemDetail> operationFailure(
+            ApiOperationException exception, HttpServletRequest request) {
+        return response(exception.status(), exception.status().getReasonPhrase(), exception.detail(),
+                exception.code(), request);
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ProblemDetail> notFound(NoResourceFoundException exception, HttpServletRequest request) {
         return response(HttpStatus.NOT_FOUND, "Not Found", "Resource was not found", "RESOURCE_NOT_FOUND", request);
