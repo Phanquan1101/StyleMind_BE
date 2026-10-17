@@ -22,6 +22,8 @@ import com.stylemind.identity.logging.CorrelationIdFilter;
 import com.stylemind.identity.model.login.LoginAccount;
 import com.stylemind.identity.repository.account.AccountRepository;
 import com.stylemind.identity.repository.session.RefreshSessionRepository;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.RefreshSessionRow;
 import com.stylemind.identity.security.JwtTokenService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -280,11 +282,11 @@ class LoginPostgresIntegrationTests {
     void statusChangedAfterCredentialCheckIsRevalidatedUnderLock() throws Exception {
         AccountFixture account = createAccount("ACTIVE", true, "Correct account password", "CUSTOMER");
         doAnswer(invocation -> {
-            Optional<LoginAccount> snapshot = (Optional<LoginAccount>) invocation.callRealMethod();
+            Optional<Account> snapshot = (Optional<Account>) invocation.callRealMethod();
             jdbcTemplate.update("UPDATE public.account SET account_status = 'LOCKED' WHERE account_id = ?",
                     account.accountId());
             return snapshot;
-        }).when(accountRepository).findForLogin(account.email());
+        }).when(accountRepository).findByEmail(account.email());
 
         postLogin(account.email(), "Correct account password")
                 .andExpect(status().isForbidden())
@@ -296,11 +298,11 @@ class LoginPostgresIntegrationTests {
     void passwordHashChangedAfterCredentialCheckIsRejectedWithoutSession() throws Exception {
         AccountFixture account = createAccount("ACTIVE", true, "Original correct password", "CUSTOMER");
         doAnswer(invocation -> {
-            Optional<LoginAccount> snapshot = (Optional<LoginAccount>) invocation.callRealMethod();
+            Optional<Account> snapshot = (Optional<Account>) invocation.callRealMethod();
             jdbcTemplate.update("UPDATE public.account SET password_hash = ? WHERE account_id = ?",
                     passwordEncoder.encode("new password value"), account.accountId());
             return snapshot;
-        }).when(accountRepository).findForLogin(account.email());
+        }).when(accountRepository).findByEmail(account.email());
 
         postLogin(account.email(), "Original correct password")
                 .andExpect(status().isUnauthorized())
@@ -338,8 +340,7 @@ class LoginPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only session write failure");
-        }).when(refreshSessionRepository).insert(any(UUID.class), any(UUID.class), any(String.class),
-                any(OffsetDateTime.class), any(OffsetDateTime.class));
+        }).when(refreshSessionRepository).saveAndFlush(any(RefreshSessionRow.class));
         MvcResult insertFailure = postLogin(account.email(), "Correct account password")
                 .andExpect(status().isInternalServerError()).andReturn();
         assertThat(insertFailure.getResponse().getContentAsString()).doesNotContain("access_token", "refresh_token");

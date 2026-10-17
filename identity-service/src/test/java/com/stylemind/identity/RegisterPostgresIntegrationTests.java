@@ -7,8 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.logging.CorrelationIdFilter;
-import com.stylemind.identity.model.emailverification.EmailVerificationChallenge;
+import com.stylemind.identity.entity.AccountRole;
+import com.stylemind.identity.entity.EmailVerificationChallengeRow;
 import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.account.AccountRoleRepository;
 import com.stylemind.identity.repository.emailverification.EmailVerificationRepository;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -119,6 +121,9 @@ class RegisterPostgresIntegrationTests {
 
     @MockitoSpyBean
     private AccountRepository accountRepository;
+
+    @MockitoSpyBean
+    private AccountRoleRepository roleRepository;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -446,7 +451,7 @@ class RegisterPostgresIntegrationTests {
     void challengeInsertFailureRollsBackAccountAndRole() throws Exception {
         String email = email();
         doThrow(new IllegalStateException("test-only challenge write failure"))
-                .when(challengeRepository).insert(any(EmailVerificationChallenge.class));
+                .when(challengeRepository).saveAndFlush(any(EmailVerificationChallengeRow.class));
 
         MvcResult result = register(email);
 
@@ -461,7 +466,7 @@ class RegisterPostgresIntegrationTests {
     void roleInsertFailureRollsBackAccountBeforeChallengeAndEmail() throws Exception {
         String email = email();
         org.mockito.Mockito.doThrow(new IllegalStateException("test-only role write failure"))
-                .when(accountRepository).insertRole(any(UUID.class), org.mockito.ArgumentMatchers.eq("CUSTOMER"));
+                .when(roleRepository).saveAndFlush(any(AccountRole.class));
 
         MvcResult result = register(email);
 
@@ -478,7 +483,7 @@ class RegisterPostgresIntegrationTests {
         register(email);
         String code = latestEmailCode();
         doThrow(new IllegalStateException("test-only account update failure"))
-                .when(accountRepository).activate(any(UUID.class), any());
+                .when(accountRepository).flush();
 
         MvcResult failure = postJson("/api/v1/auth/verify-email", Map.of("email", email, "code", code));
 

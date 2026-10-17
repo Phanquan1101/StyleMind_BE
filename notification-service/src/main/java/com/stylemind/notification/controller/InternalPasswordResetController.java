@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,13 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/internal/v1")
+@RequiredArgsConstructor
 public class InternalPasswordResetController {
 
     private final PasswordResetEmailSender sender;
-
-    public InternalPasswordResetController(PasswordResetEmailSender sender) {
-        this.sender = sender;
-    }
 
     @PostMapping(path = "/password-resets", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Send a password reset code", responses = {

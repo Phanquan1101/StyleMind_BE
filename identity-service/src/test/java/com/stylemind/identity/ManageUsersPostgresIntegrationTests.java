@@ -3,6 +3,7 @@ package com.stylemind.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -16,7 +17,10 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.stylemind.identity.repository.users.ManageUsersRepository;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.AccountRole;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.account.AccountRoleRepository;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -47,6 +51,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -87,11 +93,12 @@ class ManageUsersPostgresIntegrationTests {
     @Autowired private ObjectMapper mapper;
     @Autowired private PasswordEncoder passwordEncoder;
     @LocalServerPort private int port;
-    @MockitoSpyBean private ManageUsersRepository repository;
+    @MockitoSpyBean private AccountRepository accountRepository;
+    @MockitoSpyBean private AccountRoleRepository roleRepository;
 
     @BeforeEach
     void clearDisposableDatabase() {
-        reset(repository);
+        reset(accountRepository, roleRepository);
         jdbc.update("DELETE FROM public.profile_style");
         jdbc.update("DELETE FROM public.profile_color");
         jdbc.update("DELETE FROM public.profile_brand");
@@ -204,7 +211,7 @@ class ManageUsersPostgresIntegrationTests {
         String adminToken = token(admin.id(), "ADMIN");
         String customerToken = token(customer.id(), "CUSTOMER");
 
-        clearInvocations(repository);
+        clearInvocations(accountRepository, roleRepository);
         for (Route route : routes) {
             assertProblem(send(route.method(), route.path(), null, route.body()), 401, "AUTHENTICATION_REQUIRED");
             assertProblem(send(route.method(), route.path(), "not-a-jwt", route.body()), 401,
@@ -227,7 +234,7 @@ class ManageUsersPostgresIntegrationTests {
             assertProblem(send(route.method(), route.path(), token(admin.id(), "STYLIST"), route.body()),
                     403, "ACCESS_DENIED");
         }
-        org.mockito.Mockito.verifyNoInteractions(repository);
+        org.mockito.Mockito.verifyNoInteractions(accountRepository, roleRepository);
 
         String unsupportedRole = token(admin.id(), "STYLIST");
         assertProblem(send("GET", USERS, unsupportedRole, null), 403, "ACCESS_DENIED");
@@ -264,7 +271,7 @@ class ManageUsersPostgresIntegrationTests {
         assertThat(send("PATCH", encodedStatus, adminToken, "{\"account_status\":\"ACTIVE\"}")
                 .statusCode()).isEqualTo(200);
 
-        clearInvocations(repository);
+        clearInvocations(accountRepository, roleRepository);
         assertThat(send("OPTIONS", USERS, null, null).statusCode()).isEqualTo(401);
         assertThat(send("OPTIONS", USERS, customerToken, null).statusCode()).isEqualTo(403);
         HttpResponse<String> options = send("OPTIONS", USERS, adminToken, null);
@@ -275,10 +282,10 @@ class ManageUsersPostgresIntegrationTests {
             HttpResponse<String> unsupported = send(method, USERS, adminToken, "{}");
             assertThat(unsupported.statusCode()).isBetween(400, 499);
         }
-        org.mockito.Mockito.verifyNoInteractions(repository);
+        org.mockito.Mockito.verifyNoInteractions(accountRepository, roleRepository);
         assertThat(send("POST", USERS, null, "{}").statusCode()).isEqualTo(401);
         assertThat(send("POST", USERS, customerToken, "{}").statusCode()).isEqualTo(403);
-        org.mockito.Mockito.verifyNoInteractions(repository);
+        org.mockito.Mockito.verifyNoInteractions(accountRepository, roleRepository);
     }
 
     @Test
@@ -485,22 +492,29 @@ class ManageUsersPostgresIntegrationTests {
         CountDownLatch roleReplacementWritten = new CountDownLatch(1);
         CountDownLatch releaseRoleReplacement = new CountDownLatch(1);
         doAnswer(invocation -> {
-            int inserted = (int) invocation.callRealMethod();
+            Object inserted = invocation.callRealMethod();
             roleReplacementWritten.countDown();
             if (!releaseRoleReplacement.await(20, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("test synchronization timed out");
             }
             return inserted;
-        }).when(repository).insertRole(adminA.id(), "CUSTOMER");
+        }).when(roleRepository).saveAll(argThat(rows -> {
+            for (AccountRole row : rows) {
+                if (adminA.id().equals(row.getAccountId()) && "CUSTOMER".equals(row.getRoleCode())) {
+                    return true;
+                }
+            }
+            return false;
+        }));
 
         CompletableFuture<HttpResponse<String>> write = sendAsync(
                 "PUT", USERS + "/" + adminA.id() + "/roles", tokenB, "{\"roles\":[\"CUSTOMER\"]}");
         CompletableFuture<HttpResponse<String>> list = null;
         try {
             assertThat(roleReplacementWritten.await(15, TimeUnit.SECONDS)).isTrue();
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             list = sendAsync("GET", USERS, tokenA, null);
-            awaitDatabaseLockWait("pg_advisory_xact_lock_shared(");
+            awaitDatabaseLockWait("account_role");
             releaseRoleReplacement.countDown();
 
             HttpResponse<String> writeResponse = write.get(25, TimeUnit.SECONDS);
@@ -515,16 +529,16 @@ class ManageUsersPostgresIntegrationTests {
             assertThat(listResponse.headers().firstValue("X-Correlation-Id").orElse(""))
                     .isEqualTo(json(listResponse).path("correlationId").asText());
             assertThat(listResponse.body()).doesNotContain(adminA.email(), adminB.email());
-            verify(repository, never()).userPage(any());
+            verify(accountRepository, never()).findAll(any(Specification.class), any(Pageable.class));
             assertThat(roles(adminA.id())).containsExactly("CUSTOMER");
             assertThat(qualifyingAdminCount()).isEqualTo(1);
 
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             HttpResponse<String> head = send("HEAD", USERS, tokenA, null);
             assertThat(head.statusCode()).isEqualTo(403);
             assertThat(head.body()).isEmpty();
             assertNoStore(head);
-            verify(repository, never()).userPage(any());
+            verify(accountRepository, never()).findAll(any(Specification.class), any(Pageable.class));
         } finally {
             releaseRoleReplacement.countDown();
             write.get(25, TimeUnit.SECONDS);
@@ -543,13 +557,14 @@ class ManageUsersPostgresIntegrationTests {
         CountDownLatch suspensionWritten = new CountDownLatch(1);
         CountDownLatch releaseSuspension = new CountDownLatch(1);
         doAnswer(invocation -> {
-            int updated = (int) invocation.callRealMethod();
+            Object updated = invocation.callRealMethod();
             suspensionWritten.countDown();
             if (!releaseSuspension.await(20, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("test synchronization timed out");
             }
             return updated;
-        }).when(repository).updateStatus(adminA.id(), "SUSPENDED");
+        }).when(accountRepository).saveAndFlush(argThat(account -> adminA.id().equals(account.getAccountId())
+                && "SUSPENDED".equals(account.getAccountStatus())));
 
         CompletableFuture<HttpResponse<String>> write = sendAsync(
                 "PATCH", USERS + "/" + adminA.id() + "/status", tokenB,
@@ -557,9 +572,9 @@ class ManageUsersPostgresIntegrationTests {
         CompletableFuture<HttpResponse<String>> list = null;
         try {
             assertThat(suspensionWritten.await(15, TimeUnit.SECONDS)).isTrue();
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             list = sendAsync("GET", USERS, tokenA, null);
-            awaitDatabaseLockWait("pg_advisory_xact_lock_shared(");
+            awaitDatabaseLockWait("account_role");
             releaseSuspension.countDown();
 
             HttpResponse<String> writeResponse = write.get(25, TimeUnit.SECONDS);
@@ -574,7 +589,7 @@ class ManageUsersPostgresIntegrationTests {
             assertThat(listResponse.headers().firstValue("X-Correlation-Id").orElse(""))
                     .isEqualTo(json(listResponse).path("correlationId").asText());
             assertThat(listResponse.body()).doesNotContain(adminA.email(), adminB.email());
-            verify(repository, never()).userPage(any());
+            verify(accountRepository, never()).findAll(any(Specification.class), any(Pageable.class));
             assertThat(jdbc.queryForObject("SELECT account_status FROM public.account WHERE account_id = ?",
                     String.class, adminA.id())).isEqualTo("SUSPENDED");
             assertThat(roles(adminA.id())).containsExactly("ADMIN", "CUSTOMER");
@@ -602,7 +617,7 @@ class ManageUsersPostgresIntegrationTests {
                 throw new IllegalStateException("test synchronization timed out");
             }
             return invocation.callRealMethod();
-        }).when(repository).userPage(any());
+        }).when(accountRepository).findAll(any(Specification.class), any(Pageable.class));
 
         CompletableFuture<HttpResponse<String>> list = sendAsync("GET", USERS, tokenA, null);
         CompletableFuture<HttpResponse<String>> write = null;
@@ -610,7 +625,7 @@ class ManageUsersPostgresIntegrationTests {
             assertThat(listAuthorizedBeforeCount.await(15, TimeUnit.SECONDS)).isTrue();
             write = sendAsync("PUT", USERS + "/" + adminA.id() + "/roles", tokenB,
                     "{\"roles\":[\"CUSTOMER\"]}");
-            awaitDatabaseLockWait("pg_advisory_xact_lock(");
+            awaitDatabaseLockWait("account_role");
             releaseList.countDown();
 
             HttpResponse<String> listResponse = list.get(25, TimeUnit.SECONDS);
@@ -624,18 +639,18 @@ class ManageUsersPostgresIntegrationTests {
             assertThat(roles(adminA.id())).containsExactly("CUSTOMER");
             assertThat(qualifyingAdminCount()).isEqualTo(1);
 
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             HttpResponse<String> staleList = send("GET", USERS, tokenA, null);
             assertProblem(staleList, 403, "ADMIN_ACCESS_DENIED");
             assertThat(staleList.body()).doesNotContain(adminA.email(), adminB.email());
-            verify(repository, never()).userPage(any());
+            verify(accountRepository, never()).findAll(any(Specification.class), any(Pageable.class));
 
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             HttpResponse<String> staleHead = send("HEAD", USERS, tokenA, null);
             assertThat(staleHead.statusCode()).isEqualTo(403);
             assertThat(staleHead.body()).isEmpty();
             assertNoStore(staleHead);
-            verify(repository, never()).userPage(any());
+            verify(accountRepository, never()).findAll(any(Specification.class), any(Pageable.class));
         } finally {
             releaseList.countDown();
             list.get(25, TimeUnit.SECONDS);
@@ -662,14 +677,14 @@ class ManageUsersPostgresIntegrationTests {
             assertThat(accountState(adminA.id())).isEqualTo(before);
             assertThat(roles(adminA.id())).containsExactly("ADMIN", "CUSTOMER");
 
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             HttpResponse<String> list = send("GET", USERS, tokenA, null);
             assertThat(list.statusCode()).isEqualTo(200);
             assertNoStore(list);
             assertThat(strings(findItem(json(list), adminA.id()).path("roles")))
                     .containsExactly("ADMIN", "CUSTOMER");
 
-            clearInvocations(repository);
+            clearInvocations(accountRepository, roleRepository);
             HttpResponse<String> head = send("HEAD", USERS, tokenA, null);
             assertThat(head.statusCode()).isEqualTo(200);
             assertThat(head.body()).isEmpty();
@@ -682,7 +697,7 @@ class ManageUsersPostgresIntegrationTests {
     private PairResult runContendedPair(User firstActor, User secondActor,
             String firstMethod, String firstPath, String firstBody,
             String secondMethod, String secondPath, String secondBody) throws Exception {
-        reset(repository);
+        reset(accountRepository, roleRepository);
         CountDownLatch firstOwnsDatabaseLock = new CountDownLatch(1);
         CountDownLatch secondAttemptsDatabaseLock = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
@@ -701,19 +716,19 @@ class ManageUsersPostgresIntegrationTests {
                 secondAttemptsDatabaseLock.countDown();
             }
             return invocation.callRealMethod();
-        }).when(repository).lockAdminMutations();
+        }).when(roleRepository).findLockedByIdRoleCodeOrderByIdAccountIdAsc("ADMIN");
 
         CompletableFuture<HttpResponse<String>> first = sendAsync(firstMethod, firstPath,
                 token(firstActor.id(), "ADMIN"), firstBody);
         if (!firstOwnsDatabaseLock.await(15, TimeUnit.SECONDS)) {
             releaseFirst.countDown();
-            throw new AssertionError("First administrative request did not acquire the advisory lock");
+            throw new AssertionError("First administrative request did not acquire the Admin role row locks");
         }
         CompletableFuture<HttpResponse<String>> second = sendAsync(secondMethod, secondPath,
                 token(secondActor.id(), "ADMIN"), secondBody);
         try {
             assertThat(secondAttemptsDatabaseLock.await(15, TimeUnit.SECONDS)).isTrue();
-            awaitAdvisoryLockWait();
+            awaitDatabaseLockWait("account_role");
         } finally {
             releaseFirst.countDown();
         }
@@ -726,23 +741,6 @@ class ManageUsersPostgresIntegrationTests {
         assertThat(pair.first().statusCode()).isEqualTo(200);
         assertNoStore(pair.first());
         assertProblem(pair.second(), 403, "ADMIN_ACCESS_DENIED");
-    }
-
-    private void awaitAdvisoryLockWait() throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-        while (System.nanoTime() < deadline) {
-            Integer waiting = jdbc.queryForObject("""
-                    SELECT count(*) FROM pg_stat_activity
-                    WHERE datname = current_database() AND state = 'active'
-                      AND wait_event_type = 'Lock'
-                      AND query ILIKE '%pg_advisory_xact_lock%'
-                    """, Integer.class);
-            if (waiting != null && waiting > 0) {
-                return;
-            }
-            Thread.sleep(15);
-        }
-        throw new AssertionError("Second administrative request did not wait on PostgreSQL advisory lock");
     }
 
     private void awaitDatabaseLockWait(String queryFragment) throws Exception {

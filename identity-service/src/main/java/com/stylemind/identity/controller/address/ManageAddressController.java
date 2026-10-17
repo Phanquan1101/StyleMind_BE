@@ -8,6 +8,7 @@ import com.stylemind.identity.service.address.ManageAddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Map;
@@ -33,11 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/me/addresses")
 @SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
 public class ManageAddressController {
     private static final Set<String> OWNER_QUERY_FIELDS = Set.of("account_id", "customer_id", "user_id");
     private final ManageAddressService service;
-
-    public ManageAddressController(ManageAddressService service) { this.service = service; }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List the authenticated account's addresses", responses = {

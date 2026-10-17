@@ -8,6 +8,7 @@ import com.stylemind.identity.service.profile.ManageProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.RequiredArgsConstructor;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -22,13 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1")
 @SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
 public class ManageProfileController {
 
     private final ManageProfileService manageProfileService;
-
-    public ManageProfileController(ManageProfileService manageProfileService) {
-        this.manageProfileService = manageProfileService;
-    }
 
     @GetMapping(path = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Get the authenticated account profile",
