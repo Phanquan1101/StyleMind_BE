@@ -1,6 +1,16 @@
-# Identity — First Admin Provisioning (Operator-Controlled)
+# Identity — First Admin Provisioning
 
-This is a manual, one-time operational procedure. There is intentionally no public endpoint, application startup seed, runtime backdoor, hard-coded account, or committed credential. This task does not provision an Admin in any persistent database.
+## Local Docker Compose bootstrap
+
+The owner approved a local-only bootstrap for team development. It is available only when Identity runs with the Compose-provided `compose-local` Spring profile and `STYLEMIND_BOOTSTRAP_ADMIN_ENABLED=true`.
+
+Set `STYLEMIND_BOOTSTRAP_ADMIN_EMAIL` and `STYLEMIND_BOOTSTRAP_ADMIN_PASSWORD` in the ignored local `.env`; never put real values in Git. On first startup, if that normalized email is absent from `stylemind_identity`, the bootstrap creates one account with status `ACTIVE`, `email_verified_at` set, a password hash produced by Identity's configured `PasswordEncoder`, and the `ADMIN` role. This trusted local bootstrap is the explicit exception to Register OTP; it creates no OTP row and sends no email. No migration or public API is involved.
+
+The operation is insert-only. Repeated startups leave an already-provisioned Admin unchanged. If the email already belongs to another account, the bootstrap does not activate, verify, promote, or change its password/roles; it logs a generic warning and leaves that row untouched. Updating the environment password does not rotate an existing account. The flag is disabled by default. After creating the local Admin, it may be disabled while the account remains in the persistent Compose volume. This local exception does not define or authorize production behavior.
+
+## Other environments: operator-controlled provisioning
+
+For runtimes outside the explicitly local Compose profile, there is no startup seed or public endpoint. Continue to use the operator-controlled procedure below. Production topology is not inferred here.
 
 ## Preconditions
 
