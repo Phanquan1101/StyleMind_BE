@@ -6,6 +6,7 @@ import com.stylemind.identity.service.address.ManageAddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,10 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/locations")
 @SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
 public class LocationLookupController {
     private final ManageAddressService service;
-
-    public LocationLookupController(ManageAddressService service) { this.service = service; }
 
     @GetMapping(path = "/provinces", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List pinned Vietnam provinces", responses = {

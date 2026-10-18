@@ -1,13 +1,15 @@
 package com.stylemind.identity.service.passwordreset.internal;
 
-import com.stylemind.identity.model.login.LoginAccount;
-import com.stylemind.identity.model.passwordreset.PasswordResetChallenge;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.PasswordResetChallengeRow;
+import com.stylemind.identity.entity.RefreshSessionRow;
 import com.stylemind.identity.repository.account.AccountRepository;
 import com.stylemind.identity.repository.passwordreset.PasswordResetRepository;
 import com.stylemind.identity.repository.session.RefreshSessionRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,28 +33,33 @@ public class PasswordResetTransactionService {
 
     @Transactional
     public boolean reset(UUID accountId, byte[] tokenHash, String newPasswordHash) {
-        LoginAccount account = accountRepository.lockLoginAccount(accountId).orElse(null);
-        if (account == null || !"ACTIVE".equals(account.accountStatus()) || account.emailVerifiedAt() == null) {
+        Account account = accountRepository.findLockedByAccountId(accountId).orElse(null);
+        if (account == null || !"ACTIVE".equals(account.getAccountStatus())
+                || account.getEmailVerifiedAt() == null) {
             return false;
         }
-        PasswordResetChallenge challenge = challengeRepository.lockByResetTokenHash(tokenHash).orElse(null);
-        if (challenge == null || !challenge.accountId().equals(accountId) || challenge.verifiedAt() == null
-                || challenge.consumedAt() != null || challenge.resetTokenExpiresAt() == null) {
+        PasswordResetChallengeRow challenge = challengeRepository.findLockedByResetTokenHash(tokenHash).orElse(null);
+        if (challenge == null || !challenge.getAccountId().equals(accountId) || challenge.getVerifiedAt() == null
+                || challenge.getConsumedAt() != null || challenge.getResetTokenExpiresAt() == null
+                || challenge.getResetTokenHash() == null
+                || !java.security.MessageDigest.isEqual(challenge.getResetTokenHash(), tokenHash)) {
             return false;
         }
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         now = now.withNano((now.getNano() / 1_000) * 1_000);
-        if (!now.isBefore(challenge.resetTokenExpiresAt())) {
+        if (!now.isBefore(challenge.getResetTokenExpiresAt())) {
             return false;
         }
 
-        if (!accountRepository.updatePasswordHash(accountId, newPasswordHash)) {
-            throw new IllegalStateException("Password reset update did not affect the locked account");
-        }
-        if (!challengeRepository.consumeResetGrant(accountId, challenge.challengeId(), tokenHash, now)) {
-            throw new IllegalStateException("Password reset grant could not be consumed");
-        }
-        refreshSessionRepository.revokeAllActiveForAccount(accountId, now);
+        account.setPasswordHash(newPasswordHash);
+        challenge.setConsumedAt(now);
+        accountRepository.flush();
+        challengeRepository.flush();
+        OffsetDateTime revokedAt = now;
+        List<RefreshSessionRow> activeSessions = refreshSessionRepository
+                .findByAccountIdAndRevokedAtIsNull(accountId);
+        activeSessions.forEach(session -> session.setRevokedAt(revokedAt));
+        refreshSessionRepository.saveAll(activeSessions);
         return true;
     }
 }

@@ -1,6 +1,7 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.clearInvocations;
@@ -14,6 +15,7 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.stylemind.identity.repository.address.AddressRepository;
+import com.stylemind.identity.entity.CustomerAddress;
 import com.stylemind.identity.service.address.ManageAddressService;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -300,8 +302,7 @@ class ManageAddressPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only insert failure after write");
-        }).when(repository).insert(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(owner),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
+        }).when(repository).saveAndFlush(argThat(address -> owner.equals(address.getAccountId())));
         assertThat(send("POST", ADDRESSES, bearer, body(null, "A", "0912345678", "A", null)).statusCode()).isEqualTo(500);
         assertThat(count(owner)).isZero();
         reset(repository);
@@ -312,8 +313,7 @@ class ManageAddressPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only patch failure after write");
-        }).when(repository).update(org.mockito.ArgumentMatchers.eq(owner), org.mockito.ArgumentMatchers.eq(second),
-                org.mockito.ArgumentMatchers.any());
+        }).when(repository).saveAndFlush(argThat(address -> second.equals(address.getAddressId())));
         assertThat(send("PATCH", ADDRESSES + "/" + second, bearer, "{\"label\":\"Changed\"}")
                 .statusCode()).isEqualTo(500);
         assertThat(state(owner)).isEqualTo(before);
@@ -322,7 +322,14 @@ class ManageAddressPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only default failure after write");
-        }).when(repository).setDefault(org.mockito.ArgumentMatchers.eq(owner), org.mockito.ArgumentMatchers.eq(second));
+        }).when(repository).saveAll(argThat(addresses -> {
+            for (CustomerAddress address : addresses) {
+                if (second.equals(address.getAddressId()) && address.isDefaultAddress()) {
+                    return true;
+                }
+            }
+            return false;
+        }));
         assertThat(send("PUT", ADDRESSES + "/" + second + "/default", bearer, null).statusCode()).isEqualTo(500);
         assertThat(state(owner)).isEqualTo(before);
         reset(repository);
@@ -330,7 +337,7 @@ class ManageAddressPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only delete failure after write");
-        }).when(repository).delete(org.mockito.ArgumentMatchers.eq(owner), org.mockito.ArgumentMatchers.eq(second));
+        }).when(repository).delete(argThat(address -> second.equals(address.getAddressId())));
         assertThat(send("DELETE", ADDRESSES + "/" + second, bearer, null).statusCode()).isEqualTo(500);
         assertThat(state(owner)).isEqualTo(before);
         assertThat(defaultCount(owner)).isEqualTo(1);
@@ -463,7 +470,7 @@ class ManageAddressPostgresIntegrationTests {
             Integer waiting = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity "
                     + "WHERE pid <> pg_backend_pid() AND datname = current_database() "
                     + "AND state = 'active' AND wait_event_type = 'Lock' "
-                    + "AND query ILIKE '%public.account%' AND query ILIKE '%FOR UPDATE%'", Integer.class);
+                    + "AND query ILIKE '%public.account%'", Integer.class);
             if (waiting != null && waiting > 0) return waiting;
             Thread.sleep(10);
         }
@@ -485,7 +492,7 @@ class ManageAddressPostgresIntegrationTests {
                 }
             }
             return invocation.callRealMethod();
-        }).when(repository).findAll(org.mockito.ArgumentMatchers.any());
+        }).when(repository).findByAccountId(org.mockito.ArgumentMatchers.any(UUID.class));
         CompletableFuture<HttpResponse<String>> a = concurrentRequest(bearer, methodA, pathA, bodyA, ready, start);
         CompletableFuture<HttpResponse<String>> b = concurrentRequest(bearer, methodB, pathB, bodyB, ready, start);
         try {
