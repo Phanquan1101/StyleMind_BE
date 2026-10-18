@@ -34,6 +34,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +53,19 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import com.stylemind.commerce.repository.branch.BranchRepository;
+import com.stylemind.commerce.repository.cart.CartRepository;
+import com.stylemind.commerce.repository.cart.CartItemRepository;
+import com.stylemind.commerce.repository.catalog.BrandRepository;
+import com.stylemind.commerce.repository.catalog.CategoryRepository;
+import com.stylemind.commerce.repository.order.CancellationRepository;
+import com.stylemind.commerce.repository.order.OrderAddressRepository;
+import com.stylemind.commerce.repository.order.OrderHistoryRepository;
+import com.stylemind.commerce.repository.order.OrderItemRepository;
+import com.stylemind.commerce.repository.order.OrderRepository;
+import com.stylemind.commerce.repository.product.ProductRepository;
+import com.stylemind.commerce.repository.product.ProductVariantRepository;
+import com.stylemind.commerce.repository.product.VariantImageRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,11 +74,51 @@ import org.springframework.web.bind.annotation.RestController;
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
         "spring.datasource.hikari.initialization-fail-timeout=-1",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
 })
 @AutoConfigureMockMvc
 @Import(CommerceServiceApplicationTests.JwtTestConfiguration.class)
 class CommerceServiceApplicationTests {
+
+    @MockBean
+    private BranchRepository branchRepository;
+
+    @MockBean
+    private BrandRepository brandRepository;
+
+    @MockBean
+    private CategoryRepository categoryRepository;
+
+    @MockBean
+    private ProductRepository productRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
+
+    @MockBean
+    private VariantImageRepository variantImageRepository;
+
+    @MockBean
+    private CartRepository cartRepository;
+
+    @MockBean
+    private CartItemRepository cartItemRepository;
+
+    @MockBean
+    private OrderRepository orderRepository;
+
+    @MockBean
+    private OrderAddressRepository orderAddressRepository;
+
+    @MockBean
+    private OrderItemRepository orderItemRepository;
+
+    @MockBean
+    private OrderHistoryRepository orderHistoryRepository;
+
+    @MockBean
+    private CancellationRepository cancellationRepository;
 
     private static final String CORRELATION_HEADER = "X-Correlation-Id";
     private static final RSAKey SIGNING_KEY = generateRsaKey();

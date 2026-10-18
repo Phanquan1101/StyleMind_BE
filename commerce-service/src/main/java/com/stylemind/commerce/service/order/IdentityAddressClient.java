@@ -3,7 +3,7 @@ package com.stylemind.commerce.service.order;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.commerce.client.identity.IdentityFeignClient;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.order.AddressSnapshot;
+import com.stylemind.commerce.dto.order.AddressSnapshot;
 import feign.FeignException;
 import feign.RetryableException;
 import java.util.UUID;

@@ -1,15 +1,15 @@
 package com.stylemind.commerce.service.branch;
 
 import com.stylemind.commerce.dto.branch.BranchListResponse;
+import com.stylemind.commerce.dto.branch.BranchRequest;
 import com.stylemind.commerce.dto.branch.BranchResponse;
+import com.stylemind.commerce.entity.Branch;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.branch.Branch;
-import com.stylemind.commerce.model.branch.BranchCommand;
 import com.stylemind.commerce.repository.branch.BranchRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,38 +22,45 @@ public class BranchService {
 
     @Transactional(readOnly = true)
     public BranchListResponse listPublic() {
-        return new BranchListResponse(repository.list(true).stream().map(this::response).toList());
+        return new BranchListResponse(repository.findAllByBranchStatusOrderByNameAscBranchIdAsc("ACTIVE")
+                .stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
     public BranchResponse getPublic(UUID branchId) {
-        return response(repository.find(branchId, true).orElseThrow(this::notFound));
+        return response(repository.findByBranchIdAndBranchStatus(branchId, "ACTIVE").orElseThrow(this::notFound));
     }
 
     @Transactional(readOnly = true)
     public BranchListResponse listAdmin() {
-        return new BranchListResponse(repository.list(false).stream().map(this::response).toList());
+        return new BranchListResponse(repository.findAllByOrderByNameAscBranchIdAsc()
+                .stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
     public BranchResponse getAdmin(UUID branchId) {
-        return response(repository.find(branchId, false).orElseThrow(this::notFound));
+        return response(repository.findById(branchId).orElseThrow(this::notFound));
     }
 
     @Transactional
-    public BranchResponse create(BranchCommand command) {
+    public BranchResponse create(BranchRequest command) {
         try {
-            return response(repository.insert(UUID.randomUUID(), command));
-        } catch (DuplicateKeyException exception) {
+            Branch branch = new Branch();
+            branch.setBranchId(UUID.randomUUID());
+            apply(branch, command);
+            return response(repository.saveAndFlush(branch));
+        } catch (DataIntegrityViolationException exception) {
             throw duplicateCode();
         }
     }
 
     @Transactional
-    public BranchResponse replace(UUID branchId, BranchCommand command) {
+    public BranchResponse replace(UUID branchId, BranchRequest command) {
         try {
-            return response(repository.update(branchId, command).orElseThrow(this::notFound));
-        } catch (DuplicateKeyException exception) {
+            Branch branch = repository.findById(branchId).orElseThrow(this::notFound);
+            apply(branch, command);
+            return response(repository.saveAndFlush(branch));
+        } catch (DataIntegrityViolationException exception) {
             throw duplicateCode();
         }
     }
@@ -61,18 +68,27 @@ public class BranchService {
     @Transactional
     public void delete(UUID branchId) {
         try {
-            if (repository.delete(branchId) != 1) {
+            if (!repository.existsById(branchId)) {
                 throw notFound();
             }
+            repository.deleteById(branchId);
         } catch (DataIntegrityViolationException exception) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "BRANCH_IN_USE",
                     "Branch is used by existing data");
         }
     }
 
+    private void apply(Branch branch, BranchRequest request) {
+        branch.setBranchCode(request.branchCode());
+        branch.setName(request.name());
+        branch.setAddressLine(request.addressLine());
+        branch.setContactPhone(request.contactPhone());
+        branch.setBranchStatus(request.branchStatus().name());
+    }
+
     private BranchResponse response(Branch branch) {
-        return new BranchResponse(branch.branchId(), branch.branchCode(), branch.name(), branch.addressLine(),
-                branch.contactPhone(), branch.branchStatus().name());
+        return new BranchResponse(branch.getBranchId(), branch.getBranchCode(), branch.getName(), branch.getAddressLine(),
+                branch.getContactPhone(), branch.getBranchStatus());
     }
 
     private ApiOperationException notFound() {

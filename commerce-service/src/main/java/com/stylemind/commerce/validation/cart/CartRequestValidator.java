@@ -2,8 +2,8 @@ package com.stylemind.commerce.validation.cart;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.cart.CartItemCommand;
-import com.stylemind.commerce.model.cart.CartOwner;
+import com.stylemind.commerce.dto.cart.CartItemCommand;
+import com.stylemind.commerce.dto.cart.CartOwner;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Iterator;
 import java.util.Set;
