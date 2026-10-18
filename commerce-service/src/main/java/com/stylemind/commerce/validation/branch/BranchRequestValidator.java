@@ -2,8 +2,8 @@ package com.stylemind.commerce.validation.branch;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.branch.BranchCommand;
-import com.stylemind.commerce.model.branch.BranchStatus;
+import com.stylemind.commerce.dto.branch.BranchRequest;
+import com.stylemind.commerce.enums.BranchStatus;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
@@ -18,13 +18,13 @@ public class BranchRequestValidator {
             "branch_code", "name", "address_line", "contact_phone", "branch_status");
     private static final String CODE_PATTERN = "[A-Z0-9][A-Z0-9_-]{1,31}";
 
-    public BranchCommand command(JsonNode body) {
+    public BranchRequest command(JsonNode body) {
         requireExactFields(body);
         String code = text(body, "branch_code", false).strip().toUpperCase(Locale.ROOT);
         if (!code.matches(CODE_PATTERN)) {
             throw invalidRequest();
         }
-        return new BranchCommand(code, boundedText(text(body, "name", false), 1, 160),
+        return new BranchRequest(code, boundedText(text(body, "name", false), 1, 160),
                 boundedText(text(body, "address_line", false), 1, 500),
                 nullableBoundedText(body, "contact_phone", 32),
                 enumValue(text(body, "branch_status", false), BranchStatus.class));

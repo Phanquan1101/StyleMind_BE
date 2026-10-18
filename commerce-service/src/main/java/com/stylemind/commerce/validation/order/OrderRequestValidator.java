@@ -2,9 +2,9 @@ package com.stylemind.commerce.validation.order;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.order.CancellationStatus;
-import com.stylemind.commerce.model.order.OrderStatus;
-import com.stylemind.commerce.model.order.PaymentMethod;
+import com.stylemind.commerce.enums.CancellationStatus;
+import com.stylemind.commerce.enums.OrderStatus;
+import com.stylemind.commerce.enums.PaymentMethod;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Iterator;
 import java.util.Locale;

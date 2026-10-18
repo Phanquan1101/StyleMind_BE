@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.commerce.dto.catalog.CatalogReferenceListResponse;
 import com.stylemind.commerce.dto.catalog.CatalogReferenceResponse;
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.model.catalog.CatalogReferenceCommand;
-import com.stylemind.commerce.model.catalog.CatalogReferenceType;
+import com.stylemind.commerce.dto.catalog.CatalogReferenceRequest;
+import com.stylemind.commerce.enums.CatalogReferenceType;
 import com.stylemind.commerce.service.catalog.CatalogReferenceService;
 import com.stylemind.commerce.validation.catalog.CatalogReferenceRequestValidator;
 import io.swagger.v3.oas.annotations.Operation;
@@ -82,7 +82,7 @@ public class BrandController {
                     @ApiResponse(responseCode = "409", description = "Duplicate slug")
             })
     public CatalogReferenceResponse replace(@PathVariable String brandId, @RequestBody JsonNode body) {
-        CatalogReferenceCommand command = validator.command(body);
+        CatalogReferenceRequest command = validator.command(body);
         return service.replace(CatalogReferenceType.BRAND, id(brandId), command);
     }
 
