@@ -1,0 +1,169 @@
+{
+  "info": {
+    "name": "StyleMind Commerce US-03.02-03.04 Products Variants Images",
+    "_postman_id": "8f64dd1f-7932-4edb-a9a6-663cbb91c3bb",
+    "description": "Importable requests for product, variant, product-view, and variant-image APIs. Set baseUrl and bearerToken before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8082"},
+    {"key": "bearerToken", "value": ""},
+    {"key": "categoryId", "value": ""},
+    {"key": "brandId", "value": ""},
+    {"key": "productId", "value": ""},
+    {"key": "variantId", "value": ""},
+    {"key": "imageId", "value": ""}
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {"key": "token", "value": "{{bearerToken}}", "type": "string"}
+    ]
+  },
+  "item": [
+    {
+      "name": "Admin Products",
+      "item": [
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": \"{{categoryId}}\",\n  \"brand_id\": \"{{brandId}}\",\n  \"name\": \"Linen Shirt\",\n  \"description\": \"Lightweight linen\",\n  \"demographic_segment\": \"WOMEN\",\n  \"product_status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/products"
+          }
+        },
+        {
+          "name": "Get Admin Product",
+          "request": {"method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"}
+        },
+        {
+          "name": "Replace Product",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": \"{{categoryId}}\",\n  \"brand_id\": \"{{brandId}}\",\n  \"name\": \"Linen Overshirt\",\n  \"description\": \"Updated description\",\n  \"demographic_segment\": \"WOMEN\",\n  \"product_status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"}
+        }
+      ]
+    },
+    {
+      "name": "Admin Variants",
+      "item": [
+        {
+          "name": "Create Variant",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SKU-001\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 199000,\n  \"variant_status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}/variants"
+          }
+        },
+        {
+          "name": "Replace Variant",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SKU-001-EDIT\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 209000,\n  \"variant_status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}"
+          }
+        },
+        {
+          "name": "Invalid Price (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SKU-BAD\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": -1,\n  \"variant_status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}/variants"
+          }
+        },
+        {
+          "name": "Delete Variant",
+          "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}"}
+        }
+      ]
+    },
+    {
+      "name": "Product Views",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/products?keyword=linen&category_id={{categoryId}}&min_price_vnd=100000&max_price_vnd=300000&demographic_segment=WOMEN&page=0&size=20"
+          }
+        },
+        {
+          "name": "Product Detail",
+          "request": {"method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/products/{{productId}}"}
+        },
+        {
+          "name": "Batch Variant Lookup",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"variant_ids\": [\"{{variantId}}\"]\n}"},
+            "url": "{{baseUrl}}/api/v1/variants/batch-lookup"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Variant Images",
+      "item": [
+        {
+          "name": "Upload Variant Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "file", "type": "file", "src": []},
+                {"key": "alt_text", "value": "Front image", "type": "text"}
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}/images"
+          }
+        },
+        {
+          "name": "Reorder Images",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\"image_id\": \"{{imageId}}\", \"display_order\": 0}\n  ],\n  \"primary_image_id\": \"{{imageId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}/images/reorder"
+          }
+        },
+        {
+          "name": "Delete Image",
+          "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variant-images/{{imageId}}"}
+        }
+      ]
+    }
+  ]
+}
