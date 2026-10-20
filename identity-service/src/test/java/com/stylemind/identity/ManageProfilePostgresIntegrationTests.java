@@ -1,7 +1,7 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
@@ -13,7 +13,10 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.stylemind.identity.repository.profile.ProfileRepository;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.ProfileColor;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.profile.ProfileColorRepository;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -77,11 +80,12 @@ class ManageProfilePostgresIntegrationTests {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;
     @LocalServerPort private int port;
-    @MockitoSpyBean private ProfileRepository profileRepository;
+    @MockitoSpyBean private AccountRepository accountRepository;
+    @MockitoSpyBean private ProfileColorRepository profileColorRepository;
 
     @BeforeEach
     void clearDisposableProfileDatabase() {
-        reset(profileRepository);
+        reset(accountRepository, profileColorRepository);
         jdbc.update("DELETE FROM public.profile_style");
         jdbc.update("DELETE FROM public.profile_color");
         jdbc.update("DELETE FROM public.profile_brand");
@@ -334,7 +338,7 @@ class ManageProfilePostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only profile write failure");
-        }).when(profileRepository).replaceColorCodes(eq(owner), anyList());
+        }).when(profileColorRepository).saveAll(any(Iterable.class));
 
         MvcResult failure;
         try {
@@ -342,7 +346,7 @@ class ManageProfilePostgresIntegrationTests {
                     styleBody("\"LOOSE\"", "180", "\"L\"", "\"32\"", "\"EU 42\"",
                             "[\"NEW\"]", "[\"BLUE\"]", "[]"));
         } finally {
-            reset(profileRepository);
+            reset(accountRepository, profileColorRepository);
         }
         assertProblem(failure, 500, "INTERNAL_ERROR");
         JsonNode profile = json(perform("GET", STYLE, customer, null)).path("style_profile");
@@ -376,7 +380,7 @@ class ManageProfilePostgresIntegrationTests {
 
     private void assertSerializedWrites(UUID owner, String bearer, String method, String path,
             String firstBody, String secondBody) throws Exception {
-        reset(profileRepository);
+        reset(accountRepository, profileColorRepository);
         CountDownLatch firstOwnsLock = new CountDownLatch(1);
         CountDownLatch secondReachedLock = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
@@ -395,7 +399,7 @@ class ManageProfilePostgresIntegrationTests {
                 secondReachedLock.countDown();
             }
             return invocation.callRealMethod();
-        }).when(profileRepository).lockOwnerAccount(eq(owner));
+        }).when(accountRepository).findLockedByAccountId(eq(owner));
 
         CompletableFuture<HttpResponse<String>> first = sendAsync(method, path, bearer, firstBody);
         assertThat(firstOwnsLock.await(10, TimeUnit.SECONDS)).isTrue();
@@ -408,7 +412,7 @@ class ManageProfilePostgresIntegrationTests {
         }
         assertThat(first.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
         assertThat(second.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
-        reset(profileRepository);
+            reset(accountRepository, profileColorRepository);
     }
 
     private void awaitPostgresRowLockWait() throws Exception {

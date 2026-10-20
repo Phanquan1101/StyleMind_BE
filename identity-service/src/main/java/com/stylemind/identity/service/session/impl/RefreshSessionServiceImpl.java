@@ -7,6 +7,7 @@ import com.stylemind.identity.dto.login.LoginResponse;
 import com.stylemind.identity.errors.InvalidRefreshTokenException;
 import com.stylemind.identity.errors.MalformedRefreshTokenException;
 import com.stylemind.identity.model.session.RefreshSession;
+import com.stylemind.identity.entity.RefreshSessionRow;
 import com.stylemind.identity.repository.session.RefreshSessionRepository;
 import com.stylemind.identity.validation.auth.RefreshTokenFormat;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class RefreshSessionServiceImpl implements RefreshSessionService {
     public LoginResponse refresh(String refreshToken) {
         String tokenHash = digest(refreshToken);
         RefreshSession snapshot = refreshSessionRepository.findByTokenHash(tokenHash)
+                .map(RefreshSessionServiceImpl::snapshot)
                 .orElseThrow(InvalidRefreshTokenException::new);
         return transactionService.rotate(snapshot.accountId(), tokenHash);
     }
@@ -37,6 +39,7 @@ public class RefreshSessionServiceImpl implements RefreshSessionService {
     public void logout(String refreshToken) {
         String tokenHash = digest(refreshToken);
         refreshSessionRepository.findByTokenHash(tokenHash)
+                .map(RefreshSessionServiceImpl::snapshot)
                 .ifPresent(snapshot -> transactionService.revoke(snapshot.accountId(), tokenHash));
     }
 
@@ -45,5 +48,10 @@ public class RefreshSessionServiceImpl implements RefreshSessionService {
             throw new MalformedRefreshTokenException();
         }
         return tokenService.refreshTokenHash(refreshToken);
+    }
+
+    private static RefreshSession snapshot(RefreshSessionRow row) {
+        return new RefreshSession(row.getSessionId(), row.getAccountId(), row.getTokenHash(),
+                row.getIssuedAt(), row.getExpiresAt(), row.getRevokedAt());
     }
 }

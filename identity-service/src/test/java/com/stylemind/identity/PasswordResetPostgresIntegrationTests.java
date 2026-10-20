@@ -398,7 +398,7 @@ class PasswordResetPostgresIntegrationTests {
         String originalHash = jdbcTemplate.queryForObject("SELECT password_hash FROM public.account WHERE account_id = ?",
                 String.class, accountId);
         doThrow(new IllegalStateException("test-only session revocation failure"))
-                .when(refreshSessionRepository).revokeAllActiveForAccount(any(UUID.class), any(OffsetDateTime.class));
+                .when(refreshSessionRepository).saveAll(any(Iterable.class));
 
         assertThat(reset(resetToken, "new-password-value-2026").getResponse().getStatus()).isEqualTo(500);
         assertThat(jdbcTemplate.queryForObject("SELECT password_hash FROM public.account WHERE account_id = ?",

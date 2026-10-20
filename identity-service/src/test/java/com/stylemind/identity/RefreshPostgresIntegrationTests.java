@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.errors.ApiExceptionHandler;
 import com.stylemind.identity.logging.CorrelationIdFilter;
 import com.stylemind.identity.repository.session.RefreshSessionRepository;
+import com.stylemind.identity.entity.RefreshSessionRow;
 import com.stylemind.identity.security.JwtTokenService;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -308,8 +309,7 @@ class RefreshPostgresIntegrationTests {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test-only refresh-session insert failure");
-        }).when(refreshSessionRepository).insert(any(UUID.class), any(UUID.class), anyString(),
-                any(OffsetDateTime.class), any(OffsetDateTime.class));
+        }).when(refreshSessionRepository).saveAndFlush(any(RefreshSessionRow.class));
         HttpResponse<String> insertFailure = post("/api/v1/auth/refresh", Map.of("refresh_token", token));
         assertThat(insertFailure.statusCode()).isEqualTo(500);
         assertThat(insertFailure.body()).doesNotContain("access_token", "refresh_token", token);
@@ -376,7 +376,7 @@ class RefreshPostgresIntegrationTests {
         String token = login(account.email()).path("refresh_token").asText();
         String hash = hash(token);
         doThrow(new IllegalStateException("test-only revoke failure"))
-                .when(refreshSessionRepository).revokeIfActive(anyString(), any(OffsetDateTime.class));
+                .when(refreshSessionRepository).flush();
 
         HttpResponse<String> response = post("/api/v1/auth/logout", Map.of("refresh_token", token));
         assertThat(response.statusCode()).isEqualTo(500);

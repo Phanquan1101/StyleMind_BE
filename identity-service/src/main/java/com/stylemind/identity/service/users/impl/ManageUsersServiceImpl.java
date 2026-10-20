@@ -1,22 +1,29 @@
 package com.stylemind.identity.service.users.impl;
 
-import com.stylemind.identity.service.users.ManageUsersService;
 import com.stylemind.identity.dto.users.ManageUsersPageResponse;
 import com.stylemind.identity.dto.users.ManagedUserResponse;
 import com.stylemind.identity.dto.users.ManagedUserRolesResponse;
 import com.stylemind.identity.dto.users.ManagedUserStatusResponse;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.AccountRole;
 import com.stylemind.identity.errors.ApiOperationException;
 import com.stylemind.identity.model.users.AdminManagedAccountState;
 import com.stylemind.identity.model.users.ManageUserListCriteria;
-import com.stylemind.identity.model.users.ManagedUserPageData;
-import com.stylemind.identity.model.users.ManagedUserSummary;
-import com.stylemind.identity.repository.users.ManageUsersRepository;
-import java.util.ArrayList;
-import java.util.Comparator;
+import com.stylemind.identity.repository.account.AccountRepository;
+import com.stylemind.identity.repository.account.AccountRoleRepository;
+import com.stylemind.identity.service.users.ManageUsersService;
+import com.stylemind.identity.service.users.internal.ManageUserSpecifications;
+import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -29,44 +36,56 @@ public class ManageUsersServiceImpl implements ManageUsersService {
     private static final String ACTIVE = "ACTIVE";
     private static final String SUSPENDED = "SUSPENDED";
 
-    private final ManageUsersRepository repository;
+    private final AccountRepository accountRepository;
+    private final AccountRoleRepository roleRepository;
 
-    public ManageUsersServiceImpl(ManageUsersRepository repository) {
-        this.repository = repository;
+    public ManageUsersServiceImpl(AccountRepository accountRepository, AccountRoleRepository roleRepository) {
+        this.accountRepository = accountRepository;
+        this.roleRepository = roleRepository;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ManageUsersPageResponse list(UUID actorId, ManageUserListCriteria criteria) {
-        repository.lockAdminListing();
-        AdminManagedAccountState actor = repository.lockActorForRead(actorId)
-                .orElseThrow(this::actorDenied);
-        requireEligibleAdmin(actor, repository.roles(actorId));
-        ManagedUserPageData page = repository.userPage(criteria);
-        List<ManagedUserResponse> items = page.items().stream()
-                .map(this::response).toList();
-        long total = page.totalElements();
+        // Shared locks on current ADMIN role rows serialize the listing snapshot against admin mutations.
+        List<AccountRole> lockedAdmins = roleRepository.findReadLockedByIdRoleCodeOrderByIdAccountIdAsc("ADMIN");
+        Account actor = accountRepository.findReadLockedByAccountId(actorId).orElseThrow(this::actorDenied);
+        List<String> actorRoles = roles(actorId);
+        requireEligibleAdmin(state(actor), actorRoles);
+
+        Sort sort = Sort.by(Sort.Order.desc("registeredAt"), Sort.Order.asc("accountId"));
+        Page<Account> page = accountRepository.findAll(ManageUserSpecifications.matching(criteria),
+                PageRequest.of(criteria.page(), criteria.size(), sort));
+        List<UUID> ids = page.getContent().stream().map(Account::getAccountId).toList();
+        Map<UUID, List<String>> pageRoles = roleRepository.findByIdAccountIdIn(ids).stream()
+                .collect(Collectors.groupingBy(AccountRole::getAccountId,
+                        Collectors.mapping(AccountRole::getRoleCode, Collectors.toList())));
+        List<ManagedUserResponse> items = page.getContent().stream()
+                .map(account -> response(account, pageRoles.getOrDefault(account.getAccountId(), List.of())))
+                .toList();
+        long total = page.getTotalElements();
         long pages = total == 0 ? 0 : (total + criteria.size() - 1) / criteria.size();
         return new ManageUsersPageResponse(items, criteria.page(), criteria.size(), total, pages);
     }
 
     @Transactional
     public ManagedUserStatusResponse updateStatus(UUID actorId, UUID targetId, String requestedStatus) {
-        repository.lockAdminMutations();
-        Map<UUID, AdminManagedAccountState> locked = repository.lockAccountsForMutation(List.of(actorId, targetId));
-        AdminManagedAccountState actor = locked.get(actorId);
-        requireEligibleAdmin(actor, actor == null ? List.of() : repository.roles(actorId));
-        AdminManagedAccountState target = locked.get(targetId);
+        List<AccountRole> lockedAdmins = lockAdminMutations();
+        Map<UUID, Account> lockedAccounts = lockAccounts(actorId, targetId);
+        Account actor = lockedAccounts.get(actorId);
+        requireEligibleAdmin(actor == null ? null : state(actor), actor == null ? List.of() : roles(actorId));
+        Account target = lockedAccounts.get(targetId);
         if (target == null) {
             throw notFound();
         }
 
-        String current = target.accountStatus();
+        String current = target.getAccountStatus();
         if (current.equals(requestedStatus)) {
-            return statusResponse(targetId, current, target.emailVerifiedAt());
+            return statusResponse(targetId, current, target.getEmailVerifiedAt());
         }
-        boolean currentQualifyingAdmin = qualifies(target, repository.roles(targetId));
+        List<String> targetRoles = roles(targetId);
+        boolean currentQualifyingAdmin = qualifies(state(target), targetRoles);
         if (currentQualifyingAdmin && SUSPENDED.equals(requestedStatus)
-                && repository.countQualifyingAdmins() <= 1) {
+                && countQualifyingAdmins(lockedAdmins) <= 1) {
             throw lastAdminRequired();
         }
         if (actorId.equals(targetId)) {
@@ -75,7 +94,7 @@ public class ManageUsersServiceImpl implements ManageUsersService {
         if (ACTIVE.equals(current) && SUSPENDED.equals(requestedStatus)) {
             // Approved transition.
         } else if (SUSPENDED.equals(current) && ACTIVE.equals(requestedStatus)
-                && target.emailVerifiedAt() != null) {
+                && target.getEmailVerifiedAt() != null) {
             // Approved transition; verification state is never changed here.
         } else if (SUSPENDED.equals(current) && ACTIVE.equals(requestedStatus)) {
             throw transitionNotAllowed();
@@ -83,51 +102,80 @@ public class ManageUsersServiceImpl implements ManageUsersService {
             throw transitionNotAllowed();
         }
 
-        if (repository.updateStatus(targetId, requestedStatus) != 1) {
-            throw new IllegalStateException("Locked account status update did not affect one row");
-        }
-        return statusResponse(targetId, requestedStatus, target.emailVerifiedAt());
+        target.setAccountStatus(requestedStatus);
+        accountRepository.saveAndFlush(target);
+        return statusResponse(targetId, requestedStatus, target.getEmailVerifiedAt());
     }
 
     @Transactional
     public ManagedUserRolesResponse replaceRoles(UUID actorId, UUID targetId, Set<String> requestedRoles) {
-        repository.lockAdminMutations();
-        Map<UUID, AdminManagedAccountState> locked = repository.lockAccountsForMutation(List.of(actorId, targetId));
-        AdminManagedAccountState actor = locked.get(actorId);
-        requireEligibleAdmin(actor, actor == null ? List.of() : repository.roles(actorId));
-        AdminManagedAccountState target = locked.get(targetId);
+        List<AccountRole> lockedAdmins = lockAdminMutations();
+        Map<UUID, Account> lockedAccounts = lockAccounts(actorId, targetId);
+        Account actor = lockedAccounts.get(actorId);
+        requireEligibleAdmin(actor == null ? null : state(actor), actor == null ? List.of() : roles(actorId));
+        Account target = lockedAccounts.get(targetId);
         if (target == null) {
             throw notFound();
         }
 
-        List<String> currentRoles = repository.roles(targetId);
+        List<String> currentRoles = roles(targetId);
         List<String> desiredRoles = requestedRoles.stream().sorted().toList();
         if (currentRoles.equals(desiredRoles)) {
             return new ManagedUserRolesResponse(targetId, currentRoles);
         }
-        boolean currentQualifyingAdmin = qualifies(target, currentRoles);
+        boolean currentQualifyingAdmin = qualifies(state(target), currentRoles);
         if (currentQualifyingAdmin && currentRoles.contains("ADMIN") && !requestedRoles.contains("ADMIN")
-                && repository.countQualifyingAdmins() <= 1) {
+                && countQualifyingAdmins(lockedAdmins) <= 1) {
             throw lastAdminRequired();
         }
         if (actorId.equals(targetId)) {
             throw selfChangeForbidden();
         }
 
-        int deleted = repository.deleteRoles(targetId);
+        long deleted = roleRepository.deleteByIdAccountId(targetId);
         if (deleted != currentRoles.size()) {
             throw new IllegalStateException("Locked account role replacement did not delete the expected rows");
         }
-        for (String role : desiredRoles) {
-            if (!ALLOWED_ROLES.contains(role) || repository.insertRole(targetId, role) != 1) {
-                throw new IllegalStateException("Account role replacement did not insert the expected row");
-            }
+        if (!ALLOWED_ROLES.containsAll(desiredRoles)) {
+            throw new IllegalStateException("Requested roles passed validation but include an unsupported role");
         }
-        List<String> persistedRoles = repository.roles(targetId);
+        roleRepository.saveAll(desiredRoles.stream().map(role -> new AccountRole(targetId, role)).toList());
+        roleRepository.flush();
+        List<String> persistedRoles = roles(targetId);
         if (!persistedRoles.equals(desiredRoles)) {
             throw new IllegalStateException("Account role replacement could not be verified");
         }
         return new ManagedUserRolesResponse(targetId, persistedRoles);
+    }
+
+    private List<AccountRole> lockAdminMutations() {
+        return roleRepository.findLockedByIdRoleCodeOrderByIdAccountIdAsc("ADMIN");
+    }
+
+    private Map<UUID, Account> lockAccounts(UUID actorId, UUID targetId) {
+        List<UUID> ids = java.util.stream.Stream.of(actorId, targetId).distinct().sorted().toList();
+        return accountRepository.findLockedByAccountIdInOrderByAccountIdAsc(ids).stream()
+                .collect(Collectors.toMap(Account::getAccountId, Function.identity()));
+    }
+
+    private int countQualifyingAdmins(List<AccountRole> lockedAdmins) {
+        List<UUID> adminIds = lockedAdmins.stream().map(AccountRole::getAccountId).distinct().toList();
+        if (adminIds.isEmpty()) {
+            return 0;
+        }
+        return (int) accountRepository.findByAccountIdIn(adminIds).stream()
+                .filter(account -> ACTIVE.equals(account.getAccountStatus()) && account.getEmailVerifiedAt() != null)
+                .count();
+    }
+
+    private List<String> roles(UUID accountId) {
+        return roleRepository.findByIdAccountIdOrderByIdRoleCodeAsc(accountId).stream()
+                .map(AccountRole::getRoleCode).toList();
+    }
+
+    private AdminManagedAccountState state(Account account) {
+        return new AdminManagedAccountState(account.getAccountId(), account.getAccountStatus(),
+                account.getEmailVerifiedAt(), account.getRegisteredAt());
     }
 
     private void requireEligibleAdmin(AdminManagedAccountState actor, List<String> roles) {
@@ -142,13 +190,12 @@ public class ManageUsersServiceImpl implements ManageUsersService {
                 && roles.contains("ADMIN");
     }
 
-    private ManagedUserResponse response(ManagedUserSummary summary) {
-        return new ManagedUserResponse(summary.accountId(), summary.email(), summary.accountStatus(),
-                summary.emailVerifiedAt(), summary.registeredAt(), summary.roles());
+    private ManagedUserResponse response(Account account, List<String> roles) {
+        return new ManagedUserResponse(account.getAccountId(), account.getEmail(), account.getAccountStatus(),
+                account.getEmailVerifiedAt(), account.getRegisteredAt(), roles.stream().sorted().toList());
     }
 
-    private ManagedUserStatusResponse statusResponse(UUID id, String status,
-            java.time.OffsetDateTime emailVerifiedAt) {
+    private ManagedUserStatusResponse statusResponse(UUID id, String status, OffsetDateTime emailVerifiedAt) {
         return new ManagedUserStatusResponse(id, status, emailVerifiedAt);
     }
 

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -30,15 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
 public class ManageUsersController {
 
     private final ManageUsersService service;
     private final ManageUsersRequestValidator validator;
-
-    public ManageUsersController(ManageUsersService service, ManageUsersRequestValidator validator) {
-        this.service = service;
-        this.validator = validator;
-    }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List and filter users (ADMIN only)",

@@ -1,6 +1,8 @@
 package com.stylemind.identity.service.passwordreset.internal;
 
 import com.stylemind.identity.client.notification.payload.PasswordResetEmailDispatch;
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.PasswordResetChallengeRow;
 import com.stylemind.identity.model.passwordreset.PasswordResetAccount;
 import com.stylemind.identity.model.passwordreset.PasswordResetChallenge;
 import com.stylemind.identity.model.passwordreset.PasswordResetVerification;
@@ -43,20 +45,22 @@ public class PasswordResetPersistence {
 
     @Transactional
     public PasswordResetEmailDispatch reserveOtp(String email) {
-        Optional<PasswordResetAccount> accountResult = accountRepository.lockPasswordResetAccountByEmail(
-                normalize(email));
+        Optional<PasswordResetAccount> accountResult = accountRepository.findLockedByEmail(normalize(email))
+                .map(account -> new PasswordResetAccount(account.getAccountId(), account.getAccountStatus(),
+                        account.getEmailVerifiedAt()));
         if (accountResult.isEmpty() || !eligible(accountResult.get())) {
             return null;
         }
         PasswordResetAccount account = accountResult.get();
         OffsetDateTime now = now();
-        Optional<PasswordResetChallenge> currentResult = challengeRepository.lockByAccount(account.accountId());
+        Optional<PasswordResetChallenge> currentResult = challengeRepository
+                .findLockedByAccountId(account.accountId()).map(PasswordResetPersistence::snapshot);
         if (currentResult.isEmpty()) {
             UUID challengeId = UUID.randomUUID();
             String code = cryptography.generateOtp();
-            challengeRepository.insert(new PasswordResetChallenge(challengeId, account.accountId(),
+            challengeRepository.saveAndFlush(row(new PasswordResetChallenge(challengeId, account.accountId(),
                     cryptography.otpDigest(account.accountId(), challengeId, code), now.plus(OTP_TTL),
-                    0, null, now, now, 1, null, null, null, null));
+                    0, null, now, now, 1, null, null, null, null)));
             return new PasswordResetEmailDispatch(normalize(email), code);
         }
 
@@ -82,7 +86,7 @@ public class PasswordResetPersistence {
         OffsetDateTime windowStart = windowElapsed ? now : current.sendWindowStartedAt();
         UUID challengeId = UUID.randomUUID();
         String code = cryptography.generateOtp();
-        challengeRepository.rotateOtp(new PasswordResetChallenge(
+        saveRotatedChallenge(new PasswordResetChallenge(
                 challengeId,
                 account.accountId(),
                 cryptography.otpDigest(account.accountId(), challengeId, code),
@@ -101,13 +105,15 @@ public class PasswordResetPersistence {
 
     @Transactional
     public PasswordResetVerification verifyOtp(String email, String code) {
-        Optional<PasswordResetAccount> accountResult = accountRepository.lockPasswordResetAccountByEmail(
-                normalize(email));
+        Optional<PasswordResetAccount> accountResult = accountRepository.findLockedByEmail(normalize(email))
+                .map(account -> new PasswordResetAccount(account.getAccountId(), account.getAccountStatus(),
+                        account.getEmailVerifiedAt()));
         if (accountResult.isEmpty() || !eligible(accountResult.get())) {
             return PasswordResetVerification.invalid();
         }
         PasswordResetAccount account = accountResult.get();
-        Optional<PasswordResetChallenge> challengeResult = challengeRepository.lockByAccount(account.accountId());
+        Optional<PasswordResetChallenge> challengeResult = challengeRepository
+                .findLockedByAccountId(account.accountId()).map(PasswordResetPersistence::snapshot);
         if (challengeResult.isEmpty()) {
             return PasswordResetVerification.invalid();
         }
@@ -124,18 +130,28 @@ public class PasswordResetPersistence {
         if (!cryptography.matchesOtp(account.accountId(), challenge.challengeId(), code, challenge.otpDigest())) {
             int attempts = challenge.failedAttempts() + 1;
             OffsetDateTime lockedUntil = attempts == MAX_FAILED_ATTEMPTS ? now.plus(LOCK_TTL) : null;
-            if (!challengeRepository.recordFailedAttempt(account.accountId(), challenge.challengeId(),
-                    attempts, lockedUntil)) {
+            PasswordResetChallengeRow locked = challengeRepository.findLockedByAccountId(account.accountId())
+                    .orElse(null);
+            if (locked == null || !locked.getChallengeId().equals(challenge.challengeId())
+                    || locked.getVerifiedAt() != null || locked.getConsumedAt() != null) {
                 throw new IllegalStateException("Password reset attempt could not be recorded");
             }
+            locked.setFailedAttempts((short) attempts);
+            locked.setLockedUntil(lockedUntil);
+            challengeRepository.flush();
             return PasswordResetVerification.invalid();
         }
 
         String resetToken = cryptography.generateResetToken();
-        if (!challengeRepository.issueResetGrant(account.accountId(), challenge.challengeId(), now,
-                cryptography.resetTokenHash(resetToken), now.plus(RESET_TOKEN_TTL))) {
+        PasswordResetChallengeRow locked = challengeRepository.findLockedByAccountId(account.accountId()).orElse(null);
+        if (locked == null || !locked.getChallengeId().equals(challenge.challengeId())
+                || locked.getVerifiedAt() != null || locked.getConsumedAt() != null) {
             return PasswordResetVerification.invalid();
         }
+        locked.setVerifiedAt(now);
+        locked.setResetTokenHash(cryptography.resetTokenHash(resetToken));
+        locked.setResetTokenExpiresAt(now.plus(RESET_TOKEN_TTL));
+        challengeRepository.flush();
         return PasswordResetVerification.verified(resetToken);
     }
 
@@ -160,5 +176,51 @@ public class PasswordResetPersistence {
 
     private static String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void saveRotatedChallenge(PasswordResetChallenge value) {
+        PasswordResetChallengeRow existing = challengeRepository.findLockedByAccountId(value.accountId())
+                .orElse(null);
+        if (existing != null && !existing.getChallengeId().equals(value.challengeId())) {
+            challengeRepository.delete(existing);
+            challengeRepository.flush();
+            existing = null;
+        }
+        if (existing == null) {
+            challengeRepository.saveAndFlush(row(value));
+            return;
+        }
+        apply(value, existing);
+        challengeRepository.flush();
+    }
+
+    private static PasswordResetChallengeRow row(PasswordResetChallenge value) {
+        PasswordResetChallengeRow row = new PasswordResetChallengeRow();
+        row.setChallengeId(value.challengeId());
+        row.setAccountId(value.accountId());
+        apply(value, row);
+        return row;
+    }
+
+    private static void apply(PasswordResetChallenge value, PasswordResetChallengeRow row) {
+        row.setOtpDigest(value.otpDigest().clone());
+        row.setOtpExpiresAt(value.otpExpiresAt());
+        row.setFailedAttempts((short) value.failedAttempts());
+        row.setLockedUntil(value.lockedUntil());
+        row.setLastSendAttemptAt(value.lastSendAttemptAt());
+        row.setSendWindowStartedAt(value.sendWindowStartedAt());
+        row.setSendCount((short) value.sendCount());
+        row.setVerifiedAt(value.verifiedAt());
+        row.setResetTokenHash(value.resetTokenHash() == null ? null : value.resetTokenHash().clone());
+        row.setResetTokenExpiresAt(value.resetTokenExpiresAt());
+        row.setConsumedAt(value.consumedAt());
+    }
+
+    private static PasswordResetChallenge snapshot(PasswordResetChallengeRow row) {
+        return new PasswordResetChallenge(row.getChallengeId(), row.getAccountId(), row.getOtpDigest().clone(),
+                row.getOtpExpiresAt(), row.getFailedAttempts(), row.getLockedUntil(), row.getLastSendAttemptAt(),
+                row.getSendWindowStartedAt(), row.getSendCount(), row.getVerifiedAt(),
+                row.getResetTokenHash() == null ? null : row.getResetTokenHash().clone(),
+                row.getResetTokenExpiresAt(), row.getConsumedAt());
     }
 }

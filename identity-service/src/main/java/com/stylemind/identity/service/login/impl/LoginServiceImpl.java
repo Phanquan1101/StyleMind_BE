@@ -5,6 +5,7 @@ import com.stylemind.identity.service.login.internal.LoginSessionService;
 import com.stylemind.identity.dto.login.LoginRequest;
 import com.stylemind.identity.dto.login.LoginResponse;
 import com.stylemind.identity.errors.InvalidCredentialsException;
+import com.stylemind.identity.entity.Account;
 import com.stylemind.identity.model.login.LoginAccount;
 import com.stylemind.identity.repository.account.AccountRepository;
 import java.util.Locale;
@@ -33,7 +34,7 @@ public class LoginServiceImpl implements LoginService {
 
     public LoginResponse login(LoginRequest request) {
         String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
-        Optional<LoginAccount> accountResult = accountRepository.findForLogin(normalizedEmail);
+        Optional<LoginAccount> accountResult = accountRepository.findByEmail(normalizedEmail).map(LoginServiceImpl::loginAccount);
         if (accountResult.isEmpty()) {
             passwordEncoder.matches(request.password(), timingEqualizationHash);
             throw new InvalidCredentialsException();
@@ -51,5 +52,10 @@ public class LoginServiceImpl implements LoginService {
         }
 
         return loginSessionService.createSession(account.accountId(), account.passwordHash());
+    }
+
+    private static LoginAccount loginAccount(Account account) {
+        return new LoginAccount(account.getAccountId(), account.getPasswordHash(), account.getAccountStatus(),
+                account.getEmailVerifiedAt());
     }
 }

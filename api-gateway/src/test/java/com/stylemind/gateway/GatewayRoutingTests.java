@@ -31,6 +31,7 @@ import org.springframework.test.context.DynamicPropertySource;
 class GatewayRoutingTests {
 
     private static final AtomicReference<RecordingIdentityServer> IDENTITY_SERVER = new AtomicReference<>();
+    private static final AtomicReference<RecordingIdentityServer> COMMERCE_SERVER = new AtomicReference<>();
 
     @Value("${local.server.port}")
     private int gatewayPort;
@@ -38,19 +39,25 @@ class GatewayRoutingTests {
     @DynamicPropertySource
     static void routeIdentityToTestServer(DynamicPropertyRegistry registry) {
         registry.add("stylemind.gateway.identity-base-url", () -> identityServer().baseUrl());
+        registry.add("stylemind.gateway.commerce-base-url", () -> commerceServer().baseUrl());
     }
 
     @AfterAll
-    static void stopIdentityServer() {
+    static void stopUpstreamServers() {
         RecordingIdentityServer server = IDENTITY_SERVER.getAndSet(null);
         if (server != null) {
             server.close();
         }
+        RecordingIdentityServer commerce = COMMERCE_SERVER.getAndSet(null);
+        if (commerce != null) {
+            commerce.close();
+        }
     }
 
     @BeforeEach
-    void resetIdentityResponse() {
+    void resetUpstreamResponses() {
         identityServer().respondWith(202, "application/json", "{\"upstream\":\"identity\"}", Map.of());
+        commerceServer().respondWith(202, "application/json", "{\"upstream\":\"commerce\"}", Map.of());
     }
 
     @Test
@@ -99,6 +106,85 @@ class GatewayRoutingTests {
 
     @Test
     @Order(3)
+    void servesGatewaySwaggerUiWithoutProxyingAnUpstreamSwaggerUi() throws Exception {
+        int identityRequestsBefore = identityServer().requestCount();
+        int commerceRequestsBefore = commerceServer().requestCount();
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/swagger-ui/index.html")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Content-Type")).contains("text/html");
+        assertThat(response.body()).contains("Swagger UI");
+        assertThat(identityServer().requestCount()).isEqualTo(identityRequestsBefore);
+        assertThat(commerceServer().requestCount()).isEqualTo(commerceRequestsBefore);
+    }
+
+    @Test
+    @Order(4)
+    void exposesIdentityAndCommerceSwaggerUrlsInGatewaySwaggerConfig() throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/v3/api-docs/swagger-config")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).contains("Identity Service");
+        assertThat(response.body()).contains("/identity/v3/api-docs");
+        assertThat(response.body()).contains("Commerce Service");
+        assertThat(response.body()).contains("/commerce/v3/api-docs");
+        assertThat(response.body()).contains("Payment Service");
+        assertThat(response.body()).contains("/payment/v3/api-docs");
+        assertThat(response.body()).contains("Wardrobe Community Service");
+        assertThat(response.body()).contains("/wardrobe-community/v3/api-docs");
+        assertThat(response.body()).contains("Stylist Service");
+        assertThat(response.body()).contains("/stylist/v3/api-docs");
+        assertThat(response.body()).contains("Notification Service");
+        assertThat(response.body()).contains("/notification/v3/api-docs");
+    }
+
+    @Test
+    @Order(5)
+    void proxiesIdentityAndCommerceOpenApiDocumentsWithServiceSpecificPaths() throws Exception {
+        identityServer().respondWith(200, "application/json", "{\"info\":{\"title\":\"StyleMind Identity API\"}}",
+                Map.of());
+        commerceServer().respondWith(200, "application/json", "{\"info\":{\"title\":\"StyleMind Commerce API\"}}",
+                Map.of());
+
+        HttpResponse<String> identity = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/identity/v3/api-docs")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> commerce = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/commerce/v3/api-docs")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(identity.statusCode()).isEqualTo(200);
+        assertThat(identity.body()).contains("StyleMind Identity API");
+        assertThat(identityServer().lastMethod()).isEqualTo("GET");
+        assertThat(identityServer().lastPath()).isEqualTo("/v3/api-docs");
+        assertThat(commerce.statusCode()).isEqualTo(200);
+        assertThat(commerce.body()).contains("StyleMind Commerce API");
+        assertThat(commerceServer().lastMethod()).isEqualTo("GET");
+        assertThat(commerceServer().lastPath()).isEqualTo("/v3/api-docs");
+    }
+
+    @Test
+    @Order(6)
+    void stripsServicePrefixBeforeForwardingCommerceApiRequests() throws Exception {
+        commerceServer().respondWith(200, "application/json", "{\"items\":[]}", Map.of());
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(uri("/commerce/api/v1/products?size=10")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("{\"items\":[]}");
+        assertThat(commerceServer().lastMethod()).isEqualTo("GET");
+        assertThat(commerceServer().lastPath()).isEqualTo("/api/v1/products?size=10");
+    }
+
+    @Test
+    @Order(7)
     void preservesProblemDetailsStatusContentTypeAndResponseHeaders() throws Exception {
         String problem = "{\"type\":\"about:blank\",\"title\":\"Conflict\",\"status\":409,"
                 + "\"code\":\"EMAIL_ALREADY_REGISTERED\"}";
@@ -124,7 +210,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(4)
+    @Order(8)
     void doesNotAddBodyTo204OrHeadResponses() throws Exception {
         identityServer().respondWith(204, "application/json", "must-not-appear", Map.of());
         HttpResponse<byte[]> noContent = HttpClient.newHttpClient().send(
@@ -146,7 +232,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(5)
+    @Order(9)
     void proxiesJwksWithoutWrappingOrChangingTheDocument() throws Exception {
         String jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"gateway-test-key\","
                 + "\"use\":\"sig\",\"alg\":\"RS256\",\"n\":\"abc\",\"e\":\"AQAB\"}]}";
@@ -163,7 +249,7 @@ class GatewayRoutingTests {
     }
 
     @Test
-    @Order(6)
+    @Order(10)
     void internalNotificationPathsAndEncodedVariantsNeverReachIdentityRoute() throws Exception {
         String[] paths = {
             "/internal/v1/email-verifications",
@@ -209,7 +295,15 @@ class GatewayRoutingTests {
     }
 
     private static RecordingIdentityServer identityServer() {
-        RecordingIdentityServer current = IDENTITY_SERVER.get();
+        return upstreamServer(IDENTITY_SERVER);
+    }
+
+    private static RecordingIdentityServer commerceServer() {
+        return upstreamServer(COMMERCE_SERVER);
+    }
+
+    private static RecordingIdentityServer upstreamServer(AtomicReference<RecordingIdentityServer> holder) {
+        RecordingIdentityServer current = holder.get();
         if (current != null) {
             return current;
         }
@@ -217,13 +311,13 @@ class GatewayRoutingTests {
         try {
             created = new RecordingIdentityServer();
         } catch (IOException exception) {
-            throw new IllegalStateException("Unable to start the local Identity test server", exception);
+            throw new IllegalStateException("Unable to start the local upstream test server", exception);
         }
-        if (IDENTITY_SERVER.compareAndSet(null, created)) {
+        if (holder.compareAndSet(null, created)) {
             return created;
         }
         created.close();
-        return IDENTITY_SERVER.get();
+        return holder.get();
     }
 
     private static final class RecordingIdentityServer {

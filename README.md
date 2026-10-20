@@ -103,6 +103,12 @@ Compose starts one PostgreSQL 18 container and creates one database and login ro
 
 Compose also starts `api-gateway` on `127.0.0.1:8080` and routes current public Identity API, JWKS and OpenAPI paths to Identity. Postman uses `http://localhost:8080`; backend service ports are not published to the host. Identity reaches Notification using the Compose service name through its Feign client. Notification's `/internal/**` routes are deliberately not exposed by the Gateway.
 
+### First local Admin
+
+The first Admin can be provisioned automatically by the **local Compose** Identity startup. In the ignored `.env`, set `STYLEMIND_BOOTSTRAP_ADMIN_ENABLED=true` and replace `STYLEMIND_BOOTSTRAP_ADMIN_EMAIL` and `STYLEMIND_BOOTSTRAP_ADMIN_PASSWORD` with local credentials. The password must satisfy the Register password length policy. This creates one `ACTIVE`, email-verified account with the `ADMIN` role only; this explicitly trusted local bootstrap does not send or create an OTP challenge. Its password is hashed with the Identity `PasswordEncoder`.
+
+Provisioning is insert-only and idempotent: a matching eligible Admin is left unchanged; if the configured email already belongs to any other account, startup leaves that account unchanged and logs a generic warning. It never promotes, verifies, activates, or changes the password of an existing account. Changing the `.env` password does not rotate an already-created account. The feature requires the Compose-only `compose-local` profile and the explicit enable flag; it is disabled by default and is not the provisioning procedure for non-local environments. After the first local Admin is created, you can set the flag back to `false`; the account remains in the database volume.
+
 To start only the current Auth/API runtime instead of every scaffold:
 
 ```powershell
