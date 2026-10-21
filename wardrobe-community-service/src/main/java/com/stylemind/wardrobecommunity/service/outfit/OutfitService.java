@@ -230,7 +230,7 @@ public class OutfitService {
                 .map(row -> itemResponse(row, catalogItems.get(row.getVariantId())))
                 .toList();
         return new OutfitDetailResponse(outfit.getOutfitId(), outfit.getName(), outfit.getCreationSource(),
-                outfit.getCreatedAt(), outfit.getUpdatedAt(), items);
+                outfit.getCreatedAt(), outfit.getUpdatedAt(), items, outfit.getPublicToken());
     }
 
     /** A variant Commerce no longer returns keeps its row: product fields are null and available is false. */

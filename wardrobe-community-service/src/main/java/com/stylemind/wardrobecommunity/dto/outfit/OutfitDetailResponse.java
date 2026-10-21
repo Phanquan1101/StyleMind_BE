@@ -11,5 +11,6 @@ public record OutfitDetailResponse(
         @JsonProperty("creation_source") String creationSource,
         @JsonProperty("created_at") OffsetDateTime createdAt,
         @JsonProperty("updated_at") OffsetDateTime updatedAt,
-        List<OutfitItemResponse> items) {
+        List<OutfitItemResponse> items,
+        @JsonProperty("public_token") String publicToken) {
 }

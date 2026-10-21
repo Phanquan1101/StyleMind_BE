@@ -19,6 +19,8 @@ public interface OutfitRepository extends JpaRepository<Outfit, UUID> {
 
     long countByOwnerAccountId(UUID ownerAccountId);
 
+    Optional<Outfit> findByPublicToken(String publicToken);
+
     /** Rows of (outfit, item_count) for one page, newest update first. */
     @Query("""
             select o, (select count(i) from OutfitItem i where i.outfitId = o.outfitId)

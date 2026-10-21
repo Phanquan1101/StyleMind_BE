@@ -118,3 +118,32 @@ The ADMIN 403, the 503 `CATALOG_UNAVAILABLE` when Commerce is down, the 100-outf
 ### Verification status
 
 The collection JSON has been structurally validated (valid JSON, every script and request body parses). It has not been executed against a live Gateway stack by the author, so report the first real run result separately.
+
+## Share Outfits — US-05.03
+
+Collection: `StyleMind-Wardrobe-Share-Outfits.postman_collection.json` (wardrobe-community-service through the API Gateway under `/wardrobe-community`; Login goes to Identity through the same gateway).
+
+### Prerequisites
+
+1. PostgreSQL, Identity, Notification, Commerce, Wardrobe Community and the API Gateway are running, and `STYLEMIND_SERVICE_TOKEN` has the same value for all of them (Wardrobe calls Commerce, Identity and Notification with it). Mailpit (`http://localhost:8025`) is running to receive the invitation emails.
+2. Two dedicated, verified CUSTOMER accounts, as for the Manage Outfits collection: A is the owner and B is the recipient. Set `emailA`, `passwordA`, `emailB`, `passwordB` locally. `emailB` must be the exact address B registered with, because a share is matched to the viewer by email.
+3. One existing ACTIVE Commerce variant id in `variantId1` (see the Manage Outfits prerequisites).
+4. `baseUrl` is the gateway, `http://localhost:8080` by default. The invitation link points to `STYLEMIND_FRONTEND_BASE_URL` (default `http://localhost:3000`) plus `/shared/outfits/{outfit_id}`.
+
+### Folders
+
+- 01: Login A and B (captures `accessTokenA` and `accessTokenB`; values are not logged).
+- 02: A creates an outfit and shares it with B (201), shares again (200, no second email), lists shares; B lists and reads the shared outfit (no owner id, email, source, public token or share list in the body, `Cache-Control: no-store`); A revokes (204, then 404), B gets 404; A shares again after the revoke (201, same share id).
+- 03: A turns the public link on (43-character token), repeats it (same token), reads the owner detail, anyone reads the outfit without a token, A turns it off (old token is 404), turns it on again (a different token), then off.
+- 04: validation (self share, invalid email, unknown property, malformed ids), B gets 404 on every owner route of A's outfit, shared-list pagination errors, unknown public token, and deleting the outfit removes it from B's view.
+- 05: missing and invalid bearer tokens return 401.
+
+Run the folders in order with the Collection Runner. After the request "A shares the outfit with B", open Mailpit and check that exactly one Vietnamese invitation email arrived for B with a VIEW OUTFIT button; repeated shares to the same address must not send another one. The second send after the revoke does send a new email.
+
+### Not covered here
+
+The limits (20 active shares per outfit, 30 grants per day), the 429, the 503 `IDENTITY_UNAVAILABLE` and `CATALOG_UNAVAILABLE` cases, ADMIN 403, and a failing Notification are covered by the automated tests (`OutfitSharePostgresIntegrationTests`, `IdentityDirectoryClientTests`, `ShareInvitationMailClientTests`). The public link is returned only as a token; the browser address `{frontend}/shared/outfits/{id}` and the public link page are frontend work. Product image URLs are returned exactly as Commerce provides them (relative to Commerce), and Commerce currently requires a login to download images.
+
+### Verification status
+
+The collection JSON has been structurally validated (valid JSON, every script and request body parses). It has not been executed against a live Gateway stack by the author, so report the first real run result separately.
