@@ -18,6 +18,7 @@ public final class ReplaceStyleProfileRequest {
 
     private JsonNode fitPreference;
     private BigDecimal heightCm;
+    private BigDecimal weightKg;
     private JsonNode usualTopSize;
     private JsonNode usualBottomSize;
     private JsonNode shoeSize;
@@ -58,6 +59,19 @@ public final class ReplaceStyleProfileRequest {
             description = "Exact decimal centimeters in [50, 250], with at most one fractional digit.")
     public BigDecimal getHeightCm() {
         return heightCm;
+    }
+
+    @JsonSetter(value = "weight_kg", nulls = Nulls.SET)
+    @JsonDeserialize(using = StrictJsonDecimalDeserializer.class)
+    public void setWeightKg(BigDecimal weightKg) {
+        this.weightKg = weightKg;
+    }
+
+    @JsonProperty("weight_kg")
+    @Schema(type = "number", nullable = true,
+            description = "Optional; omitted means null. Exact decimal kilograms in [20, 300], with at most one fractional digit.")
+    public BigDecimal getWeightKg() {
+        return weightKg;
     }
 
     @JsonSetter(value = "usual_top_size", nulls = Nulls.SET)

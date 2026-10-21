@@ -8,6 +8,7 @@ public record StyleProfileSnapshot(
         boolean profileExists,
         String fitPreference,
         BigDecimal heightCm,
+        BigDecimal weightKg,
         String usualTopSize,
         String usualBottomSize,
         String shoeSize,
@@ -22,6 +23,6 @@ public record StyleProfileSnapshot(
     }
 
     public static StyleProfileSnapshot absent() {
-        return new StyleProfileSnapshot(false, null, null, null, null, null, List.of(), List.of(), List.of());
+        return new StyleProfileSnapshot(false, null, null, null, null, null, null, List.of(), List.of(), List.of());
     }
 }

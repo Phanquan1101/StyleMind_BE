@@ -50,24 +50,43 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
-        "spring.datasource.hikari.initialization-fail-timeout=-1"
+        "stylemind.security.jwt.jwk-set-uri="
 })
 @AutoConfigureMockMvc
+@Testcontainers
 @Import(WardrobeCommunityServiceApplicationTests.JwtTestConfiguration.class)
 class WardrobeCommunityServiceApplicationTests {
 
     private static final String CORRELATION_HEADER = "X-Correlation-Id";
     private static final RSAKey SIGNING_KEY = generateRsaKey();
     private static final RSAKey OTHER_SIGNING_KEY = generateRsaKey();
+
+    @Container
+    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+            .withDatabaseName("stylemind_wardrobe_community_app_test")
+            .withUsername("wardrobe_community_app_test")
+            .withPassword("test-only-not-a-secret");
+
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
 
     @Autowired
     private MockMvc mockMvc;

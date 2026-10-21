@@ -85,3 +85,65 @@ Brand UUID checks are syntax-only. A valid UUID does not prove that a Commerce b
 Structural validation passed: both JSON files parse; the collection declares the Postman Collection v2.1 schema; request-variable references resolve, including request-local profileBoundaryBody and Authorization values; shared collection/environment scopes have no token override; and every embedded pre-request/test JavaScript script passes Node syntax checking. Shared files contain no password or access-token values.
 
 Runtime execution is NOT EXECUTED. Newman is not installed in this workspace, and no A/B test-account credentials were supplied. The collection was not sent to an HTTP service or persistent database. Structural validation is not an E2E pass. See the [US-02.05 implementation report](../docs/qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md) for Java HTTP/PostgreSQL tests and Identity regression evidence.
+
+## Manage Outfits — US-05.01
+
+Collection: `StyleMind-Wardrobe-Manage-Outfits.postman_collection.json` (wardrobe-community-service, called through the API Gateway under `/wardrobe-community`; Login goes to Identity through the same gateway).
+
+### Prerequisites
+
+1. PostgreSQL, Identity, Commerce, Wardrobe Community and the API Gateway are running, and `STYLEMIND_SERVICE_TOKEN` is the same value for Commerce and Wardrobe Community (the outfit APIs read product data from Commerce).
+2. Two dedicated, verified CUSTOMER accounts, as for the Profile collection (see "Provision dedicated test accounts"). Set `emailA`, `passwordA`, `emailB`, `passwordB` locally.
+3. Existing ACTIVE Commerce variants. Wardrobe stores only variant ids, so create or pick them in Commerce first and set these collection or environment variables locally:
+   - `variantId1`: any ACTIVE variant (product P1).
+   - `siblingVariantId`: another ACTIVE variant of the same product P1 (for example a different color or size).
+   - `variantId2`: an ACTIVE variant of a different product.
+   - `variantId3`: an ACTIVE variant of a third product.
+4. `baseUrl` is the gateway, `http://localhost:8080` by default. Keep tokens, ids and passwords out of exported files.
+
+### Folders
+
+- 01: Login CUSTOMER A and B (captures `accessTokenA`/`accessTokenB`; values are not logged).
+- 02: A's happy path: create, list, get, rename, add item, change item to a sibling variant (and the no-op repeat), remove item, delete outfit, then 404.
+- 03: A's validation and conflicts against a one-item baseline outfit: invalid name/source/items, 400 for malformed ids and pagination, 409 `VARIANT_NOT_ACTIVE`, `OUTFIT_ITEM_DUPLICATE`, `OUTFIT_LAST_ITEM`, and a final check that the baseline is unchanged.
+- 04: ownership: B gets 404 `RESOURCE_NOT_FOUND` on every route of A's outfit, A's outfit is unchanged.
+- 05: missing and invalid bearer tokens return 401.
+
+Run the folders in order with the Collection Runner. A request stops the run when a prerequisite variable or token is missing. Each folder deletes the outfits it creates.
+
+### Not covered here
+
+The ADMIN 403, the 503 `CATALOG_UNAVAILABLE` when Commerce is down, the 100-outfit and 10-item limits, and the concurrent-add check cannot be driven safely from Postman. They are covered by the automated tests (`OutfitPostgresIntegrationTests`, `CommerceCatalogClientTests`). Image URLs are returned exactly as Commerce provides them (relative to the Commerce service, for example `/api/v1/variant-images/{id}/content`).
+
+### Verification status
+
+The collection JSON has been structurally validated (valid JSON, every script and request body parses). It has not been executed against a live Gateway stack by the author, so report the first real run result separately.
+
+## Share Outfits — US-05.03
+
+Collection: `StyleMind-Wardrobe-Share-Outfits.postman_collection.json` (wardrobe-community-service through the API Gateway under `/wardrobe-community`; Login goes to Identity through the same gateway).
+
+### Prerequisites
+
+1. PostgreSQL, Identity, Notification, Commerce, Wardrobe Community and the API Gateway are running, and `STYLEMIND_SERVICE_TOKEN` has the same value for all of them (Wardrobe calls Commerce, Identity and Notification with it). Mailpit (`http://localhost:8025`) is running to receive the invitation emails.
+2. Two dedicated, verified CUSTOMER accounts, as for the Manage Outfits collection: A is the owner and B is the recipient. Set `emailA`, `passwordA`, `emailB`, `passwordB` locally. `emailB` must be the exact address B registered with, because a share is matched to the viewer by email.
+3. One existing ACTIVE Commerce variant id in `variantId1` (see the Manage Outfits prerequisites).
+4. `baseUrl` is the gateway, `http://localhost:8080` by default. The invitation link points to `STYLEMIND_FRONTEND_BASE_URL` (default `http://localhost:3000`) plus `/shared/outfits/{outfit_id}`.
+
+### Folders
+
+- 01: Login A and B (captures `accessTokenA` and `accessTokenB`; values are not logged).
+- 02: A creates an outfit and shares it with B (201), shares again (200, no second email), lists shares; B lists and reads the shared outfit (no owner id, email, source, public token or share list in the body, `Cache-Control: no-store`); A revokes (204, then 404), B gets 404; A shares again after the revoke (201, same share id).
+- 03: A turns the public link on (43-character token), repeats it (same token), reads the owner detail, anyone reads the outfit without a token, A turns it off (old token is 404), turns it on again (a different token), then off.
+- 04: validation (self share, invalid email, unknown property, malformed ids), B gets 404 on every owner route of A's outfit, shared-list pagination errors, unknown public token, and deleting the outfit removes it from B's view.
+- 05: missing and invalid bearer tokens return 401.
+
+Run the folders in order with the Collection Runner. After the request "A shares the outfit with B", open Mailpit and check that exactly one Vietnamese invitation email arrived for B with a VIEW OUTFIT button; repeated shares to the same address must not send another one. The second send after the revoke does send a new email.
+
+### Not covered here
+
+The limits (20 active shares per outfit, 30 grants per day), the 429, the 503 `IDENTITY_UNAVAILABLE` and `CATALOG_UNAVAILABLE` cases, ADMIN 403, and a failing Notification are covered by the automated tests (`OutfitSharePostgresIntegrationTests`, `IdentityDirectoryClientTests`, `ShareInvitationMailClientTests`). The public link is returned only as a token; the browser address `{frontend}/shared/outfits/{id}` and the public link page are frontend work. Product image URLs are returned exactly as Commerce provides them (relative to Commerce), and Commerce currently requires a login to download images.
+
+### Verification status
+
+The collection JSON has been structurally validated (valid JSON, every script and request body parses). It has not been executed against a live Gateway stack by the author, so report the first real run result separately.

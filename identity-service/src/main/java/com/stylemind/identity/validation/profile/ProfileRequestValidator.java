@@ -24,6 +24,8 @@ public final class ProfileRequestValidator {
             "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final BigDecimal MIN_HEIGHT_CM = new BigDecimal("50.0");
     private static final BigDecimal MAX_HEIGHT_CM = new BigDecimal("250.0");
+    private static final BigDecimal MIN_WEIGHT_KG = new BigDecimal("20.0");
+    private static final BigDecimal MAX_WEIGHT_KG = new BigDecimal("300.0");
     private static final int MAX_COLLECTION_SIZE = 50;
 
     public String validatePatch(PatchMyProfileRequest request) {
@@ -45,6 +47,7 @@ public final class ProfileRequestValidator {
         return new StyleProfileCommand(
                 optionalCode(request.getFitPreference()),
                 height(request.getHeightCm()),
+                weight(request.getWeightKg()),
                 optionalLabel(request.getUsualTopSize(), 32),
                 optionalLabel(request.getUsualBottomSize(), 32),
                 optionalLabel(request.getShoeSize(), 32),
@@ -95,6 +98,16 @@ public final class ProfileRequestValidator {
             return null;
         }
         if (value.scale() > 1 || value.compareTo(MIN_HEIGHT_CM) < 0 || value.compareTo(MAX_HEIGHT_CM) > 0) {
+            throw invalidRequest();
+        }
+        return value;
+    }
+
+    private BigDecimal weight(BigDecimal value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.scale() > 1 || value.compareTo(MIN_WEIGHT_KG) < 0 || value.compareTo(MAX_WEIGHT_KG) > 0) {
             throw invalidRequest();
         }
         return value;

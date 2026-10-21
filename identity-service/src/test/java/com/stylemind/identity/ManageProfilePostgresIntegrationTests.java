@@ -243,6 +243,7 @@ class ManageProfilePostgresIntegrationTests {
         JsonNode empty = json(perform("GET", STYLE, customer, null)).path("style_profile");
         assertThat(empty.path("fit_preference").isNull()).isTrue();
         assertThat(empty.path("height_cm").isNull()).isTrue();
+        assertThat(empty.path("weight_kg").isNull()).isTrue();
         assertThat(empty.path("usual_top_size").isNull()).isTrue();
         assertThat(empty.path("usual_bottom_size").isNull()).isTrue();
         assertThat(empty.path("shoe_size").isNull()).isTrue();
@@ -252,12 +253,16 @@ class ManageProfilePostgresIntegrationTests {
 
         UUID unknownBrand = UUID.randomUUID();
         String replacement = styleBody("\"relaxed\"", "170.5", "\"  M  \"", "null", "\"EU 39\"",
-                "[\"zeta\",\"alpha\"]", "[\"Blue\",\"black\"]", "[\"" + unknownBrand + "\"]");
+                "[\"zeta\",\"alpha\"]", "[\"Blue\",\"black\"]", "[\"" + unknownBrand + "\"]")
+                .replace("\"weight_kg\":null", "\"weight_kg\":65.5");
         MvcResult put = perform("PUT", STYLE, customer, replacement);
         assertThat(put.getResponse().getStatus()).isEqualTo(200);
         JsonNode saved = json(put).path("style_profile");
         assertThat(saved.path("fit_preference").asText()).isEqualTo("RELAXED");
         assertThat(saved.path("height_cm").decimalValue()).isEqualByComparingTo("170.5");
+        assertThat(saved.path("weight_kg").decimalValue()).isEqualByComparingTo("65.5");
+        assertThat(jdbc.queryForObject("SELECT weight_kg FROM public.style_profile WHERE account_id = ?",
+                java.math.BigDecimal.class, owner)).isEqualByComparingTo("65.5");
         assertThat(saved.path("usual_top_size").asText()).isEqualTo("M");
         assertThat(saved.path("usual_bottom_size").isNull()).isTrue();
         assertThat(saved.path("shoe_size").asText()).isEqualTo("EU 39");
@@ -268,11 +273,19 @@ class ManageProfilePostgresIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT brand_id FROM public.profile_brand WHERE account_id = ?", UUID.class,
                 owner)).isEqualTo(unknownBrand);
 
+        MvcResult omittedWeight = perform("PUT", STYLE, customer,
+                styleBody("null", "170", "null", "null", "null", "[]", "[]", "[]").replace("\"weight_kg\":null,", ""));
+        assertThat(omittedWeight.getResponse().getStatus()).isEqualTo(200);
+        assertThat(json(omittedWeight).path("style_profile").path("weight_kg").isNull()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT weight_kg FROM public.style_profile WHERE account_id = ?",
+                java.math.BigDecimal.class, owner)).isNull();
+
         MvcResult cleared = perform("PUT", STYLE, customer,
                 styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]"));
         JsonNode clearedProfile = json(cleared).path("style_profile");
         assertThat(clearedProfile.path("fit_preference").isNull()).isTrue();
         assertThat(clearedProfile.path("height_cm").isNull()).isTrue();
+        assertThat(clearedProfile.path("weight_kg").isNull()).isTrue();
         assertThat(strings(clearedProfile.path("style_codes"))).isEmpty();
         assertThat(strings(clearedProfile.path("color_codes"))).isEmpty();
         assertThat(strings(clearedProfile.path("brand_ids"))).isEmpty();
@@ -288,6 +301,7 @@ class ManageProfilePostgresIntegrationTests {
         JsonNode emptyCreatedProfile = json(emptyCreate).path("style_profile");
         assertThat(emptyCreatedProfile.path("fit_preference").isNull()).isTrue();
         assertThat(emptyCreatedProfile.path("height_cm").isNull()).isTrue();
+        assertThat(emptyCreatedProfile.path("weight_kg").isNull()).isTrue();
         assertThat(strings(emptyCreatedProfile.path("style_codes"))).isEmpty();
         assertThat(strings(emptyCreatedProfile.path("color_codes"))).isEmpty();
         assertThat(strings(emptyCreatedProfile.path("brand_ids"))).isEmpty();
@@ -310,6 +324,12 @@ class ManageProfilePostgresIntegrationTests {
                 styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
                         .replace("\"brand_ids\":[]", "\"brand_ids\":[\"invalid\"]"),
                 styleBody("null", "251", "null", "null", "null", "[]", "[]", "[]"),
+                styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
+                        .replace("\"weight_kg\":null", "\"weight_kg\":\"70\""),
+                styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
+                        .replace("\"weight_kg\":null", "\"weight_kg\":19.9"),
+                styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
+                        .replace("\"weight_kg\":null", "\"weight_kg\":300.1"),
                 styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
                         .replace("\"color_codes\":[]", "\"color_codes\":null"),
                 styleBody("null", "null", "null", "null", "null", "[]", "[]", "[]")
@@ -523,7 +543,7 @@ class ManageProfilePostgresIntegrationTests {
 
     private static String styleBody(String fit, String height, String top, String bottom, String shoe,
             String styles, String colors, String brands) {
-        return "{\"fit_preference\":" + fit + ",\"height_cm\":" + height + ",\"usual_top_size\":" + top
+        return "{\"fit_preference\":" + fit + ",\"height_cm\":" + height + ",\"weight_kg\":null,\"usual_top_size\":" + top
                 + ",\"usual_bottom_size\":" + bottom + ",\"shoe_size\":" + shoe
                 + ",\"style_codes\":" + styles + ",\"color_codes\":" + colors + ",\"brand_ids\":" + brands + "}";
     }

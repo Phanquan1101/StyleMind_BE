@@ -26,6 +26,9 @@ public class StyleProfile {
     @Column(name = "height_cm")
     private BigDecimal heightCm;
 
+    @Column(name = "weight_kg")
+    private BigDecimal weightKg;
+
     @Column(name = "usual_top_size", columnDefinition = "text")
     private String usualTopSize;
 
