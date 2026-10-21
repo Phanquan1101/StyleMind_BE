@@ -85,6 +85,7 @@ public class ManageProfilePersistenceService {
         });
         profile.setFitPreference(command.fitPreference());
         profile.setHeightCm(command.heightCm());
+        profile.setWeightKg(command.weightKg());
         profile.setUsualTopSize(command.usualTopSize());
         profile.setUsualBottomSize(command.usualBottomSize());
         profile.setShoeSize(command.shoeSize());
@@ -110,7 +111,7 @@ public class ManageProfilePersistenceService {
         if (profile == null) {
             return StyleProfileSnapshot.absent();
         }
-        return new StyleProfileSnapshot(true, profile.getFitPreference(), profile.getHeightCm(),
+        return new StyleProfileSnapshot(true, profile.getFitPreference(), profile.getHeightCm(), profile.getWeightKg(),
                 profile.getUsualTopSize(), profile.getUsualBottomSize(), profile.getShoeSize(),
                 profileStyleRepository.findByIdAccountIdOrderByIdStyleCodeAsc(accountId).stream()
                         .map(row -> row.getId().getStyleCode()).toList(),
@@ -125,7 +126,8 @@ public class ManageProfilePersistenceService {
             return new StyleProfileResponse(null);
         }
         return new StyleProfileResponse(new StyleProfileResponse.StyleProfile(
-                snapshot.fitPreference(), snapshot.heightCm(), snapshot.usualTopSize(), snapshot.usualBottomSize(),
+                snapshot.fitPreference(), snapshot.heightCm(), snapshot.weightKg(), snapshot.usualTopSize(),
+                snapshot.usualBottomSize(),
                 snapshot.shoeSize(), snapshot.styleCodes(), snapshot.colorCodes(), snapshot.brandIds()));
     }
 
