@@ -1,0 +1,1881 @@
+{
+  "info": {
+    "name": "StyleMind Identity — Manage Users US-02.07",
+    "description": "Owner-approved Admin user-list, account-status, and complete-role replacement contract. Use only a disposable local database with dedicated verified fixture accounts. No credentials or tokens are embedded.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "tokenA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tokenB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tokenC",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshC",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "snapshotBefore",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Sign in Admin A, Admin B and Customer C",
+      "item": [
+        {
+          "name": "Login A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailA}}\",\n  \"password\": \"{{passwordA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.test('Login A token response', function () { pm.expect(r).to.have.all.keys('access_token', 'refresh_token', 'token_type', 'expires_in'); pm.expect(r.token_type).to.eql('Bearer'); });",
+                  "pm.collectionVariables.set('tokenA', r.access_token);",
+                  "pm.collectionVariables.set('refreshA', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identify A",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('A fixture identity', function () { pm.expect(pm.response.json().account_id).to.eql(pm.environment.get('accountIdA')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailB}}\",\n  \"password\": \"{{passwordB}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('tokenB', r.access_token);",
+                  "pm.collectionVariables.set('refreshB', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identify B",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenB');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('B differs from A', function () { pm.expect(pm.response.json().account_id).to.eql(pm.environment.get('accountIdB')); pm.expect(pm.environment.get('accountIdB')).not.to.eql(pm.environment.get('accountIdA')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login C",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailC}}\",\n  \"password\": \"{{passwordC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('tokenC', r.access_token);",
+                  "pm.collectionVariables.set('refreshC', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identify C",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('C differs from A and B', function () { const id = pm.response.json().account_id; pm.expect(id).to.eql(pm.environment.get('accountIdC')); pm.expect(id).not.to.eql(pm.environment.get('accountIdA')); pm.expect(id).not.to.eql(pm.environment.get('accountIdB')); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - List, filter, page and safe output",
+      "item": [
+        {
+          "name": "List all users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('initialUsers', JSON.stringify(pm.response.json().items.map(function (u) { return u.account_id; })));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter ADMIN role without truncating complete roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?role=ADMIN&size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.test('every result contains ADMIN; all roles remain', function () { pm.response.json().items.forEach(function (u) { pm.expect(u.roles).to.include('ADMIN'); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter by exact status and email substring",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?status=ACTIVE&email_contains={{emailA}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.test('email filter returns A only', function () { const p = pm.response.json(); pm.expect(p.items).to.have.length(1); pm.expect(p.items[0].email).to.eql(pm.environment.get('emailA').trim().toLowerCase()); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page 0 size 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?page=0&size=1"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.test('page 0 metadata', function () { const p = pm.response.json(); pm.expect(p.page).to.eql(0); pm.expect(p.size).to.eql(1); pm.expect(p.total_elements).to.be.at.least(3); });",
+                  "pm.collectionVariables.set('page0Id', pm.response.json().items[0].account_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page 1 size 1 is distinct",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?page=1&size=1"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.test('stable page boundary', function () { const p = pm.response.json(); pm.expect(p.page).to.eql(1); pm.expect(p.items[0].account_id).not.to.eql(pm.collectionVariables.get('page0Id')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unmatched email returns empty page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?email_contains=missing-user-us0207-unique"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.test('empty result metadata', function () { const p = pm.response.json(); pm.expect(p.items).to.be.empty; pm.expect(p.total_elements).to.eql(0); pm.expect(p.total_pages).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown list query is rejected",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?sort=email"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code INVALID_REQUEST', function () { pm.expect(p.code).to.eql('INVALID_REQUEST'); pm.expect(p.status).to.eql(400); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Non-admin denial and unchanged-state proofs",
+      "item": [
+        {
+          "name": "Snapshot all users before C status attempt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "const users = pm.response.json().items;",
+                  "pm.collectionVariables.set('snapshotBefore', JSON.stringify(users.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; })));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer C cannot list users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot unchanged after denied C status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const current = pm.response.json();",
+                  "const canonical = current.items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; });",
+                  "pm.test('rejected request left full user list unchanged', function () { pm.expect(JSON.stringify(canonical)).to.eql(pm.collectionVariables.get('snapshotBefore')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot before denied C status update",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('snapshotBefore', JSON.stringify(pm.response.json().items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; })));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer C cannot change B status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdB}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot unchanged after denied status update",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const current = pm.response.json();",
+                  "const canonical = current.items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; });",
+                  "pm.test('rejected request left full user list unchanged', function () { pm.expect(JSON.stringify(canonical)).to.eql(pm.collectionVariables.get('snapshotBefore')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot before denied C role update",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('snapshotBefore', JSON.stringify(pm.response.json().items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; })));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer C cannot replace B roles",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdB}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot unchanged after denied role update",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const current = pm.response.json();",
+                  "const canonical = current.items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; });",
+                  "pm.test('rejected request left full user list unchanged', function () { pm.expect(JSON.stringify(canonical)).to.eql(pm.collectionVariables.get('snapshotBefore')); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Suspend, refresh denial, reactivate and old access token",
+      "item": [
+        {
+          "name": "A suspends C",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdC}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('C suspended', function () { pm.expect(pm.response.json().account_status).to.eql('SUSPENDED'); pm.expect(pm.response.json().account_id).to.eql(pm.environment.get('accountIdC')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C cannot Login while suspended",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailC}}\",\n  \"password\": \"{{passwordC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCOUNT_NOT_ACTIVE', function () { pm.expect(p.code).to.eql('ACCOUNT_NOT_ACTIVE'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C existing refresh session is not usable while suspended",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCOUNT_NOT_ACTIVE', function () { pm.expect(p.code).to.eql('ACCOUNT_NOT_ACTIVE'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Previously issued access JWT still reaches baseline /me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('old access JWT remains valid until exp', function () { pm.expect(pm.response.json().account_id).to.eql(pm.environment.get('accountIdC')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A reactivates verified C",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdC}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('verified target reactivated', function () { const r = pm.response.json(); pm.expect(r.account_status).to.eql('ACTIVE'); pm.expect(r.email_verified_at).to.not.be.null; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C refresh session remains available after reactivation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('tokenC', r.access_token);",
+                  "pm.collectionVariables.set('refreshC', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Role replacement and stale ADMIN rejection",
+      "item": [
+        {
+          "name": "A grants C both supported roles",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"ADMIN\",\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdC}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('complete sorted role set', function () { pm.expect(pm.response.json().roles).to.eql(['ADMIN', 'CUSTOMER']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C old CUSTOMER token cannot access ADMIN API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh obtains current ADMIN role from database",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('tokenC', r.access_token);",
+                  "pm.collectionVariables.set('refreshC', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C with refreshed ADMIN token can list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A removes ADMIN from C",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdC}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('role set fully replaced', function () { pm.expect(pm.response.json().roles).to.eql(['CUSTOMER']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C stale ADMIN JWT is rejected by live database role check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ADMIN_ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ADMIN_ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh obtains current CUSTOMER-only role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshC}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('tokenC', r.access_token);",
+                  "pm.collectionVariables.set('refreshC', r.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C refreshed as CUSTOMER cannot enter ADMIN route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenC');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - No-op, self-change and last qualifying Admin guards",
+      "item": [
+        {
+          "name": "A no-op status and role replacement are accepted",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('no-op status', function () { pm.expect(pm.response.json().account_status).to.eql('ACTIVE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A no-op complete role replacement",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"ADMIN\",\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('no-op role set', function () { pm.expect(pm.response.json().roles).to.eql(['ADMIN', 'CUSTOMER']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A cannot suspend own account while B remains qualifying Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ADMIN_SELF_CHANGE_FORBIDDEN', function () { pm.expect(p.code).to.eql('ADMIN_SELF_CHANGE_FORBIDDEN'); pm.expect(p.status).to.eql(409); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A cannot replace own roles while B remains qualifying Admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ADMIN_SELF_CHANGE_FORBIDDEN', function () { pm.expect(p.code).to.eql('ADMIN_SELF_CHANGE_FORBIDDEN'); pm.expect(p.status).to.eql(409); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A demotes B, leaving A as the only qualifying Admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdB}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "pm.test('B demoted', function () { pm.expect(pm.response.json().roles).to.eql(['CUSTOMER']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot before final guard checks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const page = pm.response.json();",
+                  "pm.test('page fields and safe user representation', function () {",
+                  "  pm.expect(page).to.have.all.keys('items', 'page', 'size', 'total_elements', 'total_pages');",
+                  "  page.items.forEach(function (u) {",
+                  "    pm.expect(u).to.have.all.keys('account_id', 'email', 'account_status', 'email_verified_at', 'registered_at', 'roles');",
+                  "    ['password', 'password_hash', 'token_hash', 'refresh_token', 'otp', 'challenge'].forEach(function (k) { pm.expect(u).not.to.have.property(k); });",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('snapshotBefore', JSON.stringify(pm.response.json().items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; })));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B old ADMIN access JWT is denied after role removal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenB');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code ADMIN_ACCESS_DENIED', function () { pm.expect(p.code).to.eql('ADMIN_ACCESS_DENIED'); pm.expect(p.status).to.eql(403); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A cannot remove the last qualifying Admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"CUSTOMER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/roles"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code LAST_QUALIFYING_ADMIN_REQUIRED', function () { pm.expect(p.code).to.eql('LAST_QUALIFYING_ADMIN_REQUIRED'); pm.expect(p.status).to.eql(409); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A cannot suspend the last qualifying Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_status\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/users/{{accountIdA}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "const p = pm.response.json();",
+                  "pm.test('Problem Details code LAST_QUALIFYING_ADMIN_REQUIRED', function () { pm.expect(p.code).to.eql('LAST_QUALIFYING_ADMIN_REQUIRED'); pm.expect(p.status).to.eql(409); });",
+                  "pm.test('no-store error response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Final state proves last-Admin denials did not mutate accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/users?size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('tokenA');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+                  "else pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('no-store response', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });",
+                  "const current = pm.response.json();",
+                  "const canonical = current.items.map(function (u) { return { account_id: u.account_id, email: u.email, account_status: u.account_status, email_verified_at: u.email_verified_at, registered_at: u.registered_at, roles: u.roles }; });",
+                  "pm.test('rejected request left full user list unchanged', function () { pm.expect(JSON.stringify(canonical)).to.eql(pm.collectionVariables.get('snapshotBefore')); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+erDiagram
+    %% System view only. REF labels are logical links, not cross-database FK constraints.
+    ACCOUNT ||--|{ ACCOUNT_ROLE : has_roles
+    ACCOUNT ||--o{ CUSTOMER_ADDRESS : owns
+    ACCOUNT ||..o{ ORDER : places_REF
+    ACCOUNT ||..o{ CART : owns_user_cart_REF
+    ACCOUNT ||..o{ WARDROBE : owns_REF
+    ACCOUNT ||..o{ FRIENDSHIP : connects_as_user_a_REF
+    ACCOUNT ||..o{ FRIENDSHIP : connects_as_user_b_REF
+    ACCOUNT ||..o{ CHAT_PARTICIPANT : joins_REF
+    ACCOUNT ||..o{ NOTIFICATION : receives_REF
+    ACCOUNT ||..o{ STYLIST_SESSION : consults_REF
+    CATEGORY ||--o{ PRODUCT : classifies
+    BRAND ||--o{ PRODUCT : brands
+    PRODUCT ||--o{ PRODUCT_VARIANT : offers
+    PRODUCT_VARIANT ||--o{ VARIANT_IMAGE : has_images
+    %% Branch directory is retained without inventing fulfillment or stock relationships.
+    BRANCH {
+        uuid branch_id PK
+        string name
+    }
+    CART ||--o{ CART_ITEM : contains
+    PRODUCT_VARIANT ||--o{ CART_ITEM : selected_in
+    ORDER ||--|{ ORDER_ITEM : contains
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : purchased_as
+    ORDER ||--|| ORDER_ADDRESS_SNAPSHOT : freezes_address
+    CUSTOMER_ADDRESS o|..o{ ORDER_ADDRESS_SNAPSHOT : source_REF
+    ORDER ||--o| CANCELLATION_REQUEST : may_be_cancelled
+    ORDER ||..o{ PAYMENT_ATTEMPT : paid_through_REF
+    PAYMENT_ATTEMPT ||--o| FINANCIAL_TRANSACTION : settles_payment
+    WARDROBE ||--o{ WARDROBE_ITEM : contains
+    WARDROBE ||--o| WARDROBE_REQUIREMENT : configures_if_persisted
+    WARDROBE ||--o{ WARDROBE_SHARE : shared_with
+    FRIENDSHIP ||--o{ WARDROBE_SHARE : supports_sharing
+    WARDROBE ||--o{ CHAT_SESSION : provides_context
+    CHAT_SESSION ||--|{ CHAT_PARTICIPANT : includes
+    CHAT_PARTICIPANT ||--o{ CHAT_MESSAGE : sends
+    WARDROBE ||--o{ OUTFIT : keeps
+    OUTFIT ||--|{ OUTFIT_ITEM : combines
+    WARDROBE_ITEM o|--o{ OUTFIT_ITEM : owned_piece
+    PRODUCT_VARIANT o|..o{ OUTFIT_ITEM : shop_piece_REF
+    STYLIST_SESSION ||--o{ STYLING_REQUEST : receives
+    WARDROBE o|..o{ STYLING_REQUEST : supplies_context_REF
+    WARDROBE_REQUIREMENT o|..o{ STYLING_REQUEST : supplies_criteria_REF
+    STYLING_REQUEST ||--o{ WARDROBE_RECOMMENDATION : generates
+    WARDROBE_RECOMMENDATION ||--|{ RECOMMENDATION_ITEM : contains
+    PRODUCT_VARIANT o|..o{ RECOMMENDATION_ITEM : shop_variant_only_REF
+    WARDROBE_ITEM o|..o{ RECOMMENDATION_ITEM : owned_context_REF
+    WARDROBE_RECOMMENDATION o|..o{ OUTFIT : saved_as_REF

@@ -1,0 +1,6 @@
+Initial targeted validation-test run — 2026-10-08
+Command: mvn -f identity-service/pom.xml -Dtest=ProfileRequestValidationTests test
+Result: 7 tests, 1 failure, 0 errors, 0 skipped.
+Classification: test-fixture defect. The missing-brand_ids fixture removed the property but left a trailing comma, so Jackson correctly raised JsonParseException before validation. The fixture was corrected to remove the preceding comma as well. No application behavior was changed in response to this failure.
+Original Surefire report retained at identity-service/target/surefire-reports/com.stylemind.identity.ProfileRequestValidationTests.txt until verification artifacts are collected.
+Follow-up targeted run: 7 tests, 1 failure, 0 errors, 0 skipped. The remaining failure was an assertion classification defect: the strict decimal DTO rejects a JSON string height during Jackson binding with MismatchedInputException, before ProfileRequestValidator runs. HTTP error mapping is separately covered as 400 INVALID_REQUEST. The unit case was moved to assert strict binding rejection directly; application code was unchanged.

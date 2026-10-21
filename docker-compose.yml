@@ -1,0 +1,197 @@
+name: stylemind
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${STYLEMIND_POSTGRES_ADMIN_USERNAME:?Set STYLEMIND_POSTGRES_ADMIN_USERNAME in .env}
+      POSTGRES_PASSWORD: ${STYLEMIND_POSTGRES_ADMIN_PASSWORD:?Set STYLEMIND_POSTGRES_ADMIN_PASSWORD in .env}
+      STYLEMIND_IDENTITY_DB_USERNAME: ${STYLEMIND_IDENTITY_DB_USERNAME:?Set STYLEMIND_IDENTITY_DB_USERNAME in .env}
+      STYLEMIND_IDENTITY_DB_PASSWORD: ${STYLEMIND_IDENTITY_DB_PASSWORD:?Set STYLEMIND_IDENTITY_DB_PASSWORD in .env}
+      STYLEMIND_COMMERCE_DB_USERNAME: ${STYLEMIND_COMMERCE_DB_USERNAME:?Set STYLEMIND_COMMERCE_DB_USERNAME in .env}
+      STYLEMIND_COMMERCE_DB_PASSWORD: ${STYLEMIND_COMMERCE_DB_PASSWORD:?Set STYLEMIND_COMMERCE_DB_PASSWORD in .env}
+      STYLEMIND_PAYMENT_DB_USERNAME: ${STYLEMIND_PAYMENT_DB_USERNAME:?Set STYLEMIND_PAYMENT_DB_USERNAME in .env}
+      STYLEMIND_PAYMENT_DB_PASSWORD: ${STYLEMIND_PAYMENT_DB_PASSWORD:?Set STYLEMIND_PAYMENT_DB_PASSWORD in .env}
+      STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME: ${STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME:?Set STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME in .env}
+      STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD: ${STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD:?Set STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD in .env}
+      STYLEMIND_STYLIST_DB_USERNAME: ${STYLEMIND_STYLIST_DB_USERNAME:?Set STYLEMIND_STYLIST_DB_USERNAME in .env}
+      STYLEMIND_STYLIST_DB_PASSWORD: ${STYLEMIND_STYLIST_DB_PASSWORD:?Set STYLEMIND_STYLIST_DB_PASSWORD in .env}
+      STYLEMIND_NOTIFICATION_DB_USERNAME: ${STYLEMIND_NOTIFICATION_DB_USERNAME:?Set STYLEMIND_NOTIFICATION_DB_USERNAME in .env}
+      STYLEMIND_NOTIFICATION_DB_PASSWORD: ${STYLEMIND_NOTIFICATION_DB_PASSWORD:?Set STYLEMIND_NOTIFICATION_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/verify-boundaries.sql:/opt/stylemind/verify-boundaries.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  identity-service:
+    build:
+      context: ./identity-service
+    environment:
+      SERVER_PORT: "8081"
+      SPRING_PROFILES_ACTIVE: compose-local
+      STYLEMIND_IDENTITY_DB_URL: ${STYLEMIND_IDENTITY_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_identity}
+      STYLEMIND_IDENTITY_DB_USERNAME: ${STYLEMIND_IDENTITY_DB_USERNAME:?Set STYLEMIND_IDENTITY_DB_USERNAME in .env}
+      STYLEMIND_IDENTITY_DB_PASSWORD: ${STYLEMIND_IDENTITY_DB_PASSWORD:?Set STYLEMIND_IDENTITY_DB_PASSWORD in .env}
+      STYLEMIND_BOOTSTRAP_ADMIN_ENABLED: ${STYLEMIND_BOOTSTRAP_ADMIN_ENABLED:-false}
+      STYLEMIND_BOOTSTRAP_ADMIN_EMAIL: ${STYLEMIND_BOOTSTRAP_ADMIN_EMAIL:-}
+      STYLEMIND_BOOTSTRAP_ADMIN_PASSWORD: ${STYLEMIND_BOOTSTRAP_ADMIN_PASSWORD:-}
+      STYLEMIND_VERIFICATION_HMAC_SECRET: ${STYLEMIND_VERIFICATION_HMAC_SECRET:?Set STYLEMIND_VERIFICATION_HMAC_SECRET in .env}
+      STYLEMIND_NOTIFICATION_BASE_URL: http://notification-service:8086
+      STYLEMIND_SERVICE_TOKEN: ${STYLEMIND_SERVICE_TOKEN:?Set STYLEMIND_SERVICE_TOKEN in .env}
+      STYLEMIND_JWT_ISSUER: ${STYLEMIND_JWT_ISSUER:-https://identity.stylemind.local}
+      STYLEMIND_JWT_AUDIENCE: ${STYLEMIND_JWT_AUDIENCE:-stylemind-api}
+      STYLEMIND_JWT_PRIVATE_KEY_PATH: ${STYLEMIND_JWT_PRIVATE_KEY_PATH:-/run/secrets/stylemind-identity-private.pem}
+      STYLEMIND_JWT_ACCESS_TTL: ${STYLEMIND_JWT_ACCESS_TTL:-PT15M}
+      STYLEMIND_JWT_REFRESH_TTL: ${STYLEMIND_JWT_REFRESH_TTL:-P7D}
+      STYLEMIND_OPENAPI_SERVER_URL: /identity
+    depends_on:
+      postgres:
+        condition: service_healthy
+      notification-service:
+        condition: service_started
+    volumes:
+      - ${STYLEMIND_IDENTITY_JWT_PRIVATE_KEY_FILE:-./.secrets/stylemind-identity-private.pem}:/run/secrets/stylemind-identity-private.pem:ro
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    environment:
+      SERVER_PORT: "8080"
+      STYLEMIND_IDENTITY_BASE_URL: http://identity-service:8081
+      STYLEMIND_COMMERCE_BASE_URL: http://commerce-service:8082
+      STYLEMIND_PAYMENT_BASE_URL: http://payment-service:8083
+      STYLEMIND_WARDROBE_COMMUNITY_BASE_URL: http://wardrobe-community-service:8084
+      STYLEMIND_STYLIST_BASE_URL: http://stylist-service:8085
+      STYLEMIND_NOTIFICATION_BASE_URL: http://notification-service:8086
+    depends_on:
+      identity-service:
+        condition: service_started
+      commerce-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      wardrobe-community-service:
+        condition: service_started
+      stylist-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  commerce-service:
+    build:
+      context: ./commerce-service
+    environment:
+      SERVER_PORT: "8082"
+      STYLEMIND_COMMERCE_DB_URL: ${STYLEMIND_COMMERCE_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_commerce}
+      STYLEMIND_COMMERCE_DB_USERNAME: ${STYLEMIND_COMMERCE_DB_USERNAME:?Set STYLEMIND_COMMERCE_DB_USERNAME in .env}
+      STYLEMIND_COMMERCE_DB_PASSWORD: ${STYLEMIND_COMMERCE_DB_PASSWORD:?Set STYLEMIND_COMMERCE_DB_PASSWORD in .env}
+      STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-http://identity-service:8081/.well-known/jwks.json}
+      STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-RS256}
+      STYLEMIND_IDENTITY_BASE_URL: ${STYLEMIND_IDENTITY_BASE_URL:-http://identity-service:8081}
+      STYLEMIND_SERVICE_TOKEN: ${STYLEMIND_SERVICE_TOKEN:?Set STYLEMIND_SERVICE_TOKEN in .env}
+      STYLEMIND_OPENAPI_SERVER_URL: /commerce
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: ./payment-service
+    environment:
+      SERVER_PORT: "8083"
+      STYLEMIND_PAYMENT_DB_URL: ${STYLEMIND_PAYMENT_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_payment}
+      STYLEMIND_PAYMENT_DB_USERNAME: ${STYLEMIND_PAYMENT_DB_USERNAME:?Set STYLEMIND_PAYMENT_DB_USERNAME in .env}
+      STYLEMIND_PAYMENT_DB_PASSWORD: ${STYLEMIND_PAYMENT_DB_PASSWORD:?Set STYLEMIND_PAYMENT_DB_PASSWORD in .env}
+      STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
+      STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /payment
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  wardrobe-community-service:
+    build:
+      context: ./wardrobe-community-service
+    environment:
+      SERVER_PORT: "8084"
+      STYLEMIND_WARDROBE_COMMUNITY_DB_URL: ${STYLEMIND_WARDROBE_COMMUNITY_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_wardrobe_community}
+      STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME: ${STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME:?Set STYLEMIND_WARDROBE_COMMUNITY_DB_USERNAME in .env}
+      STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD: ${STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD:?Set STYLEMIND_WARDROBE_COMMUNITY_DB_PASSWORD in .env}
+      STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-http://identity-service:8081/.well-known/jwks.json}
+      STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-RS256}
+      STYLEMIND_COMMERCE_BASE_URL: ${STYLEMIND_COMMERCE_BASE_URL:-http://commerce-service:8082}
+      STYLEMIND_SERVICE_TOKEN: ${STYLEMIND_SERVICE_TOKEN:?Set STYLEMIND_SERVICE_TOKEN in .env}
+      STYLEMIND_IDENTITY_BASE_URL: ${STYLEMIND_IDENTITY_BASE_URL:-http://identity-service:8081}
+      STYLEMIND_NOTIFICATION_BASE_URL: ${STYLEMIND_NOTIFICATION_BASE_URL:-http://notification-service:8086}
+      STYLEMIND_FRONTEND_BASE_URL: ${STYLEMIND_FRONTEND_BASE_URL:-http://localhost:3000}
+      STYLEMIND_OPENAPI_SERVER_URL: /wardrobe-community
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  stylist-service:
+    build:
+      context: ./stylist-service
+    environment:
+      SERVER_PORT: "8085"
+      STYLEMIND_STYLIST_DB_URL: ${STYLEMIND_STYLIST_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_stylist}
+      STYLEMIND_STYLIST_DB_USERNAME: ${STYLEMIND_STYLIST_DB_USERNAME:?Set STYLEMIND_STYLIST_DB_USERNAME in .env}
+      STYLEMIND_STYLIST_DB_PASSWORD: ${STYLEMIND_STYLIST_DB_PASSWORD:?Set STYLEMIND_STYLIST_DB_PASSWORD in .env}
+      STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
+      STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /stylist
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./notification-service
+    environment:
+      SERVER_PORT: "8086"
+      STYLEMIND_NOTIFICATION_DB_URL: ${STYLEMIND_NOTIFICATION_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_notification}
+      STYLEMIND_NOTIFICATION_DB_USERNAME: ${STYLEMIND_NOTIFICATION_DB_USERNAME:?Set STYLEMIND_NOTIFICATION_DB_USERNAME in .env}
+      STYLEMIND_NOTIFICATION_DB_PASSWORD: ${STYLEMIND_NOTIFICATION_DB_PASSWORD:?Set STYLEMIND_NOTIFICATION_DB_PASSWORD in .env}
+      STYLEMIND_SERVICE_TOKEN: ${STYLEMIND_SERVICE_TOKEN:?Set STYLEMIND_SERVICE_TOKEN in .env}
+      STYLEMIND_SMTP_HOST: ${STYLEMIND_SMTP_HOST:-mailpit}
+      STYLEMIND_SMTP_PORT: ${STYLEMIND_SMTP_PORT:-1025}
+      STYLEMIND_SMTP_USERNAME: ${STYLEMIND_SMTP_USERNAME:-}
+      STYLEMIND_SMTP_PASSWORD: ${STYLEMIND_SMTP_PASSWORD:-}
+      STYLEMIND_SMTP_AUTH: ${STYLEMIND_SMTP_AUTH:-false}
+      STYLEMIND_SMTP_STARTTLS: ${STYLEMIND_SMTP_STARTTLS:-false}
+      STYLEMIND_SMTP_CONNECT_TIMEOUT_MS: ${STYLEMIND_SMTP_CONNECT_TIMEOUT_MS:-3000}
+      STYLEMIND_SMTP_READ_TIMEOUT_MS: ${STYLEMIND_SMTP_READ_TIMEOUT_MS:-5000}
+      STYLEMIND_SMTP_WRITE_TIMEOUT_MS: ${STYLEMIND_SMTP_WRITE_TIMEOUT_MS:-5000}
+      STYLEMIND_EMAIL_FROM: ${STYLEMIND_EMAIL_FROM:-no-reply@stylemind.local}
+      STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
+      STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_OPENAPI_SERVER_URL: /notification
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+  health-probe:
+    image: curlimages/curl:8.12.1
+    profiles: ["tools"]
+
+volumes:
+  postgres-data:
