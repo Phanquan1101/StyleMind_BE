@@ -1,5 +1,6 @@
 package com.stylemind.commerce.service.order;
 
+import com.stylemind.commerce.client.payment.OrderPaymentRequest;
 import com.stylemind.commerce.dto.cart.CartItemResponse;
 import com.stylemind.commerce.dto.order.CancellationRequestResponse;
 import com.stylemind.commerce.dto.order.CheckoutPriceResponse;
@@ -37,6 +38,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,7 @@ public class OrderService {
     private final OrderHistoryRepository historyRepository;
     private final CancellationRepository cancellationRepository;
     private final IdentityAddressClient identityAddressClient;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public CheckoutPriceResponse preview(UUID customerId) {
@@ -91,7 +94,9 @@ public class OrderService {
             throw new ApiOperationException(HttpStatus.CONFLICT, "DUPLICATE_CHECKOUT",
                     "Checkout key was already used for an order");
         }
-        return response(detail(findSummary(orderId).orElseThrow()));
+        OrderResponse created = response(detail(findSummary(orderId).orElseThrow()));
+        events.publishEvent(OrderPaymentRequest.from(created));
+        return created;
     }
 
     @Transactional(readOnly = true)

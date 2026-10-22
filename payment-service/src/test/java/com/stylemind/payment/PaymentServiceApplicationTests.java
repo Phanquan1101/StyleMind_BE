@@ -59,6 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
+        "spring.flyway.enabled=false",
         "spring.datasource.hikari.initialization-fail-timeout=-1"
 })
 @AutoConfigureMockMvc
@@ -222,6 +223,12 @@ class PaymentServiceApplicationTests {
                 .isEqualTo("JWT");
         assertThat(api.path("paths").has("/api/test")).isFalse();
         assertThat(api.path("paths").has("/auth/login")).isFalse();
+    }
+
+    @Test
+    void swaggerUiIsPublic() throws Exception {
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test

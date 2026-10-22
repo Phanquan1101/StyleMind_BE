@@ -1,3 +1,7 @@
+# US-04.01 ? Create SePay Payment (part 1)
+
+Import [the creation/handoff collection](StyleMind-Commerce-Payment-Handoff.postman_collection.json) and follow [the US-04.01 guide](US-04.01_CREATE_SEPAY_PAYMENT_RUN_GUIDE.md). This branch includes creation only; webhook settlement and COD collection are deferred. See [scope, evidence and remaining gaps](../docs/qa/US-04.01_PART1_DELIVERY.md).
+
 # Manage Profile Postman Guide
 
 ## Manage Users — US-02.07
