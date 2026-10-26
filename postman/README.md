@@ -1,3 +1,7 @@
+## US-04.03 Confirm COD Collection
+
+[Collection](StyleMind-COD-Two-Step.postman_collection.json), [run guide](COD_TWO_STEP_RUN_GUIDE.md), and [branch handover](../docs/setup/US-04.03_BRANCH_HANDOVER.md). Includes collection, outbox/inbox delivery and Commerce V8.
+
 ## US-04.02 Confirm Payment
 
 [Team setup and push guide](../docs/setup/US-04.02_TEAM_SETUP.md), [collection](StyleMind-US-04.02-Confirm-Payment.postman_collection.json), [run guide](US-04.02_CONFIRM_PAYMENT_RUN_GUIDE.md). Includes local HMAC/API-key simulation; credentials are empty.

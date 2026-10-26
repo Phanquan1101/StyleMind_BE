@@ -68,7 +68,7 @@ class OrderPaymentHandoffTests {
     @EnableTransactionManagement
     static class Config {
         @Bean PaymentClient client() { return mock(PaymentClient.class); }
-        @Bean OrderPaymentHandoff listener(PaymentClient client) { return new OrderPaymentHandoff(client); }
+        @Bean OrderPaymentHandoff listener(PaymentClient client) { return new OrderPaymentHandoff(client, mock(com.stylemind.commerce.service.order.CodOrderConfirmationService.class)); }
         @Bean TestTransactions transactionManager() { return new TestTransactions(); }
     }
 

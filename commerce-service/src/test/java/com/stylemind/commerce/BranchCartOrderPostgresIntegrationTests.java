@@ -88,6 +88,7 @@ class BranchCartOrderPostgresIntegrationTests {
 
     @BeforeEach
     void reset() {
+        jdbc.execute("DROP TRIGGER IF EXISTS fail_cod_confirmation_test ON public.order_status_history");
         org.mockito.Mockito.reset(payment);
         org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
             com.stylemind.commerce.client.payment.OrderPaymentRequest request = invocation.getArgument(0);
@@ -258,7 +259,7 @@ class BranchCartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.order_status").value("CANCELLED"))
-                .andExpect(jsonPath("$.history.length()").value(2));
+                .andExpect(jsonPath("$.history.length()").value(3));
     }
 
     @Test
@@ -314,6 +315,105 @@ class BranchCartOrderPostgresIntegrationTests {
         });
         org.mockito.Mockito.verifyNoInteractions(payment);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void codCheckoutOnlyConfirmsAfterPendingAttemptAcknowledgementAndNeverMarksPaid() throws Exception {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest snapshot = invocation.getArgument(0);
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(snapshot.orderStatus()).isEqualTo("PENDING_PAYMENT");
+            assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class,
+                    snapshot.orderId())).isEqualTo("PENDING_PAYMENT");
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), snapshot.orderId(),
+                    "COD", snapshot.acceptedTotalVnd(), "SMCODTEST", "PENDING", null, null, null);
+        }).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result = createCod("cod-two-steps");
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(json(result).path("order_status").asText()).isEqualTo("PLACED");
+        assertThat(jdbc.queryForList("SELECT to_status FROM public.order_status_history ORDER BY changed_at", String.class))
+                .containsExactly("PENDING_PAYMENT", "PLACED");
+        assertThat(json(result).path("history").size()).isEqualTo(2);
+    }
+
+    @Test
+    void unavailablePaymentKeepsCodPendingAndOwnerRecoveryConfirmsOnce() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalStateException("test-only outage")).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result = createCod("cod-pending-recovery");
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(json(result).path("order_status").asText()).isEqualTo("PENDING_PAYMENT");
+        UUID id = UUID.fromString(json(result).path("order_id").asText());
+        UUID attempt = UUID.randomUUID();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest snapshot = invocation.getArgument(0);
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attempt, id, "COD",
+                    snapshot.acceptedTotalVnd(), "SMCODTEST", "PENDING", null, null, null);
+        }).when(payment).create(org.mockito.ArgumentMatchers.any());
+        for (int i = 0; i < 2; i++) mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id)
+                .header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, id)).isEqualTo("PLACED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.order_status_history WHERE order_id=?", Integer.class, id)).isEqualTo(2);
+    }
+
+    @Test
+    void malformedPaymentAcknowledgementCannotConfirmCodOrder() throws Exception {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest snapshot = invocation.getArgument(0);
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), snapshot.orderId(),
+                    "COD", snapshot.acceptedTotalVnd(), "SMTEST", "CANCELLED", null, null, null);
+        }).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result = createCod("cod-invalid-ack"); UUID id = UUID.fromString(json(result).path("order_id").asText());
+        assertThat(json(result).path("order_status").asText()).isEqualTo("PENDING_PAYMENT");
+        mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isBadGateway());
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, id)).isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
+    void cancelledCodIsNotRevivedByAnInflightAttemptAcknowledgement() throws Exception {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest snapshot = invocation.getArgument(0);
+            jdbc.update("UPDATE public.customer_order SET order_status='CANCELLED' WHERE order_id=?", snapshot.orderId());
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), snapshot.orderId(),
+                    "COD", snapshot.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
+        }).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result = createCod("cod-cancel-race");
+        assertThat(json(result).path("order_status").asText()).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.order_status_history WHERE to_status='PLACED'", Integer.class)).isZero();
+    }
+
+    @Test
+    void confirmationWriteFailureLeavesCodPendingAndRetryCommitsOrderAndHistoryTogether() throws Exception {
+        jdbc.execute("CREATE OR REPLACE FUNCTION public.fail_cod_confirmation_test_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.to_status='PLACED' THEN RAISE EXCEPTION 'test-only failure'; END IF; RETURN NEW; END $$");
+        jdbc.execute("CREATE TRIGGER fail_cod_confirmation_test BEFORE INSERT ON public.order_status_history FOR EACH ROW EXECUTE FUNCTION public.fail_cod_confirmation_test_fn()");
+        MvcResult result;
+        try {
+            result = createCod("cod-confirm-rollback");
+            assertThat(json(result).path("order_status").asText()).isEqualTo("PENDING_PAYMENT");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM public.order_status_history", Integer.class)).isEqualTo(1);
+        } finally { jdbc.execute("DROP TRIGGER fail_cod_confirmation_test ON public.order_status_history"); }
+        UUID id = UUID.fromString(json(result).path("order_id").asText());
+        mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, id)).isEqualTo("PLACED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.order_status_history", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void adminCannotMarkUnconfirmedCodAsPaidOrSkipAutomaticConfirmation() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalStateException("test-only outage")).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result = createCod("cod-no-admin-shortcut"); String id = json(result).path("order_id").asText();
+        for (String target : List.of("PAID", "PLACED", "PROCESSING")) mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"order_status\":\"" + target + "\",\"reason\":null}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COD_CONFIRMATION_REQUIRED"));
+    }
+
+    private MvcResult createCod(String key) throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        return postJson("/api/v1/orders", customerToken(), "{\"checkout_key\":\"" + key
+                + "\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\"}");
     }
 
     private String branchBody(String code, String status) {

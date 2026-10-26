@@ -31,6 +31,7 @@ class PaymentEventDispatcherPostgresIntegrationTests {
     @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
             .withDatabaseName("payment_dispatch_test").withUsername("dispatch_test").withPassword("test-only");
     static final AtomicReference<String> MODE = new AtomicReference<>("success");
+    static final Map<String, String> METHODS = new ConcurrentHashMap<>();
     static final Map<String, Integer> RECEIVED = new ConcurrentHashMap<>();
     static final AtomicReference<JdbcTemplate> FIXTURE_JDBC = new AtomicReference<>();
     static final AtomicBoolean NO_WRITE_TX_DURING_HTTP = new AtomicBoolean(true);
@@ -53,7 +54,7 @@ class PaymentEventDispatcherPostgresIntegrationTests {
     @BeforeEach void reset() {
         jdbc.update("DELETE FROM public.payment_outbox"); jdbc.update("DELETE FROM public.payment_exception");
         jdbc.update("DELETE FROM public.financial_transaction"); jdbc.update("DELETE FROM public.payment_attempt");
-        MODE.set("success"); RECEIVED.clear(); FIXTURE_JDBC.set(jdbc); NO_WRITE_TX_DURING_HTTP.set(true);
+        MODE.set("success"); RECEIVED.clear(); METHODS.clear(); FIXTURE_JDBC.set(jdbc); NO_WRITE_TX_DURING_HTTP.set(true);
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
@@ -83,7 +84,7 @@ class PaymentEventDispatcherPostgresIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT exception_reason FROM public.payment_exception", String.class)).isEqualTo("ORDER_PAYMENT_REJECTED");
         assertThat(jdbc.queryForObject("SELECT attempt_status FROM public.payment_attempt", String.class)).isEqualTo("SETTLED");
     }
-    @Test void legacyPayloadIsDeliveredButCodOutboxRemainsOutsideThisStory() throws Exception {
+    @Test void legacySepayPayloadIsDeliveredButPendingCodCannotPublishCollection() throws Exception {
         settle();
         String payload = jdbc.queryForObject("SELECT event_payload FROM public.payment_outbox", String.class);
         var legacy = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload); legacy.remove("payment_method");
@@ -114,6 +115,55 @@ class PaymentEventDispatcherPostgresIntegrationTests {
         }
         assertThat(pending()).isZero(); assertThat(jdbc.queryForObject("SELECT count(*) FROM public.payment_exception", Integer.class)).isEqualTo(1);
     }
+    @Test void actualCodCollectionPublishesCodAndLegacyPayloadUsesStoredMethod() throws Exception {
+        collectCod();
+        var payload = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(jdbc.queryForObject("SELECT event_payload FROM public.payment_outbox", String.class));
+        payload.remove("payment_method"); jdbc.update("UPDATE public.payment_outbox SET event_payload=?", mapper.writeValueAsString(payload));
+        assertThat(dispatcher.dispatchPending()).isEqualTo(1); assertThat(pending()).isZero();
+        assertThat(METHODS.values()).containsExactly("COD"); assertThat(NO_WRITE_TX_DURING_HTTP.get()).isTrue();
+        assertThat(dispatcher.dispatchPending()).isZero();
+    }
+    @Test void codCollectionRetriesErrorsAndLostAckUsingSameIdentityWithoutRecordingMoreCash() {
+        collectCod();
+        for (String mode : List.of("error", "lost", "wrong-id", "malformed", "unknown", "no-content")) {
+            MODE.set(mode); assertThat(dispatcher.dispatchPending()).isZero(); assertThat(pending()).isEqualTo(1);
+        }
+        MODE.set("success"); assertThat(dispatcher.dispatchPending()).isEqualTo(1);
+        assertThat(RECEIVED).hasSize(1); assertThat(RECEIVED.values()).containsExactly(7);
+        assertThat(METHODS.values()).containsExactly("COD");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.financial_transaction", Integer.class)).isEqualTo(1);
+    }
+    @Test void rejectedCodOrderProducesOneAdminExceptionWithoutUndoingCollectedMoney() {
+        collectCod(); MODE.set("reconcile"); assertThat(dispatcher.dispatchPending()).isEqualTo(1);
+        assertThat(dispatcher.dispatchPending()).isZero();
+        assertThat(jdbc.queryForObject("SELECT exception_reason FROM public.payment_exception", String.class)).isEqualTo("ORDER_PAYMENT_REJECTED");
+        assertThat(jdbc.queryForObject("SELECT attempt_status FROM public.payment_attempt", String.class)).isEqualTo("SETTLED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.financial_transaction", Integer.class)).isEqualTo(1);
+    }
+    @Test void codPayloadCannotClaimAnOnlineMethod() throws Exception {
+        collectCod();
+        var payload = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(jdbc.queryForObject("SELECT event_payload FROM public.payment_outbox", String.class));
+        payload.put("payment_method", "SEPAY_VIETQR"); jdbc.update("UPDATE public.payment_outbox SET event_payload=?", mapper.writeValueAsString(payload));
+        assertThat(dispatcher.dispatchPending()).isZero(); assertThat(RECEIVED).isEmpty(); assertThat(pending()).isEqualTo(1);
+    }
+    @Test void concurrentCodWorkersPublishOneOutboxAndOneReconciliationException() throws Exception {
+        collectCod(); MODE.set("reconcile");
+        var otherWorker = new PaymentEventDispatcher(outboxRepository, delivery, commerceProperties, mapper, org.springframework.web.client.RestClient.builder(), false);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var a = pool.submit(() -> dispatcher.dispatchPending()); var b = pool.submit(() -> otherWorker.dispatchPending());
+            a.get(30, TimeUnit.SECONDS); b.get(30, TimeUnit.SECONDS);
+        }
+        assertThat(pending()).isZero(); assertThat(jdbc.queryForObject("SELECT count(*) FROM public.payment_exception", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.financial_transaction", Integer.class)).isEqualTo(1);
+    }
+    private void collectCod() {
+        UUID order = UUID.randomUUID();
+        var attempt = payments.createOrderAttempt(new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(order, UUID.randomUUID(),
+                PaymentMethod.COD, 125000, "PLACED"), "initial-" + order), Instant.now());
+        assertThat(dispatcher.dispatchPending()).isZero();
+        payments.confirmCodCollection(new com.stylemind.payment.dto.ConfirmCodCollectionRequest(attempt.id(), 125000L,
+                "COD-RECEIPT-TEST", null), UUID.randomUUID(), Instant.now());
+    }
     private void settle() throws Exception {
         UUID order = UUID.randomUUID();
         var attempt = payments.createOrderAttempt(new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(order, UUID.randomUUID(),
@@ -130,6 +180,7 @@ class PaymentEventDispatcherPostgresIntegrationTests {
             server.createContext("/internal/v1/payment-events", exchange -> {
                 var mapper = new ObjectMapper(); var body = mapper.readTree(exchange.getRequestBody());
                 String id = body.path("event_id").asText(); RECEIVED.merge(id, 1, Integer::sum);
+                METHODS.put(id, body.path("payment_method").asText());
                 if (FIXTURE_JDBC.get().queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND state='idle in transaction'", Integer.class) != 0)
                     NO_WRITE_TX_DURING_HTTP.set(false);
                 String mode = MODE.get();

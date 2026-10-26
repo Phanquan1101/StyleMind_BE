@@ -61,6 +61,16 @@ class OrderPaymentHttpTests {
     }
 
     @Test
+    void acceptsPendingCodOrderSnapshotBeforeAutomaticConfirmation() throws Exception {
+        UUID attempt = UUID.randomUUID();
+        when(payments.createOrderAttempt(any(), any())).thenReturn(new PaymentAttemptResponse(attempt, ORDER,
+                "COD", 125000, "SMCODTEST", "PENDING", null, null, null));
+        mvc.perform(post(PATH).header("X-StyleMind-Service-Token", "test-only-handoff")
+                .contentType(MediaType.APPLICATION_JSON).content(body("COD", "PENDING_PAYMENT")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
     void rejectsUnknownNullDecimalOverflowInvalidUuidKeyAndMethodState() throws Exception {
         String valid = body("COD", "PLACED");
         for (String invalid : java.util.List.of(

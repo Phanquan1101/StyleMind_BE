@@ -21,11 +21,14 @@ public class OrderPaymentController {
     private final OrderService orders;
     private final OrderRequestValidator validator;
     private final PaymentClient payment;
+    private final com.stylemind.commerce.service.order.CodOrderConfirmationService codConfirmation;
 
-    public OrderPaymentController(OrderService orders, OrderRequestValidator validator, PaymentClient payment) {
+    public OrderPaymentController(OrderService orders, OrderRequestValidator validator, PaymentClient payment,
+            com.stylemind.commerce.service.order.CodOrderConfirmationService codConfirmation) {
         this.orders = orders;
         this.validator = validator;
         this.payment = payment;
+        this.codConfirmation = codConfirmation;
     }
 
     @PostMapping(path = "/api/v1/orders/{orderId}/payment-attempt", produces = "application/json")
@@ -40,11 +43,14 @@ public class OrderPaymentController {
         }
         // Both Admin and Customer are self-only. Read transaction ends before calling Payment.
         var order = orders.get(CurrentUser.subject(authentication), false, validator.pathId(orderId));
-        boolean payable = (order.paymentMethod().equals("COD") && order.orderStatus().equals("PLACED"))
+        boolean payable = (order.paymentMethod().equals("COD") && java.util.Set.of("PENDING_PAYMENT", "PLACED").contains(order.orderStatus()))
                 || (order.paymentMethod().equals("SEPAY_VIETQR") && order.orderStatus().equals("PENDING_PAYMENT"));
         if (!payable || order.acceptedTotalVnd() <= 0) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_NOT_PAYABLE", "Order is not in an initial payable state");
         }
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(payment.create(OrderPaymentRequest.from(order)));
+        var snapshot = OrderPaymentRequest.from(order);
+        var attempt = payment.create(snapshot);
+        if ("COD".equals(order.paymentMethod())) codConfirmation.confirm(snapshot, attempt);
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(attempt);
     }
 }

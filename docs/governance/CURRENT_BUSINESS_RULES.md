@@ -110,3 +110,11 @@ The internal auth/202 behavior was explicitly requested in the Register final re
 ## US-04.02 ? Confirm Payment, approved 2026-10-26
 
 The owner requested all four Confirm Payment tasks. Authenticated SePay callbacks require exact positive integral VND and reference matching, preserve wrong-amount/late exceptions, and commit settlement plus outbox once. Delivery retries the same event ID; Commerce inbox applies only SEPAY_VIETQR/PENDING_PAYMENT ? PAID once. Owner/method/amount mismatch, cancelled/terminal or other inappropriate Orders are reconciled without reopening them. Reconciliation receipts also produce an Admin-visible Payment exception while settled money remains settled. Scope and the sole new Commerce V7 migration are recorded in [the contract](../planning/US-04.02_CONFIRM_PAYMENT_CONTRACT.md). COD collection, refunds and manual resolution are not added.
+
+## COD order confirmation and cash collection
+
+The owner explicitly approved two separate steps and chose the existing-schema mapping: COD starts PENDING_PAYMENT; after a saved pending attempt is acknowledged, Commerce automatically changes it to PLACED (confirmed, not paid). Only Admin-recorded actual collection creates a financial transaction and settles Payment. Payment failure keeps the saved Order pending and self-only recovery confirms it once; cancelled Orders are not revived. No new CONFIRMED status or COD SHIPPED prerequisite is added. See [the COD contract](../planning/COD_TWO_STEP_CONTRACT.md).
+
+## US-04.03 COD collection delivery - 2026-10-27
+
+The owner requested completion of COD PaymentConfirmed delivery and explicitly approved Commerce V8 to expand the existing inbox payment_method CHECK to COD/SEPAY_VIETQR, preserving V7 and existing data. [Scoped contract](../planning/US-04.03_COD_COLLECTION_CONTRACT.md). A committed, settled ledger/outbox is delivered without Notification; Commerce records COD collection without changing fulfilment/history. This supersedes the earlier COD-delivery exclusion only for this story. No public payment-state column/API, refund or paid-cancellation workflow is approved. Local tests use disposable databases only.

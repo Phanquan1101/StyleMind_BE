@@ -29,3 +29,11 @@ The owner explicitly approved the Manage Users API, live Admin actor checks, `AC
 ## US-04.02 scoped acceptance ? 2026-10-26
 
 The explicit completion request authorizes the SePay-only inbox/transport and terminal protection in [the current contract](../planning/US-04.02_CONFIRM_PAYMENT_CONTRACT.md), including Commerce V7. It supersedes the earlier removal only for US-04.02 and does not restore the COD SHIPPED prerequisite. Manual reconciliation resolution, refunds/paid-order cancellation, fresh attempts after expiry and production provisioning remain TBD.
+
+## COD two-step acceptance
+
+The owner explicitly chose the existing-schema option: pending COD setup uses PENDING_PAYMENT and automatic Order confirmation uses PLACED; cash collection is an independent Admin action. No CONFIRMED migration or SHIPPED-only collection guard is approved/added by this task. Notification, best-effort cart redesign, COD event delivery, refunds and manual reconciliation remain separate scope/TBD. [Contract](../planning/COD_TWO_STEP_CONTRACT.md).
+
+## US-04.03 COD collection delivery - 2026-10-27
+
+The owner requested completion of COD PaymentConfirmed delivery and explicitly approved Commerce V8 to expand the existing inbox payment_method CHECK to COD/SEPAY_VIETQR, preserving V7 and existing data. [Scoped contract](../planning/US-04.03_COD_COLLECTION_CONTRACT.md). A committed, settled ledger/outbox is delivered without Notification; Commerce records COD collection without changing fulfilment/history. This supersedes the earlier COD-delivery exclusion only for this story. No public payment-state column/API, refund or paid-cancellation workflow is approved. Local tests use disposable databases only.

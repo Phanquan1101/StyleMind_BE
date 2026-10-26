@@ -103,7 +103,7 @@ class PaymentEventPostgresIntegrationTests {
     @Test void malformedAndFractionalEventFieldsAreRejectedBeforeWriting() {
         var original = event(UUID.randomUUID(), UUID.randomUUID());
         for (var mutation : List.<Map<String, Object>>of(Map.of("amount_vnd", 125000.9), Map.of("amount_vnd", "125000"),
-                Map.of("amount_vnd", 0), Map.of("customer_id", "1-1-1-1-1"), Map.of("payment_method", "COD"),
+                Map.of("amount_vnd", 0), Map.of("customer_id", "1-1-1-1-1"), Map.of("payment_method", "UNKNOWN"),
                 Map.of("confirmed_at", "invalid"), Map.of("unknown", true))) {
             var invalid = new HashMap<>(original); invalid.putAll(mutation);
             assertThat(send(invalid).getStatusCode().value()).isEqualTo(400);
@@ -137,6 +137,81 @@ class PaymentEventPostgresIntegrationTests {
             assertThat(state(order)).isEqualTo("PENDING_PAYMENT"); assertThat(count("order_status_history")).isZero();
         } finally { jdbc.execute("DROP TRIGGER fail_event_test ON public.payment_event_inbox"); }
         assertThat(send(event).getBody().path("outcome").asText()).isEqualTo("APPLIED");
+    }
+    @Test void codCollectionIsDurableAcrossFulfilmentStatesWithoutChangingOrderHistory() {
+        UUID owner = UUID.randomUUID();
+        for (String status : List.of("PLACED", "PROCESSING", "SHIPPED", "COMPLETED")) {
+            UUID order = order(owner, status, "COD"); var event = codEvent(order, owner);
+            var first = send(event); assertThat(first.getStatusCode().value()).isEqualTo(200);
+            assertThat(first.getBody().path("outcome").asText()).isEqualTo("APPLIED");
+            assertThat(first.getBody().path("reason").asText()).isEqualTo("COD_COLLECTION_CONFIRMED");
+            assertThat(send(event).getBody()).isEqualTo(first.getBody());
+            event.put("event_id", UUID.randomUUID());
+            assertThat(send(event).getBody().path("outcome").asText()).isEqualTo("DUPLICATE");
+            assertThat(send(codEvent(order, owner)).getBody().path("reason").asText()).isEqualTo("SECOND_PAYMENT");
+            assertThat(state(order)).isEqualTo(status);
+        }
+        assertThat(count("order_status_history")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.payment_event_inbox WHERE outcome='APPLIED' AND payment_method='COD'", Integer.class)).isEqualTo(4);
+    }
+    @Test void codCancelledPendingAndInappropriateOrdersAreReconciledWithoutRevivingThem() {
+        UUID owner = UUID.randomUUID();
+        for (String status : List.of("CANCELLED", "PENDING_PAYMENT", "PAID")) {
+            UUID order = order(owner, status, "COD"); var receipt = send(codEvent(order, owner));
+            assertThat(receipt.getBody().path("outcome").asText()).isEqualTo("RECONCILIATION_REQUIRED");
+            assertThat(receipt.getBody().path("reason").asText()).isEqualTo("ORDER_NOT_PAYABLE");
+            assertThat(state(order)).isEqualTo(status);
+        }
+        assertThat(count("order_status_history")).isZero();
+    }
+    @Test void codOwnerAmountMethodMissingOrderAndCredentialChecksCannotApplyMoney() {
+        UUID owner = UUID.randomUUID(), order = order(owner, "PLACED", "COD");
+        assertThat(send(codEvent(order, UUID.randomUUID())).getBody().path("reason").asText()).isEqualTo("OWNER_MISMATCH");
+        var wrong = codEvent(order, owner); wrong.put("amount_vnd", 1);
+        assertThat(send(wrong).getBody().path("reason").asText()).isEqualTo("AMOUNT_MISMATCH");
+        UUID online = order(owner, "PENDING_PAYMENT", "SEPAY_VIETQR");
+        assertThat(send(codEvent(online, owner)).getBody().path("reason").asText()).isEqualTo("METHOD_MISMATCH");
+        assertThat(send(codEvent(UUID.randomUUID(), owner)).getBody().path("reason").asText()).isEqualTo("ORDER_NOT_FOUND");
+        var headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth("untrusted-test-only");
+        assertThat(http.postForEntity(PATH, new HttpEntity<>(codEvent(order, owner), headers), JsonNode.class).getStatusCode().value()).isEqualTo(401);
+        assertThat(state(order)).isEqualTo("PLACED"); assertThat(state(online)).isEqualTo("PENDING_PAYMENT");
+        assertThat(count("order_status_history")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.payment_event_inbox WHERE outcome='APPLIED'", Integer.class)).isZero();
+    }
+    @Test void codConcurrentReplaysPersistOneAppliedCollectionAndRejectContentConflict() throws Exception {
+        UUID owner = UUID.randomUUID(), order = order(owner, "SHIPPED", "COD"); var event = codEvent(order, owner);
+        try (var pool = Executors.newFixedThreadPool(4)) {
+            var jobs = new ArrayList<Future<ResponseEntity<JsonNode>>>();
+            for (int i = 0; i < 4; i++) jobs.add(pool.submit(() -> send(event)));
+            for (var job : jobs) assertThat(job.get(30, TimeUnit.SECONDS).getBody().path("outcome").asText()).isEqualTo("APPLIED");
+        }
+        assertThat(count("payment_event_inbox")).isEqualTo(1);
+        event.put("amount_vnd", 1); assertThat(send(event).getStatusCode().value()).isEqualTo(409);
+        assertThat(state(order)).isEqualTo("SHIPPED"); assertThat(count("order_status_history")).isZero();
+    }
+    @Test void codDistinctConcurrentEventIdsHaveOneAppliedReceipt() throws Exception {
+        UUID owner = UUID.randomUUID(), order = order(owner, "COMPLETED", "COD");
+        var a = codEvent(order, owner); var b = new HashMap<>(a); b.put("event_id", UUID.randomUUID());
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var x = pool.submit(() -> send(a)); var y = pool.submit(() -> send(b));
+            assertThat(List.of(x.get(30, TimeUnit.SECONDS).getBody().path("outcome").asText(),
+                    y.get(30, TimeUnit.SECONDS).getBody().path("outcome").asText())).containsExactlyInAnyOrder("APPLIED", "DUPLICATE");
+        }
+        assertThat(state(order)).isEqualTo("COMPLETED"); assertThat(count("order_status_history")).isZero();
+    }
+    @Test void failedCodInboxWriteIsNotAcknowledgedAndRetryRecordsCollectionOnce() {
+        UUID owner = UUID.randomUUID(), order = order(owner, "PLACED", "COD"); var event = codEvent(order, owner);
+        jdbc.execute("CREATE OR REPLACE FUNCTION public.fail_event_test_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test-only failure'; END $$");
+        jdbc.execute("CREATE TRIGGER fail_event_test BEFORE INSERT ON public.payment_event_inbox FOR EACH ROW EXECUTE FUNCTION public.fail_event_test_fn()");
+        try { assertThat(send(event).getStatusCode().value()).isEqualTo(500); assertThat(count("payment_event_inbox")).isZero(); }
+        finally { jdbc.execute("DROP TRIGGER fail_event_test ON public.payment_event_inbox"); }
+        assertThat(send(event).getBody().path("outcome").asText()).isEqualTo("APPLIED");
+        assertThat(count("payment_event_inbox")).isEqualTo(1); assertThat(state(order)).isEqualTo("PLACED");
+        assertThat(count("order_status_history")).isZero();
+    }
+    private Map<String, Object> codEvent(UUID order, UUID owner) {
+        var body = event(order, owner); body.put("payment_method", "COD"); return body;
     }
     private UUID order(UUID owner, String status, String method) {
         UUID id = UUID.randomUUID();
