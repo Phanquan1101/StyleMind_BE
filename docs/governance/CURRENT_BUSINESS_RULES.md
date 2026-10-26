@@ -106,3 +106,7 @@ The complete owner-approved contract and local verification evidence are in [US-
 - Mailpit is the local capture/test SMTP target. External SMTP/provider delivery and production email operations are unverified; do not select a production provider or infer its active configuration from documentation.
 
 The internal auth/202 behavior was explicitly requested in the Register final review and is covered by Notification tests plus the Identity audit follow-up. See [Notification README](../../notification-service/README.md).
+
+## US-04.02 ? Confirm Payment, approved 2026-10-26
+
+The owner requested all four Confirm Payment tasks. Authenticated SePay callbacks require exact positive integral VND and reference matching, preserve wrong-amount/late exceptions, and commit settlement plus outbox once. Delivery retries the same event ID; Commerce inbox applies only SEPAY_VIETQR/PENDING_PAYMENT ? PAID once. Owner/method/amount mismatch, cancelled/terminal or other inappropriate Orders are reconciled without reopening them. Reconciliation receipts also produce an Admin-visible Payment exception while settled money remains settled. Scope and the sole new Commerce V7 migration are recorded in [the contract](../planning/US-04.02_CONFIRM_PAYMENT_CONTRACT.md). COD collection, refunds and manual resolution are not added.

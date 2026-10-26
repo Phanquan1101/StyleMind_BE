@@ -25,3 +25,7 @@ The owner explicitly approved the Manage Users API, live Admin actor checks, `AC
 - Cancellation of an already-paid Order when current model excludes refund, and handling late/mismatched/duplicate payment exceptions remain TBD under the current owner scope. Historical references include `OPEN-018`, `OPEN-019` and `OPEN-021`; see [the archived register](../archive/legacy-baseline/20261008T0855Z/docs/discovery/06_OPEN_QUESTIONS.md). A cancellation record does not itself authorize changing Order state or moving money.
 - Production database topology, key provisioning/rotation, service authentication, abuse controls and email delivery provider/operations remain TBD. Local Mailpit and owner-provided workstation SMTP configuration are not production approval or external-delivery evidence. No identifier is added for these questions.
 - A provider-specific production setup must not be inferred from Mailpit configuration or from historical local SMTP instructions. No application code, credential or configuration was changed to record these items.
+
+## US-04.02 scoped acceptance ? 2026-10-26
+
+The explicit completion request authorizes the SePay-only inbox/transport and terminal protection in [the current contract](../planning/US-04.02_CONFIRM_PAYMENT_CONTRACT.md), including Commerce V7. It supersedes the earlier removal only for US-04.02 and does not restore the COD SHIPPED prerequisite. Manual reconciliation resolution, refunds/paid-order cancellation, fresh attempts after expiry and production provisioning remain TBD.

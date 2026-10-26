@@ -5,14 +5,18 @@ import com.stylemind.payment.client.CommerceOrderPaymentSnapshot;
 import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.dto.PaymentAttemptResponse;
+import com.stylemind.payment.dto.PaymentExceptionListResponse;
+import com.stylemind.payment.dto.PaymentExceptionResponse;
 import com.stylemind.payment.errors.PaymentApiException;
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentAttemptStatus;
+import com.stylemind.payment.model.PaymentExceptionView;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -25,6 +29,7 @@ public class PaymentAttemptService {
 
     private static final Duration ONLINE_ATTEMPT_TTL = Duration.ofMinutes(15);
     private static final int MAX_REQUEST_KEY_LENGTH = 100;
+    private static final int MAX_LIMIT = 100;
 
     private final PaymentAttemptRepository repository;
     private final SepayQrPayloadBuilder qrPayloadBuilder;
@@ -64,6 +69,18 @@ public class PaymentAttemptService {
         return repository.findByOrderAndRequestKey(order.orderId(), request.requestKey())
                 .map(existing -> existingAttemptResponse(existing, order, order.customerId()))
                 .orElseGet(() -> createNewAttempt(order, request.requestKey(), now));
+    }
+
+    public PaymentExceptionListResponse listExceptions(String status, int limit, int offset) {
+        if (limit < 1 || limit > MAX_LIMIT || offset < 0) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                    "Pagination values are outside allowed bounds");
+        }
+        String filter = normalizeBlankToNull(status);
+        if (filter != null && (filter.length() > 100 || filter.codePoints().anyMatch(Character::isISOControl)))
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid exception status");
+        List<PaymentExceptionView> items = repository.findExceptions(filter, limit, offset);
+        return new PaymentExceptionListResponse(items.stream().map(this::toResponse).toList(), limit, offset);
     }
 
     private PaymentAttemptResponse createNewAttempt(
@@ -205,5 +222,22 @@ public class PaymentAttemptService {
         };
     }
 
+    private PaymentExceptionResponse toResponse(PaymentExceptionView view) {
+        return new PaymentExceptionResponse(
+                view.exceptionId(),
+                view.paymentAttemptId(),
+                view.providerName(),
+                view.providerEventId(),
+                view.receivedReference(),
+                view.receivedAmountVnd(),
+                view.exceptionReason(),
+                view.reconciliationStatus(),
+                view.reviewedByUserId(),
+                view.detectedAt());
+    }
+
+    private String normalizeBlankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
 
 }

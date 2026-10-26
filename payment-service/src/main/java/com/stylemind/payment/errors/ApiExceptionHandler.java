@@ -1,6 +1,8 @@
 package com.stylemind.payment.errors;
 
 import com.stylemind.payment.security.ApiProblemDetails;
+import com.stylemind.payment.service.SepayWebhookService.SepayWebhookMalformedException;
+import com.stylemind.payment.service.SepayWebhookService.SepayWebhookUnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +25,8 @@ public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
-            MissingServletRequestParameterException.class})
+            MissingServletRequestParameterException.class, SepayWebhookMalformedException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
                 "INVALID_REQUEST", request);
@@ -33,6 +36,13 @@ public class ApiExceptionHandler {
     public ResponseEntity<ProblemDetail> paymentApiException(PaymentApiException exception, HttpServletRequest request) {
         return response(exception.status(), exception.status().getReasonPhrase(),
                 exception.detail(), exception.code(), request);
+    }
+
+    @ExceptionHandler(SepayWebhookUnauthorizedException.class)
+    public ResponseEntity<ProblemDetail> sepayWebhookUnauthorized(
+            SepayWebhookUnauthorizedException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNAUTHORIZED, "Unauthorized", "SePay webhook authentication failed",
+                "SEPAY_WEBHOOK_AUTHENTICATION_FAILED", request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

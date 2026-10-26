@@ -2,8 +2,10 @@ package com.stylemind.payment.repository;
 
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
+import com.stylemind.payment.model.PaymentExceptionView;
 import com.stylemind.payment.model.PaymentMethod;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
@@ -154,6 +156,34 @@ public class PaymentAttemptRepository {
         } catch (DuplicateKeyException exception) {
             return false;
         }
+    }
+
+    public List<PaymentExceptionView> findExceptions(String status, int limit, int offset) {
+        String statusFilter = status == null ? null : status.trim();
+        return jdbcClient.sql("""
+                        SELECT exception_id, payment_attempt_id, provider_name, provider_event_id,
+                               received_reference, received_amount_vnd, exception_reason,
+                               reconciliation_status, reviewed_by_user_id, detected_at
+                        FROM public.payment_exception
+                        WHERE (:status IS NULL OR reconciliation_status = :status)
+                        ORDER BY detected_at DESC, exception_id DESC
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("status", statusFilter, java.sql.Types.VARCHAR)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query((rs, rowNum) -> new PaymentExceptionView(
+                        rs.getObject("exception_id", UUID.class),
+                        rs.getObject("payment_attempt_id", UUID.class),
+                        rs.getString("provider_name"),
+                        rs.getString("provider_event_id"),
+                        rs.getString("received_reference"),
+                        rs.getLong("received_amount_vnd"),
+                        rs.getString("exception_reason"),
+                        rs.getString("reconciliation_status"),
+                        rs.getObject("reviewed_by_user_id", UUID.class),
+                        rs.getTimestamp("detected_at").toInstant()))
+                .list();
     }
 
     private static PaymentAttemptSnapshot mapSnapshot(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
