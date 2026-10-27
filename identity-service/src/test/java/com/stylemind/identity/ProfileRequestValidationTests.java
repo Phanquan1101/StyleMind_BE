@@ -50,6 +50,8 @@ class ProfileRequestValidationTests {
         StyleProfileCommand emptyCommand = validator.validateReplacement(replace(empty));
         assertThat(emptyCommand.fitPreference()).isNull();
         assertThat(emptyCommand.heightCm()).isNull();
+        assertThat(emptyCommand.weightKg()).isNull();
+        assertThat(validator.validateReplacement(replace(empty.replace("\"weight_kg\":null,", ""))).weightKg()).isNull();
         assertThat(emptyCommand.styleCodes()).isEmpty();
         assertThat(emptyCommand.colorCodes()).isEmpty();
         assertThat(emptyCommand.brandIds()).isEmpty();
@@ -117,6 +119,23 @@ class ProfileRequestValidationTests {
     }
 
     @Test
+    void weightUsesExactDecimalInclusiveRangeAndAtMostOneFractionalDigit() throws Exception {
+        for (String number : List.of("20", "20.0", "300", "300.0", "65.5")) {
+            assertThat(validator.validateReplacement(replace(withWeight(number))).weightKg())
+                    .isEqualByComparingTo(new BigDecimal(number));
+        }
+        for (String number : List.of("19.9", "300.1", "65.55", "70.00")) {
+            assertInvalid(() -> validator.validateReplacement(replace(withWeight(number))));
+        }
+        assertThatThrownBy(() -> replace(withWeight("\"70\""))).isInstanceOf(JsonProcessingException.class);
+    }
+
+    private static String withWeight(String weight) {
+        return replacement("null", "null", "null", "null", "null", "[]", "[]", "[]")
+                .replace("\"weight_kg\":null", "\"weight_kg\":" + weight);
+    }
+
+    @Test
     void labelsTrimPreserveFreeFormAndEnforceCodePointLimits() throws Exception {
         String body = replacement("null", "null", "\"  size Ñ 🧵  \"", "null", "null", "[]", "[]", "[]");
         assertThat(validator.validateReplacement(replace(body)).usualTopSize()).isEqualTo("size Ñ 🧵");
@@ -169,7 +188,7 @@ class ProfileRequestValidationTests {
 
     private static String replacement(String fit, String height, String top, String bottom, String shoe,
             String styles, String colors, String brands) {
-        return "{\"fit_preference\":" + fit + ",\"height_cm\":" + height + ",\"usual_top_size\":" + top
+        return "{\"fit_preference\":" + fit + ",\"height_cm\":" + height + ",\"weight_kg\":null,\"usual_top_size\":" + top
                 + ",\"usual_bottom_size\":" + bottom + ",\"shoe_size\":" + shoe
                 + ",\"style_codes\":" + styles + ",\"color_codes\":" + colors + ",\"brand_ids\":" + brands + "}";
     }

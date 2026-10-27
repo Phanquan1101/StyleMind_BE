@@ -55,6 +55,7 @@ BEGIN
         ('style_profile', 'account_id', 'uuid', 'NO'),
         ('style_profile', 'fit_preference', 'text', 'YES'),
         ('style_profile', 'height_cm', 'numeric', 'YES'),
+        ('style_profile', 'weight_kg', 'numeric', 'YES'),
         ('style_profile', 'usual_top_size', 'text', 'YES'),
         ('style_profile', 'usual_bottom_size', 'text', 'YES'),
         ('style_profile', 'shoe_size', 'text', 'YES'),
