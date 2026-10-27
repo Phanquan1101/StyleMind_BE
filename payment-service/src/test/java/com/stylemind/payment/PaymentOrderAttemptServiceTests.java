@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 class PaymentOrderAttemptServiceTests {
     final PaymentAttemptRepository repository = mock(PaymentAttemptRepository.class);
     final CommerceOrderClient commerce = mock(CommerceOrderClient.class);
-    final SepayPaymentProperties properties = new SepayPaymentProperties("TESTBANK", "000-test-only", null, "SM");
+    final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
     final PaymentAttemptService service = new PaymentAttemptService(repository,
             new SepayQrPayloadBuilder(properties), properties, commerce);
     final UUID order = UUID.randomUUID();

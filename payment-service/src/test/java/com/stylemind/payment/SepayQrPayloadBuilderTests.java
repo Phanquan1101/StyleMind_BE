@@ -11,7 +11,7 @@ class SepayQrPayloadBuilderTests {
 
     @Test
     void qrPayloadBuilderRequiresConfiguredBankAccount() {
-        SepayQrPayloadBuilder builder = new SepayQrPayloadBuilder(new SepayPaymentProperties(
+        SepayQrPayloadBuilder builder = new SepayQrPayloadBuilder(new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY",
                 "", "", "", "SM"));
 
         assertThatThrownBy(() -> builder.buildQrImageUrl(100_000, "SMABC123"))
@@ -20,7 +20,7 @@ class SepayQrPayloadBuilderTests {
 
     @Test
     void qrPayloadBuilderBuildsVietQrImageUrl() {
-        SepayQrPayloadBuilder builder = new SepayQrPayloadBuilder(new SepayPaymentProperties(
+        SepayQrPayloadBuilder builder = new SepayQrPayloadBuilder(new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY",
                 "TESTBANK", "000-test-only", "TEST FIXTURE", "SM"));
 
         assertThat(builder.buildTransferContent("SMABC123")).isEqualTo("SMABC123");
