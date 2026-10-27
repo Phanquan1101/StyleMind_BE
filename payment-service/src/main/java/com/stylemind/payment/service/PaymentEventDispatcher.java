@@ -54,7 +54,9 @@ public class PaymentEventDispatcher {
             try {
                 var payload = (ObjectNode) mapper.readTree(event.payload());
                 payload.put("event_id", event.id().toString()); payload.put("event_type", "PaymentConfirmed");
-                payload.put("payment_method", "SEPAY_VIETQR"); // Also supports existing six-field local outbox rows.
+                if (payload.has("payment_method") && !event.method().equals(payload.path("payment_method").asText()))
+                    throw new IllegalStateException("Outbox payment method does not match settled attempt");
+                payload.put("payment_method", event.method()); // Legacy payloads use the settled attempt as authority.
                 var response = http.post().uri(properties.baseUrl() + "/internal/v1/payment-events")
                         .header("X-StyleMind-Service-Token", properties.serviceToken()).body(payload).retrieve().toEntity(String.class);
                 var ack = response.getStatusCode().value() == 200 && response.getBody() != null

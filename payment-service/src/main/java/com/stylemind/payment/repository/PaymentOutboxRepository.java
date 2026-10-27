@@ -15,19 +15,21 @@ public class PaymentOutboxRepository {
         this.jdbcClient = jdbcClient;
     }
 
-    public record PendingEvent(UUID id, Instant createdAt, UUID attemptId, String reference, long amount, String payload) { }
+    public record PendingEvent(UUID id, Instant createdAt, UUID attemptId, String reference, long amount, String payload, String method) { }
 
     public java.util.List<PendingEvent> pendingAfter(PendingEvent cursor, int limit) {
         String after = cursor == null ? "" : " AND (o.created_at,o.outbox_event_id) > (:created,:id)";
         var query = jdbcClient.sql("""
                 SELECT o.outbox_event_id,o.created_at,a.payment_attempt_id,a.payment_reference,
-                       a.expected_amount_vnd,o.event_payload
+                       f.actual_amount_vnd,o.event_payload,a.payment_method
                 FROM public.payment_outbox o JOIN public.payment_attempt a ON a.payment_attempt_id=o.aggregate_id
-                WHERE o.published_at IS NULL AND o.event_type='PaymentConfirmed' AND a.payment_method='SEPAY_VIETQR'
+                JOIN public.financial_transaction f ON f.payment_attempt_id=a.payment_attempt_id
+                WHERE o.published_at IS NULL AND o.event_type='PaymentConfirmed'
+                  AND a.payment_method IN ('SEPAY_VIETQR','COD') AND a.attempt_status='SETTLED'
                 """ + after + " ORDER BY o.created_at,o.outbox_event_id LIMIT :limit").param("limit", limit);
         if (cursor != null) query = query.param("created", java.sql.Timestamp.from(cursor.createdAt())).param("id", cursor.id());
         return query.query((rs, row) -> new PendingEvent(rs.getObject(1, UUID.class), rs.getTimestamp(2).toInstant(),
-                rs.getObject(3, UUID.class), rs.getString(4), rs.getLong(5), rs.getString(6))).list();
+                rs.getObject(3, UUID.class), rs.getString(4), rs.getLong(5), rs.getString(6), rs.getString(7))).list();
     }
 
     public boolean acknowledge(UUID id, Instant now) {

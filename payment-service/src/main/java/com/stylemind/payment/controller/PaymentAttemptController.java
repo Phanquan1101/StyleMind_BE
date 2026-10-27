@@ -1,5 +1,6 @@
 package com.stylemind.payment.controller;
 
+import com.stylemind.payment.dto.ConfirmCodCollectionRequest;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.dto.PaymentAttemptResponse;
 import com.stylemind.payment.dto.PaymentExceptionListResponse;
@@ -39,6 +40,18 @@ public class PaymentAttemptController {
                 Instant.now());
         return ResponseEntity.created(URI.create("/api/v1/payments/attempts/" + response.id()))
                 .body(response);
+    }
+
+    @PostMapping(value = "/api/v1/admin/cod-collections", consumes = "application/json", produces = "application/json")
+    ResponseEntity<PaymentAttemptResponse> confirmCodCollection(
+            @RequestBody com.fasterxml.jackson.databind.JsonNode body,
+            @AuthenticationPrincipal Jwt jwt) {
+        java.util.UUID adminId = authorizationService.adminSubject(jwt);
+        PaymentAttemptResponse response = paymentAttemptService.confirmCodCollection(
+                ConfirmCodCollectionRequest.parse(body),
+                adminId,
+                Instant.now());
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(response);
     }
 
     @GetMapping(value = "/api/v1/admin/payment-exceptions", produces = "application/json")

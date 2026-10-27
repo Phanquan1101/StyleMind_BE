@@ -32,7 +32,7 @@ public record OrderPaymentRequest(CommerceOrderPaymentSnapshot order, String req
             String status = body.get("order_status").textValue();
             String key = body.get("request_key").textValue();
             if (!key.equals("initial-" + orderId)
-                    || !(method == PaymentMethod.COD && status.equals("PLACED")
+                    || !(method == PaymentMethod.COD && Set.of("PENDING_PAYMENT", "PLACED").contains(status)
                     || method == PaymentMethod.SEPAY_VIETQR && status.equals("PENDING_PAYMENT"))) {
                 throw new IllegalArgumentException();
             }

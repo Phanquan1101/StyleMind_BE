@@ -40,6 +40,11 @@ public class PaymentEventService {
             if (applied.isPresent()) {
                 outcome = applied.get() ? "DUPLICATE" : "RECONCILIATION_REQUIRED";
                 reason = applied.get() ? "ALREADY_APPLIED" : "SECOND_PAYMENT";
+            } else if ("COD".equals(event.payment_method())) {
+                if (java.util.Set.of("PLACED", "PROCESSING", "SHIPPED", "COMPLETED").contains(order.get().status())) {
+                    outcome = "APPLIED"; reason = "COD_COLLECTION_CONFIRMED";
+                    // The durable inbox records cash receipt; fulfilment status/history must not change.
+                } else reason = "ORDER_NOT_PAYABLE";
             } else if (!"PENDING_PAYMENT".equals(order.get().status())) {
                 reason = "ORDER_NOT_PAYABLE";
             } else {

@@ -123,6 +123,26 @@ class PaymentRuntimePostgresIntegrationTests {
     }
 
     @Test
+    void codRequiresAdminAndCreatesExactlyOneManualLedgerEntry() throws Exception {
+        UUID customer = UUID.randomUUID();
+        var attempt = push(UUID.randomUUID(), customer, "COD");
+        assertThat(attempt.path("qrPayload").isNull()).isTrue();
+        var collection = Map.of("payment_attempt_id", attempt.path("id").asText(), "collected_amount_vnd", 125000);
+        String path = "/api/v1/admin/cod-collections";
+        assertThat(post(path, collection, "Authorization", "Bearer " + token(customer, "CUSTOMER"))
+                .getStatusCode().value()).isEqualTo(403);
+        assertThat(count("financial_transaction")).isZero();
+        String admin = token(UUID.randomUUID(), "ADMIN");
+        var collected = post(path, collection, "Authorization", "Bearer " + admin);
+        assertThat(collected.getStatusCode().value()).isEqualTo(200);
+        assertThat(collected.getBody().path("status").asText()).isEqualTo("PAID");
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+        assertThat(post(path, collection, "Authorization", "Bearer " + admin).getStatusCode().value()).isEqualTo(409);
+        assertThat(count("financial_transaction")).isEqualTo(1);
+    }
+
+    @Test
     void fractionalStringOverflowMissingAndDuplicateAmountFieldsCannotSettle() {
         var attempt = push(UUID.randomUUID(), UUID.randomUUID(), "SEPAY_VIETQR");
         String valid = "{\"id\":200001,\"code\":\"" + attempt.path("reference").asText()
@@ -243,6 +263,89 @@ class PaymentRuntimePostgresIntegrationTests {
         for (String query : List.of("?limit=0", "?offset=-1", "?limit=101", "?limit=not-an-integer"))
             assertThat(http.exchange(path + query, org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class)
                     .getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    void codAttemptCreationAndReplayAreAnUnpaidObligationUntilAdminRecordsCollection() {
+        UUID order = UUID.randomUUID(), owner = UUID.randomUUID(), admin = UUID.randomUUID();
+        var first = push(order, owner, "COD"); var replay = push(order, owner, "COD");
+        assertThat(first.path("id").asText()).isEqualTo(replay.path("id").asText());
+        assertThat(first.path("status").asText()).isEqualTo("PENDING");
+        assertThat(first.path("qrPayload").isNull()).isTrue(); assertThat(first.path("expiresAt").isNull()).isTrue();
+        assertThat(count("financial_transaction")).isZero(); assertThat(count("payment_outbox")).isZero();
+        var body = Map.of("payment_attempt_id", first.path("id").asText(), "collected_amount_vnd", 125000,
+                "collection_reference", " COD-TEST-RECEIPT ");
+        var collected = post("/api/v1/admin/cod-collections", body, "Authorization", "Bearer " + token(admin, "ADMIN"));
+        assertThat(collected.getStatusCode().value()).isEqualTo(200);
+        assertThat(collected.getBody().path("status").asText()).isEqualTo("PAID");
+        assertThat(collected.getHeaders().getCacheControl()).isEqualTo("no-store");
+        assertThat(jdbc.queryForObject("SELECT recorded_by_user_id FROM public.financial_transaction", UUID.class)).isEqualTo(admin);
+        assertThat(jdbc.queryForObject("SELECT provider_transaction_reference FROM public.financial_transaction", String.class))
+                .isEqualTo("COD-TEST-RECEIPT");
+        assertThat(attemptStatus()).isEqualTo("SETTLED"); assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", "Bearer " + token(admin, "ADMIN"))
+                .getStatusCode().value()).isEqualTo(409);
+        assertThat(count("financial_transaction")).isEqualTo(1); assertThat(count("payment_outbox")).isEqualTo(1);
+    }
+
+    @Test
+    void codCollectionRejectsFractionalCoercionUnknownFieldsAndInvalidInputs() {
+        var attempt = push(UUID.randomUUID(), UUID.randomUUID(), "COD");
+        String body = "{\"payment_attempt_id\":\"" + attempt.path("id").asText() + "\",\"collected_amount_vnd\":125000}";
+        String admin = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        for (String invalid : List.of(body.replace("125000", "125000.9"), body.replace("125000", "\"125000\""),
+                body.replace("125000", "9223372036854775808"), body.replace("125000", "null"),
+                body.replace("125000", "0"), body.replace("125000", "-1"),
+                body.replace(attempt.path("id").asText(), "1-1-1-1-1"), body.replace("125000", "125000,\"status\":\"PAID\""),
+                body.replace("125000", "125000,\"collected_at\":\"2099-01-01T00:00:00Z\""),
+                body.replace("125000", "125000,\"collection_reference\":true")))
+            assertThat(post("/api/v1/admin/cod-collections", invalid, "Authorization", admin).getStatusCode().value()).isEqualTo(400);
+        assertThat(attemptStatus()).isEqualTo("PENDING"); assertThat(count("financial_transaction")).isZero();
+        assertThat(count("payment_outbox")).isZero();
+    }
+
+    @Test
+    void codCollectionWrongAmountOrOnlineAttemptDoesNotRecordMoney() {
+        String admin = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        var cod = push(UUID.randomUUID(), UUID.randomUUID(), "COD");
+        assertThat(post("/api/v1/admin/cod-collections", Map.of("payment_attempt_id", cod.path("id").asText(),
+                "collected_amount_vnd", 1), "Authorization", admin).getStatusCode().value()).isEqualTo(409);
+        var online = push(UUID.randomUUID(), UUID.randomUUID(), "SEPAY_VIETQR");
+        assertThat(post("/api/v1/admin/cod-collections", Map.of("payment_attempt_id", online.path("id").asText(),
+                "collected_amount_vnd", 125000), "Authorization", admin).getStatusCode().value()).isEqualTo(409);
+        assertThat(post("/api/v1/admin/cod-collections", Map.of("payment_attempt_id", UUID.randomUUID(),
+                "collected_amount_vnd", 125000), "Authorization", admin).getStatusCode().value()).isEqualTo(404);
+        assertThat(count("financial_transaction")).isZero(); assertThat(count("payment_outbox")).isZero();
+    }
+
+    @Test
+    void concurrentAdminCodCollectionsCreditExactlyOnce() throws Exception {
+        var cod = push(UUID.randomUUID(), UUID.randomUUID(), "COD");
+        var body = Map.of("payment_attempt_id", cod.path("id").asText(), "collected_amount_vnd", 125000);
+        String adminA = "Bearer " + token(UUID.randomUUID(), "ADMIN"), adminB = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var a = pool.submit(() -> post("/api/v1/admin/cod-collections", body, "Authorization", adminA));
+            var b = pool.submit(() -> post("/api/v1/admin/cod-collections", body, "Authorization", adminB));
+            assertThat(List.of(a.get(30, java.util.concurrent.TimeUnit.SECONDS).getStatusCode().value(),
+                    b.get(30, java.util.concurrent.TimeUnit.SECONDS).getStatusCode().value())).containsExactlyInAnyOrder(200, 409);
+        }
+        assertThat(attemptStatus()).isEqualTo("SETTLED"); assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+    }
+
+    @Test
+    void codOutboxFailureRollsBackActualCollectionAndRetryIsSafe() {
+        var cod = push(UUID.randomUUID(), UUID.randomUUID(), "COD");
+        var body = Map.of("payment_attempt_id", cod.path("id").asText(), "collected_amount_vnd", 125000);
+        String admin = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        jdbc.execute("CREATE OR REPLACE FUNCTION public.fail_outbox_test_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test-only failure'; END $$");
+        jdbc.execute("CREATE TRIGGER fail_outbox_test BEFORE INSERT ON public.payment_outbox FOR EACH ROW EXECUTE FUNCTION public.fail_outbox_test_fn()");
+        try {
+            assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", admin).getStatusCode().value()).isEqualTo(500);
+            assertThat(attemptStatus()).isEqualTo("PENDING"); assertThat(count("financial_transaction")).isZero();
+        } finally { jdbc.execute("DROP TRIGGER fail_outbox_test ON public.payment_outbox"); }
+        assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", admin).getStatusCode().value()).isEqualTo(200);
+        assertThat(count("financial_transaction")).isEqualTo(1); assertThat(count("payment_outbox")).isEqualTo(1);
     }
 
     private JsonNode push(UUID order, UUID customer, String method) {
