@@ -121,6 +121,10 @@ public class OrderService {
     @Transactional
     public OrderResponse updateStatus(UUID actorId, UUID orderId, OrderRequestValidator.StatusCommand command) {
         OrderSummary current = findSummary(orderId).orElseThrow(this::notFound);
+        if (current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.COD
+                && current.orderStatus() == OrderStatus.PENDING_PAYMENT && command.orderStatus() != OrderStatus.CANCELLED) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "COD_CONFIRMATION_REQUIRED", "COD payment attempt must be confirmed first");
+        }
         if (!ALLOWED_TRANSITIONS.getOrDefault(current.orderStatus(), List.of()).contains(command.orderStatus())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "INVALID_ORDER_STATUS_TRANSITION",
                     "Order status transition is not allowed");
@@ -216,8 +220,7 @@ public class OrderService {
 
     private void insertOrder(UUID orderId, String orderNumber, UUID customerId, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod, long total, OffsetDateTime now) {
-        OrderStatus status = paymentMethod == com.stylemind.commerce.enums.PaymentMethod.COD
-                ? OrderStatus.PLACED : OrderStatus.PENDING_PAYMENT;
+        OrderStatus status = OrderStatus.PENDING_PAYMENT;
         com.stylemind.commerce.entity.Order entity = new com.stylemind.commerce.entity.Order();
         entity.setOrderId(orderId);
         entity.setOrderNumber(orderNumber);

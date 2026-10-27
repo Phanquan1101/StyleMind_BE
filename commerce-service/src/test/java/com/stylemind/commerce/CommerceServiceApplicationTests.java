@@ -81,6 +81,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Import(CommerceServiceApplicationTests.JwtTestConfiguration.class)
 class CommerceServiceApplicationTests {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.stylemind.commerce.repository.order.PaymentEventRepository paymentEventRepository;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.stylemind.commerce.repository.order.CodOrderConfirmationRepository codOrderConfirmationRepository;
+
     @MockBean
     private BranchRepository branchRepository;
 

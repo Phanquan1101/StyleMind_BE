@@ -1,0 +1,405 @@
+{
+  "info": {
+    "name": "StyleMind - US-04.03 Confirm COD Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "COD two-step collection and PaymentConfirmed delivery. Synthetic local fixtures only. See COD_TWO_STEP_RUN_GUIDE.md. Credentials must remain local."
+  },
+  "variable": [
+    {
+      "key": "commerceUrl",
+      "value": "http://localhost:8080/commerce"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:8080/payment"
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "shippingAddressId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "paymentAttemptId",
+      "value": ""
+    },
+    {
+      "key": "amountVnd",
+      "value": "125000"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 - Customer checkout COD",
+      "request": {
+        "method": "POST",
+        "url": "{{commerceUrl}}/api/v1/orders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"checkout_key\":\"cod-{{$guid}}\",\"shipping_address_id\":\"{{shippingAddressId}}\",\"payment_method\":\"COD\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('orderId', pm.response.json().order_id);",
+              "pm.collectionVariables.set('amountVnd', String(pm.response.json().accepted_total_vnd));",
+              "pm.test('COD order automatically confirmed', () => pm.expect(pm.response.json().order_status).to.equal('PLACED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Retrieve pending COD attempt (no money collected)",
+      "request": {
+        "method": "POST",
+        "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('paymentAttemptId', pm.response.json().id);",
+              "pm.test('Unpaid COD', () => { const p=pm.response.json(); pm.expect(p.method).to.equal('COD'); pm.expect(p.status).to.equal('PENDING'); pm.expect(p.qrPayload).to.equal(null); pm.expect(p.expiresAt).to.equal(null); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Customer cannot record collection",
+      "request": {
+        "method": "POST",
+        "url": "{{paymentUrl}}/api/v1/admin/cod-collections",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"payment_attempt_id\": \"{{paymentAttemptId}}\", \"collected_amount_vnd\": {{amountVnd}}, \"collection_reference\": \"COD-POSTMAN-TEST\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Wrong collected amount rejected",
+      "request": {
+        "method": "POST",
+        "url": "{{paymentUrl}}/api/v1/admin/cod-collections",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"payment_attempt_id\": \"{{paymentAttemptId}}\", \"collected_amount_vnd\": 1, \"collection_reference\": \"COD-POSTMAN-TEST\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Admin records actual collection (synthetic fixture)",
+      "request": {
+        "method": "POST",
+        "url": "{{paymentUrl}}/api/v1/admin/cod-collections",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"payment_attempt_id\": \"{{paymentAttemptId}}\", \"collected_amount_vnd\": {{amountVnd}}, \"collection_reference\": \"COD-POSTMAN-TEST\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Payment collected', () => pm.expect(pm.response.json().status).to.equal('PAID'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Repeat collection cannot credit twice",
+      "request": {
+        "method": "POST",
+        "url": "{{paymentUrl}}/api/v1/admin/cod-collections",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"payment_attempt_id\": \"{{paymentAttemptId}}\", \"collected_amount_vnd\": {{amountVnd}}, \"collection_reference\": \"COD-POSTMAN-TEST\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Fractional amount is never rounded",
+      "request": {
+        "method": "POST",
+        "url": "{{paymentUrl}}/api/v1/admin/cod-collections",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"payment_attempt_id\": \"{{paymentAttemptId}}\", \"collected_amount_vnd\": {{amountVnd}}.9, \"collection_reference\": \"COD-POSTMAN-TEST\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Order fulfilment state remains distinct from paid status",
+      "request": {
+        "method": "GET",
+        "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Order stays confirmed for fulfilment', () => pm.expect(pm.response.json().order_status).to.equal('PLACED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 - Admin lists payment exceptions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": "{{paymentUrl}}/api/v1/admin/payment-exceptions?limit=50&offset=0"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Customer cannot list payment exceptions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          }
+        ],
+        "url": "{{paymentUrl}}/api/v1/admin/payment-exceptions?limit=50&offset=0"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Recovery returns PAID after collection without collecting again",
+      "request": {
+        "method": "POST",
+        "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customerToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('COD payment stays collected', () => { const p=pm.response.json(); pm.expect(p.method).to.equal('COD'); pm.expect(p.status).to.equal('PAID'); pm.expect(p.id).to.equal(pm.collectionVariables.get('paymentAttemptId')); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

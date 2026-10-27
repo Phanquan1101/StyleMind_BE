@@ -22,8 +22,8 @@ class PaymentCreationServiceTests {
     final CommerceOrderClient commerce = mock(CommerceOrderClient.class);
     final UUID order = UUID.randomUUID(), owner = UUID.randomUUID();
     final Instant now = Instant.parse("2026-10-22T00:00:00Z");
-    final SepayPaymentProperties properties = new SepayPaymentProperties("TESTBANK", "000-test-only", null, "SM");
-    final PaymentAttemptService payments = new PaymentAttemptService(repository,
+    final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
+    final PaymentAttemptService payments = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
             new SepayQrPayloadBuilder(properties), properties, commerce);
 
     @Test
@@ -54,8 +54,8 @@ class PaymentCreationServiceTests {
     @Test
     void missingBankConfigurationDoesNotInsertAttempt() {
         when(commerce.getPaymentSnapshot(order)).thenReturn(snapshot("PENDING_PAYMENT"));
-        var empty = new SepayPaymentProperties(null, null, null, null);
-        var unconfigured = new PaymentAttemptService(repository, new SepayQrPayloadBuilder(empty), empty, commerce);
+        var empty = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", null, null, null, null);
+        var unconfigured = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class), new SepayQrPayloadBuilder(empty), empty, commerce);
         assertThatThrownBy(() -> unconfigured.createAttempt(request("config-test"), owner, now))
                 .isInstanceOf(IllegalStateException.class);
         verify(repository, never()).insert(any());

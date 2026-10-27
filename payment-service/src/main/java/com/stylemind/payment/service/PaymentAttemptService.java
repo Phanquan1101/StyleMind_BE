@@ -3,16 +3,21 @@ package com.stylemind.payment.service;
 import com.stylemind.payment.client.CommerceOrderClient;
 import com.stylemind.payment.client.CommerceOrderPaymentSnapshot;
 import com.stylemind.payment.config.SepayPaymentProperties;
+import com.stylemind.payment.dto.ConfirmCodCollectionRequest;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.dto.PaymentAttemptResponse;
+import com.stylemind.payment.dto.PaymentExceptionListResponse;
+import com.stylemind.payment.dto.PaymentExceptionResponse;
 import com.stylemind.payment.errors.PaymentApiException;
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentAttemptStatus;
+import com.stylemind.payment.model.PaymentExceptionView;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -25,18 +30,22 @@ public class PaymentAttemptService {
 
     private static final Duration ONLINE_ATTEMPT_TTL = Duration.ofMinutes(15);
     private static final int MAX_REQUEST_KEY_LENGTH = 100;
+    private static final int MAX_LIMIT = 100;
 
     private final PaymentAttemptRepository repository;
+    private final PaymentOutboxService outboxService;
     private final SepayQrPayloadBuilder qrPayloadBuilder;
     private final SepayPaymentProperties sepayProperties;
     private final CommerceOrderClient commerceOrderClient;
 
     public PaymentAttemptService(
             PaymentAttemptRepository repository,
+            PaymentOutboxService outboxService,
             SepayQrPayloadBuilder qrPayloadBuilder,
             SepayPaymentProperties sepayProperties,
             CommerceOrderClient commerceOrderClient) {
         this.repository = repository;
+        this.outboxService = outboxService;
         this.qrPayloadBuilder = qrPayloadBuilder;
         this.sepayProperties = sepayProperties;
         this.commerceOrderClient = commerceOrderClient;
@@ -64,6 +73,59 @@ public class PaymentAttemptService {
         return repository.findByOrderAndRequestKey(order.orderId(), request.requestKey())
                 .map(existing -> existingAttemptResponse(existing, order, order.customerId()))
                 .orElseGet(() -> createNewAttempt(order, request.requestKey(), now));
+    }
+
+    @Transactional
+    public PaymentAttemptResponse confirmCodCollection(
+            ConfirmCodCollectionRequest request,
+            UUID adminUserId,
+            Instant now) {
+        validateCodCollectionRequest(request);
+        PaymentAttemptSnapshot attempt = repository.findByIdForUpdate(request.paymentAttemptId())
+                .orElseThrow(() -> new PaymentApiException(
+                        HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Payment attempt was not found"));
+
+        validateCollectionAttempt(request, attempt);
+        Instant collectedAt = request.collectedAt() == null ? now : request.collectedAt();
+        if (collectedAt.isAfter(now)) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Collection cannot be recorded in the future");
+        }
+        boolean inserted = repository.insertManualCodTransaction(attempt, request.collectedAmountVnd(),
+                normalizeBlankToNull(request.collectionReference()), adminUserId, collectedAt);
+        if (!inserted) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_ALREADY_CONFIRMED",
+                    "Payment attempt already has a financial transaction");
+        }
+        outboxService.recordPaymentConfirmed(attempt, request.collectedAmountVnd(), collectedAt);
+        return responseForSnapshot(attempt, PaymentAttemptStatus.SETTLED.name(), null, null, collectedAt);
+    }
+
+    private void validateCollectionAttempt(ConfirmCodCollectionRequest request, PaymentAttemptSnapshot attempt) {
+        if (!PaymentMethod.COD.name().equals(attempt.paymentMethod())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_METHOD_MISMATCH",
+                    "Only COD payment attempts can be collected through this API");
+        }
+        if (!PaymentAttemptStatus.PENDING.name().equals(attempt.attemptStatus())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_ATTEMPT_NOT_PENDING",
+                    "Payment attempt is not pending");
+        }
+        if (attempt.expectedAmountVnd() != request.collectedAmountVnd()) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_AMOUNT_MISMATCH",
+                    "Collected amount must match the expected amount");
+        }
+
+    }
+
+    public PaymentExceptionListResponse listExceptions(String status, int limit, int offset) {
+        if (limit < 1 || limit > MAX_LIMIT || offset < 0) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                    "Pagination values are outside allowed bounds");
+        }
+        String filter = normalizeBlankToNull(status);
+        if (filter != null && (filter.length() > 100 || filter.codePoints().anyMatch(Character::isISOControl)))
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid exception status");
+        List<PaymentExceptionView> items = repository.findExceptions(filter, limit, offset);
+        return new PaymentExceptionListResponse(items.stream().map(this::toResponse).toList(), limit, offset);
     }
 
     private PaymentAttemptResponse createNewAttempt(
@@ -174,6 +236,15 @@ public class PaymentAttemptService {
         }
     }
 
+    private void validateCodCollectionRequest(ConfirmCodCollectionRequest request) {
+        if (request == null
+                || request.paymentAttemptId() == null
+                || request.collectedAmountVnd() == null
+                || request.collectedAmountVnd() <= 0) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "COD collection request is invalid");
+        }
+    }
+
     private String buildPaymentReference(UUID paymentAttemptId) {
         String compact = paymentAttemptId.toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
         return sepayProperties.paymentCodePrefix() + compact;
@@ -205,5 +276,22 @@ public class PaymentAttemptService {
         };
     }
 
+    private PaymentExceptionResponse toResponse(PaymentExceptionView view) {
+        return new PaymentExceptionResponse(
+                view.exceptionId(),
+                view.paymentAttemptId(),
+                view.providerName(),
+                view.providerEventId(),
+                view.receivedReference(),
+                view.receivedAmountVnd(),
+                view.exceptionReason(),
+                view.reconciliationStatus(),
+                view.reviewedByUserId(),
+                view.detectedAt());
+    }
+
+    private String normalizeBlankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
 
 }

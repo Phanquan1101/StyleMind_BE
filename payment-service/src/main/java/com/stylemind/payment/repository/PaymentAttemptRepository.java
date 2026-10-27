@@ -2,8 +2,10 @@ package com.stylemind.payment.repository;
 
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
+import com.stylemind.payment.model.PaymentExceptionView;
 import com.stylemind.payment.model.PaymentMethod;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
@@ -64,6 +66,15 @@ public class PaymentAttemptRepository {
                 .param("paymentAttemptId", paymentAttemptId)
                 .query(PaymentAttemptRepository::mapSnapshot)
                 .optional();
+    }
+
+    public Optional<PaymentAttemptSnapshot> findByIdForUpdate(UUID paymentAttemptId) {
+        return jdbcClient.sql("""
+                        SELECT payment_attempt_id, order_id, customer_id, payment_reference, request_key,
+                               payment_method, expected_amount_vnd, attempt_status, generated_at, expires_at,
+                               qr_payload, transfer_content
+                        FROM public.payment_attempt WHERE payment_attempt_id=:id FOR UPDATE
+                        """).param("id", paymentAttemptId).query(PaymentAttemptRepository::mapSnapshot).optional();
     }
 
     public boolean existsPendingOnlineAttempt(UUID orderId) {
@@ -154,6 +165,92 @@ public class PaymentAttemptRepository {
         } catch (DuplicateKeyException exception) {
             return false;
         }
+    }
+
+    public boolean insertManualCodTransaction(
+            PaymentAttemptSnapshot attempt,
+            long collectedAmountVnd,
+            String collectionReference,
+            UUID recordedByUserId,
+            Instant collectedAt) {
+        try {
+            int inserted = jdbcClient.sql("""
+                            INSERT INTO public.financial_transaction (
+                                transaction_id,
+                                payment_attempt_id,
+                                actual_amount_vnd,
+                                provider_transaction_reference,
+                                provider_event_id,
+                                provider_name,
+                                recorded_by_user_id,
+                                settled_at
+                            )
+                            VALUES (
+                                :transactionId,
+                                :paymentAttemptId,
+                                :actualAmountVnd,
+                                :collectionReference,
+                                NULL,
+                                NULL,
+                                :recordedByUserId,
+                                :settledAt
+                            )
+                            ON CONFLICT DO NOTHING
+                            """)
+                    .param("transactionId", UUID.randomUUID())
+                    .param("paymentAttemptId", attempt.paymentAttemptId())
+                    .param("actualAmountVnd", collectedAmountVnd)
+                    .param("collectionReference", collectionReference)
+                    .param("recordedByUserId", recordedByUserId)
+                    .param("settledAt", java.sql.Timestamp.from(collectedAt))
+                    .update();
+            if (inserted == 1) {
+                markSettled(attempt.paymentAttemptId(), collectedAt);
+            }
+            return inserted == 1;
+        } catch (DuplicateKeyException exception) {
+            return false;
+        }
+    }
+
+    public void markSettled(UUID paymentAttemptId, Instant confirmedAt) {
+        jdbcClient.sql("""
+                        UPDATE public.payment_attempt
+                        SET attempt_status = 'SETTLED',
+                            confirmed_at = :confirmedAt
+                        WHERE payment_attempt_id = :paymentAttemptId
+                        """)
+                .param("paymentAttemptId", paymentAttemptId)
+                .param("confirmedAt", java.sql.Timestamp.from(confirmedAt))
+                .update();
+    }
+
+    public List<PaymentExceptionView> findExceptions(String status, int limit, int offset) {
+        String statusFilter = status == null ? null : status.trim();
+        return jdbcClient.sql("""
+                        SELECT exception_id, payment_attempt_id, provider_name, provider_event_id,
+                               received_reference, received_amount_vnd, exception_reason,
+                               reconciliation_status, reviewed_by_user_id, detected_at
+                        FROM public.payment_exception
+                        WHERE (:status IS NULL OR reconciliation_status = :status)
+                        ORDER BY detected_at DESC, exception_id DESC
+                        LIMIT :limit OFFSET :offset
+                        """)
+                .param("status", statusFilter, java.sql.Types.VARCHAR)
+                .param("limit", limit)
+                .param("offset", offset)
+                .query((rs, rowNum) -> new PaymentExceptionView(
+                        rs.getObject("exception_id", UUID.class),
+                        rs.getObject("payment_attempt_id", UUID.class),
+                        rs.getString("provider_name"),
+                        rs.getString("provider_event_id"),
+                        rs.getString("received_reference"),
+                        rs.getLong("received_amount_vnd"),
+                        rs.getString("exception_reason"),
+                        rs.getString("reconciliation_status"),
+                        rs.getObject("reviewed_by_user_id", UUID.class),
+                        rs.getTimestamp("detected_at").toInstant()))
+                .list();
     }
 
     private static PaymentAttemptSnapshot mapSnapshot(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {

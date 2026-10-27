@@ -35,6 +35,7 @@ class OrderPaymentRecoveryHttpTests {
     @Autowired MockMvc mvc;
     @MockitoBean OrderService orders;
     @MockitoBean PaymentClient payment;
+    @MockitoBean com.stylemind.commerce.service.order.CodOrderConfirmationService codConfirmation;
     @MockitoBean JwtDecoder decoder;
 
     @BeforeEach

@@ -57,3 +57,15 @@ Cross-story EP-02 evidence is reconciled in the [EP-02 matrix](../qa/identity-us
 - **TBD** means no approved decision or contract supports implementation.
 
 Current open decisions relevant to upcoming work are listed in [OPEN_IMPLEMENTATION_DECISIONS.md](OPEN_IMPLEMENTATION_DECISIONS.md). The US-02.05 API, lifecycle, validation and syntax-only brand-reference contract is explicitly owner-approved and recorded there; do not revive the superseded proposal or require finite vocabularies or Commerce lookup for this story. Unrelated historical questions remain unchanged.
+
+## US-04.02 supplement ? 2026-10-26
+
+The owner explicitly requested completion of SePay Confirm Payment. [The scoped contract](../planning/US-04.02_CONFIRM_PAYMENT_CONTRACT.md) reintroduces SePay-only PaymentConfirmed outbox/inbox delivery and Commerce V7, superseding the earlier removal for this story only. Commerce and Payment retain separate databases and service credentials. [Current local verification](../qa/US-04.02_CONFIRM_PAYMENT_REPORT.md) includes disposable PostgreSQL and two packaged JARs; it does not assert any persistent migration or production deployment. COD collection behavior is unchanged.
+
+## COD two-step supplement
+
+The owner chose COD PENDING_PAYMENT -> PLACED after Payment attempt acknowledgement, followed separately by Admin cash collection. [The contract](../planning/COD_TWO_STEP_CONTRACT.md) and [local verification](../qa/COD_TWO_STEP_REPORT.md) describe this schema-preserving extension. Earlier statements that COD begins directly at PLACED are superseded for new checkout only. Existing data and SePay event transport remain unchanged.
+
+## US-04.03 COD collection delivery - 2026-10-27
+
+The owner requested completion of COD PaymentConfirmed delivery and explicitly approved Commerce V8 to expand the existing inbox payment_method CHECK to COD/SEPAY_VIETQR, preserving V7 and existing data. [Scoped contract](../planning/US-04.03_COD_COLLECTION_CONTRACT.md). A committed, settled ledger/outbox is delivered without Notification; Commerce records COD collection without changing fulfilment/history. This supersedes the earlier COD-delivery exclusion only for this story. No public payment-state column/API, refund or paid-cancellation workflow is approved. Local tests use disposable databases only.

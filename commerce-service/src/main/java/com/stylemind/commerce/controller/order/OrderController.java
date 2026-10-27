@@ -43,6 +43,10 @@ public class OrderController {
             @RequestBody JsonNode body) {
         OrderResponse created = service.checkout(requireSubject(authentication),
                 request.getHeader(HttpHeaders.AUTHORIZATION), validator.checkout(body));
+        if ("COD".equals(created.paymentMethod())) {
+            // checkout's transaction and synchronous AFTER_COMMIT handoff have finished before this read.
+            created = service.get(requireSubject(authentication), false, created.orderId());
+        }
         return ResponseEntity.created(URI.create("/api/v1/orders/" + created.orderId())).body(created);
     }
 

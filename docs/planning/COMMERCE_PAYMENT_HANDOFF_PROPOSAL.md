@@ -45,3 +45,7 @@ The owner explicitly approved the business behavior, API additions and service a
 - Report exact changed files, commands/results, runtime HTTP execution separately from Postman structural validation, and remaining limitations.
 
 Remaining decisions: guaranteed delivery and fresh attempts after expiry remain TBD and are not authorized by this contract. Snapshot lookup for the pre-existing public Payment API and consumption of PaymentConfirmed are outside this integration scope.
+
+## COD two-step extension
+
+The owner later approved COD PENDING_PAYMENT -> PLACED only after attempt acknowledgement, with actual Admin collection separate. Earlier dated descriptions of direct COD PLACED creation are historical. See [the new contract](COD_TWO_STEP_CONTRACT.md).
