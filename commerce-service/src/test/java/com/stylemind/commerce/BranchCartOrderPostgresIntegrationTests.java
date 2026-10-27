@@ -78,12 +78,25 @@ class BranchCartOrderPostgresIntegrationTests {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.stylemind.commerce.service.order.OrderService orderService;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.stylemind.commerce.client.payment.PaymentClient payment;
 
     private UUID variantId;
     private UUID inactiveVariantId;
 
     @BeforeEach
     void reset() {
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest request = invocation.getArgument(0);
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order WHERE order_id = ?",
+                    Integer.class, request.orderId())).isEqualTo(1);
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), request.orderId(),
+                    request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
+        });
         jdbc.update("DELETE FROM public.cancellation_request");
         jdbc.update("DELETE FROM public.order_status_history");
         jdbc.update("DELETE FROM public.order_item");
@@ -246,6 +259,61 @@ class BranchCartOrderPostgresIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.order_status").value("CANCELLED"))
                 .andExpect(jsonPath("$.history.length()").value(2));
+    }
+
+    @Test
+    void committedCheckoutSendsSnapshotAndRecoveryKeepsBothRolesSelfOnly() throws Exception {
+        for (String method : List.of("COD", "SEPAY_VIETQR")) {
+            postJson("/api/v1/cart/items", customerToken(), """
+                    {"variant_id":"%s","quantity":1,"guest_session_key":null}
+                    """.formatted(variantId));
+            MvcResult result = postJson("/api/v1/orders", customerToken(), """
+                    {"checkout_key":"handoff-%s","shipping_address_id":"%s","payment_method":"%s"}
+                    """.formatted(method, ADDRESS_ID, method));
+            assertThat(result.getResponse().getStatus()).isEqualTo(201);
+            UUID id = UUID.fromString(json(result).path("order_id").asText());
+            assertThat(json(result).has("payment_attempt")).isFalse();
+            org.mockito.Mockito.verify(payment).create(org.mockito.ArgumentMatchers.argThat(r ->
+                    r.orderId().equals(id) && r.customerId().equals(CUSTOMER_ID) && r.acceptedTotalVnd() == 100000
+                            && r.paymentMethod().equals(method) && r.requestKey().equals("initial-" + id)));
+            mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.orderId").value(id.toString()));
+            mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token(OTHER_CUSTOMER_ID, "ADMIN"))))
+                    .andExpect(status().isNotFound());
+            mockMvc.perform(post("/api/v1/orders/{id}/payment-attempt", id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken())))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
+    void paymentFailurePreservesCommittedOrderAndRolledBackCheckoutSendsNothing() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalStateException("test-upstream-private-marker"))
+                .when(payment).create(org.mockito.ArgumentMatchers.any());
+        postJson("/api/v1/cart/items", customerToken(), """
+                {"variant_id":"%s","quantity":1,"guest_session_key":null}
+                """.formatted(variantId));
+        MvcResult result = postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"handoff-failure","shipping_address_id":"%s","payment_method":"SEPAY_VIETQR"}
+                """.formatted(ADDRESS_ID));
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(json(result).path("order_status").asText()).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order", Integer.class)).isEqualTo(1);
+        org.mockito.Mockito.verify(payment).create(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.reset(payment);
+        postJson("/api/v1/cart/items", customerToken(), """
+                {"variant_id":"%s","quantity":1,"guest_session_key":null}
+                """.formatted(variantId));
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            orderService.checkout(CUSTOMER_ID, bearer(customerToken()),
+                    new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                            "handoff-rollback", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.COD));
+            status.setRollbackOnly();
+        });
+        org.mockito.Mockito.verifyNoInteractions(payment);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order", Integer.class)).isEqualTo(1);
     }
 
     private String branchBody(String code, String status) {

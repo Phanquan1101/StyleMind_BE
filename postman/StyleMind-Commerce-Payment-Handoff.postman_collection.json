@@ -1,0 +1,291 @@
+{
+  "info": {
+    "name": "StyleMind - Commerce to Payment handoff",
+    "description": "Approved 2026-10-21. Prepare an active cart and own shipping address before checkout. Run guide: US-04.01_CREATE_SEPAY_PAYMENT_RUN_GUIDE.md. Tokens/secrets are intentionally empty.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "commerceUrl",
+      "value": "http://localhost:8080/commerce"
+    },
+    {
+      "key": "paymentInternalUrl",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "otherOwnerToken",
+      "value": ""
+    },
+    {
+      "key": "handoffServiceToken",
+      "value": ""
+    },
+    {
+      "key": "shippingAddressId",
+      "value": ""
+    },
+    {
+      "key": "paymentMethod",
+      "value": "SEPAY_VIETQR"
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "firstAttemptId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Customer flow - run in order",
+      "item": [
+        {
+          "name": "1 - Checkout committed Order and automatic handoff",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checkout_key\": \"handoff-{{$guid}}\",\n  \"shipping_address_id\": \"{{shippingAddressId}}\",\n  \"payment_method\": \"{{paymentMethod}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Order created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const r = pm.response.json(); pm.collectionVariables.set('orderId', r.order_id); pm.collectionVariables.set('customerId', r.customer_id); pm.collectionVariables.set('amountVnd', String(r.accepted_total_vnd)); pm.collectionVariables.set('orderStatus', r.order_status); pm.collectionVariables.set('firstAttemptId', ''); pm.test('Initial order state', () => pm.expect(r.order_status).to.eql(r.payment_method === 'COD' ? 'PLACED' : 'PENDING_PAYMENT')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Recover or retrieve initial payment attempt and QR",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment response', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) { const r = pm.response.json(); pm.collectionVariables.set('firstAttemptId', r.id); pm.test('Matches committed order', () => { pm.expect(r.orderId).to.eql(pm.collectionVariables.get('orderId')); pm.expect(r.amountVnd).to.eql(Number(pm.collectionVariables.get('amountVnd'))); }); pm.test('No cache', () => pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Repeat recovery returns same initial attempt",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Replay succeeds', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.test('Same attempt', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('firstAttemptId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 - Other owner including Admin cannot recover this Order",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherOwnerToken}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign order hidden', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 - No JWT rejected",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Authentication required', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 - Client amount injection rejected",
+          "request": {
+            "method": "POST",
+            "url": "{{commerceUrl}}/api/v1/orders/{{orderId}}/payment-attempt",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accepted_total_vnd\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Body rejected', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal endpoint - operator test only, requires direct Payment access",
+      "item": [
+        {
+          "name": "7 - Missing service credential rejected",
+          "request": {
+            "method": "POST",
+            "url": "{{paymentInternalUrl}}/internal/v1/payments/order-attempts",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Service credential required (configured server)', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8 - Replay trusted committed snapshot",
+          "request": {
+            "method": "POST",
+            "url": "{{paymentInternalUrl}}/internal/v1/payments/order-attempts",
+            "header": [
+              {
+                "key": "X-StyleMind-Service-Token",
+                "value": "{{handoffServiceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{orderId}}\",\n  \"customer_id\": \"{{customerId}}\",\n  \"payment_method\": \"{{paymentMethod}}\",\n  \"accepted_total_vnd\": {{amountVnd}},\n  \"order_status\": \"{{orderStatus}}\",\n  \"request_key\": \"initial-{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Internal creation/replay', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.test('Same initial attempt', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('firstAttemptId')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

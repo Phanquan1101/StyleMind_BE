@@ -290,7 +290,7 @@ class CommerceServiceApplicationTests {
 
     @Test
     void nonApiRoutesAreDeniedWithProblemJson() throws Exception {
-        mockMvc.perform(get("/internal/unconfigured")
+        mockMvc.perform(get("/unconfigured")
                         .header(HttpHeaders.AUTHORIZATION, bearer(validToken(SIGNING_KEY))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
