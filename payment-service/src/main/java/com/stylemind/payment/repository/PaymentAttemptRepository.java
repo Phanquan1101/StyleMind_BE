@@ -1,0 +1,175 @@
+package com.stylemind.payment.repository;
+
+import com.stylemind.payment.model.PaymentAttemptCreation;
+import com.stylemind.payment.model.PaymentAttemptSnapshot;
+import com.stylemind.payment.model.PaymentMethod;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class PaymentAttemptRepository {
+
+    private final JdbcClient jdbcClient;
+
+    public PaymentAttemptRepository(JdbcClient jdbcClient) {
+        this.jdbcClient = jdbcClient;
+    }
+
+    public void lockOrder(UUID orderId) {
+        // Transaction-scoped, shared by public and internal creation; no schema/table or cross-service DB access.
+        jdbcClient.sql("SELECT pg_advisory_xact_lock(:key)")
+                .param("key", orderId.getMostSignificantBits() ^ orderId.getLeastSignificantBits())
+                .query((rs, rowNum) -> true).single();
+    }
+
+    public int expireStaleOnlineAttempts(Instant now) {
+        return jdbcClient.sql("""
+                        UPDATE public.payment_attempt
+                        SET attempt_status = 'EXPIRED'
+                        WHERE payment_method = 'SEPAY_VIETQR'
+                          AND attempt_status = 'PENDING'
+                          AND expires_at <= :now
+                        """)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
+    }
+
+    public Optional<PaymentAttemptSnapshot> findByOrderAndRequestKey(UUID orderId, String requestKey) {
+        return jdbcClient.sql("""
+                        SELECT payment_attempt_id, order_id, customer_id, payment_reference, request_key,
+                               payment_method, expected_amount_vnd, attempt_status, generated_at, expires_at,
+                               qr_payload, transfer_content
+                        FROM public.payment_attempt
+                        WHERE order_id = :orderId
+                          AND request_key = :requestKey
+                        """)
+                .param("orderId", orderId)
+                .param("requestKey", requestKey)
+                .query(PaymentAttemptRepository::mapSnapshot)
+                .optional();
+    }
+
+    public Optional<PaymentAttemptSnapshot> findById(UUID paymentAttemptId) {
+        return jdbcClient.sql("""
+                        SELECT payment_attempt_id, order_id, customer_id, payment_reference, request_key,
+                               payment_method, expected_amount_vnd, attempt_status, generated_at, expires_at,
+                               qr_payload, transfer_content
+                        FROM public.payment_attempt
+                        WHERE payment_attempt_id = :paymentAttemptId
+                        """)
+                .param("paymentAttemptId", paymentAttemptId)
+                .query(PaymentAttemptRepository::mapSnapshot)
+                .optional();
+    }
+
+    public boolean existsPendingOnlineAttempt(UUID orderId) {
+        Boolean exists = jdbcClient.sql("""
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM public.payment_attempt
+                            WHERE order_id = :orderId
+                              AND payment_method = 'SEPAY_VIETQR'
+                              AND attempt_status = 'PENDING'
+                        )
+                        """)
+                .param("orderId", orderId)
+                .query(Boolean.class)
+                .single();
+        return Boolean.TRUE.equals(exists);
+    }
+
+    public boolean existsSettledAttempt(UUID orderId) {
+        Boolean exists = jdbcClient.sql("""
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM public.payment_attempt
+                            WHERE order_id = :orderId
+                              AND attempt_status = 'SETTLED'
+                        )
+                        """)
+                .param("orderId", orderId)
+                .query(Boolean.class)
+                .single();
+        return Boolean.TRUE.equals(exists);
+    }
+
+    public boolean insert(PaymentAttemptCreation attempt) {
+        try {
+            return jdbcClient.sql("""
+                            INSERT INTO public.payment_attempt (
+                                payment_attempt_id,
+                                order_id,
+                                customer_id,
+                                payment_reference,
+                                request_key,
+                                payment_method,
+                                expected_amount_vnd,
+                                attempt_status,
+                                generated_at,
+                                expires_at,
+                                provider_order_reference,
+                                provider_bank_account_reference,
+                                provider_virtual_account,
+                                qr_payload,
+                                transfer_content,
+                                confirmed_at
+                            )
+                            VALUES (
+                                :paymentAttemptId,
+                                :orderId,
+                                :customerId,
+                                :paymentReference,
+                                :requestKey,
+                                :paymentMethod,
+                                :expectedAmountVnd,
+                                'PENDING',
+                                :generatedAt,
+                                :expiresAt,
+                                NULL,
+                                :providerBankAccountReference,
+                                NULL,
+                                :qrPayload,
+                                :transferContent,
+                                NULL
+                            )
+                            """)
+                    .param("paymentAttemptId", attempt.paymentAttemptId())
+                    .param("orderId", attempt.orderId())
+                    .param("customerId", attempt.customerId())
+                    .param("paymentReference", attempt.paymentReference())
+                    .param("requestKey", attempt.requestKey())
+                    .param("paymentMethod", attempt.paymentMethod().name())
+                    .param("expectedAmountVnd", attempt.expectedAmountVnd())
+                    .param("generatedAt", java.sql.Timestamp.from(attempt.generatedAt()))
+                    .param("expiresAt", attempt.expiresAt() == null ? null : java.sql.Timestamp.from(attempt.expiresAt()),
+                            java.sql.Types.TIMESTAMP)
+                    .param("providerBankAccountReference", attempt.providerBankAccountReference())
+                    .param("qrPayload", attempt.qrPayload())
+                    .param("transferContent", attempt.transferContent())
+                    .update() == 1;
+        } catch (DuplicateKeyException exception) {
+            return false;
+        }
+    }
+
+    private static PaymentAttemptSnapshot mapSnapshot(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        java.sql.Timestamp expiresAt = rs.getTimestamp("expires_at");
+        return new PaymentAttemptSnapshot(
+                rs.getObject("payment_attempt_id", UUID.class),
+                rs.getObject("order_id", UUID.class),
+                rs.getObject("customer_id", UUID.class),
+                rs.getString("payment_reference"),
+                rs.getString("request_key"),
+                rs.getString("payment_method"),
+                rs.getLong("expected_amount_vnd"),
+                rs.getString("attempt_status"),
+                rs.getTimestamp("generated_at").toInstant(),
+                expiresAt == null ? null : expiresAt.toInstant(),
+                rs.getString("qr_payload"),
+                rs.getString("transfer_content"));
+    }
+}

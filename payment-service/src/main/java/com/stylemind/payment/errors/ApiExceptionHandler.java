@@ -29,6 +29,12 @@ public class ApiExceptionHandler {
                 "INVALID_REQUEST", request);
     }
 
+    @ExceptionHandler(PaymentApiException.class)
+    public ResponseEntity<ProblemDetail> paymentApiException(PaymentApiException exception, HttpServletRequest request) {
+        return response(exception.status(), exception.status().getReasonPhrase(),
+                exception.detail(), exception.code(), request);
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ProblemDetail> methodNotAllowed(
             HttpRequestMethodNotSupportedException exception, HttpServletRequest request) {
