@@ -27,7 +27,8 @@ public class SecurityConfiguration {
             ApiAccessDeniedHandler accessDeniedHandler,
             InternalServiceTokenFilter internalServiceTokenFilter,
             @Qualifier("internalEmailVerificationPostMatcher") RequestMatcher internalEmailVerificationPostMatcher,
-            @Qualifier("internalPasswordResetPostMatcher") RequestMatcher internalPasswordResetPostMatcher)
+            @Qualifier("internalPasswordResetPostMatcher") RequestMatcher internalPasswordResetPostMatcher,
+            @Qualifier("internalOutfitShareInvitationPostMatcher") RequestMatcher internalOutfitShareInvitationPostMatcher)
             throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -37,6 +38,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/actuator/health", "/v3/api-docs", "/v3/api-docs/**").permitAll()
                         .requestMatchers(internalEmailVerificationPostMatcher).permitAll()
                         .requestMatchers(internalPasswordResetPostMatcher).permitAll()
+                        .requestMatchers(internalOutfitShareInvitationPostMatcher).permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
@@ -68,6 +70,16 @@ public class SecurityConfiguration {
         }
         return PathPatternRequestMatcher.withPathPatternParser(handlerMapping.getPatternParser())
                 .matcher(HttpMethod.POST, "/internal/v1/password-resets");
+    }
+
+    @Bean("internalOutfitShareInvitationPostMatcher")
+    RequestMatcher internalOutfitShareInvitationPostMatcher(
+            @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping) {
+        if (handlerMapping.getPatternParser() == null) {
+            throw new IllegalStateException("Notification internal route requires Spring MVC PathPatternParser");
+        }
+        return PathPatternRequestMatcher.withPathPatternParser(handlerMapping.getPatternParser())
+                .matcher(HttpMethod.POST, "/internal/v1/outfit-share-invitations");
     }
 
     @Bean

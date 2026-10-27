@@ -7,6 +7,7 @@ import java.util.UUID;
 public record StyleProfileCommand(
         String fitPreference,
         BigDecimal heightCm,
+        BigDecimal weightKg,
         String usualTopSize,
         String usualBottomSize,
         String shoeSize,
