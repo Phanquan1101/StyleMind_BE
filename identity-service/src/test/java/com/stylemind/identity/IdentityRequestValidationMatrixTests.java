@@ -9,11 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.stylemind.identity.dto.register.RegisterRequest;
-import com.stylemind.identity.service.emailverification.EmailVerificationService;
-import com.stylemind.identity.service.login.LoginService;
-import com.stylemind.identity.service.passwordreset.PasswordResetService;
-import com.stylemind.identity.service.session.RefreshSessionService;
-import com.stylemind.identity.service.register.RegisterService;
+import com.stylemind.identity.service.AccountVerificationService;
+import com.stylemind.identity.service.AuthService;
 import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,11 +49,8 @@ class IdentityRequestValidationMatrixTests {
 
     @Autowired private MockMvc mockMvc;
 
-    @MockitoBean private RegisterService registerService;
-    @MockitoBean private EmailVerificationService emailVerificationService;
-    @MockitoBean private LoginService loginService;
-    @MockitoBean private RefreshSessionService refreshSessionService;
-    @MockitoBean private PasswordResetService passwordResetService;
+    @MockitoBean private AuthService authService;
+    @MockitoBean private AccountVerificationService accountVerificationService;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -67,8 +61,7 @@ class IdentityRequestValidationMatrixTests {
 
     @BeforeEach
     void resetInteractionsBeforeEach() {
-        clearInvocations(registerService, emailVerificationService, loginService,
-                refreshSessionService, passwordResetService);
+        clearInvocations(authService, accountVerificationService);
     }
 
     @Test
@@ -216,7 +209,7 @@ class IdentityRequestValidationMatrixTests {
                         .content("{\"email\":\"" + A + "\",\"password\":\"" + PASSWORD + "\"," + extras + "}"))
                 .andExpect(status().isCreated());
         var registration = org.mockito.ArgumentCaptor.forClass(RegisterRequest.class);
-        verify(registerService).register(registration.capture());
+        verify(authService).register(registration.capture());
         assertThat(registration.getValue().email()).isEqualTo(A);
         assertThat(registration.getValue().password()).isEqualTo(PASSWORD);
 
@@ -224,13 +217,13 @@ class IdentityRequestValidationMatrixTests {
         mockMvc.perform(post(ROOT + "/verify-email").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + A + "\",\"code\":\"012345\"," + extras + "}"))
                 .andExpect(status().isNoContent());
-        verify(emailVerificationService).verify(A, "012345");
+        verify(accountVerificationService).verifyEmail(A, "012345");
 
         clearServiceInteractions();
         mockMvc.perform(post(ROOT + "/resend-email-verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + A + "\"," + extras + "}"))
                 .andExpect(status().isNoContent());
-        verify(emailVerificationService).resend(A);
+        verify(accountVerificationService).resendEmailVerification(A);
 
         for (String routeAndBody : List.of(
                 "/login|{\"email\":\"" + A + "\",\"password\":\"" + PASSWORD + "\"," + extras + "}",
@@ -249,20 +242,20 @@ class IdentityRequestValidationMatrixTests {
         mockMvc.perform(post(ROOT + "/forgot-password").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + A + "\"," + extras + "}"))
                 .andExpect(status().isAccepted());
-        verify(passwordResetService).requestOtp(A);
+        verify(accountVerificationService).requestPasswordReset(A);
 
         clearServiceInteractions();
         mockMvc.perform(post(ROOT + "/verify-password-reset").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + A + "\",\"code\":\"012345\"," + extras + "}"))
                 .andExpect(status().isOk());
-        verify(passwordResetService).verifyOtp(A, "012345");
+        verify(accountVerificationService).verifyPasswordResetOtp(A, "012345");
 
         clearServiceInteractions();
         mockMvc.perform(post(ROOT + "/reset-password").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reset_token\":\"" + RESET_TOKEN + "\",\"new_password\":\""
                                 + PASSWORD + "\"," + extras + "}"))
                 .andExpect(status().isNoContent());
-        verify(passwordResetService).resetPassword(RESET_TOKEN, PASSWORD);
+        verify(accountVerificationService).resetPassword(RESET_TOKEN, PASSWORD);
     }
 
     @Test
@@ -272,7 +265,7 @@ class IdentityRequestValidationMatrixTests {
                         .content("{\"email\":\"" + A + "\",\"password\":\"" + registerPassword + "\"}"))
                 .andExpect(status().isCreated());
         var registration = org.mockito.ArgumentCaptor.forClass(RegisterRequest.class);
-        verify(registerService).register(registration.capture());
+        verify(authService).register(registration.capture());
         assertThat(registration.getValue().password()).isEqualTo(registerPassword);
 
         String loginPassword = "  " + PASSWORD + "  ";
@@ -281,7 +274,7 @@ class IdentityRequestValidationMatrixTests {
                         .content("{\"email\":\"" + A + "\",\"password\":\"" + loginPassword + "\"}"))
                 .andExpect(status().isOk());
         var login = org.mockito.ArgumentCaptor.forClass(com.stylemind.identity.dto.login.LoginRequest.class);
-        verify(loginService).login(login.capture());
+        verify(authService).login(login.capture());
         assertThat(login.getValue().password()).isEqualTo(loginPassword);
 
         String resetPassword = "  " + "reset password value" + "  ";
@@ -290,7 +283,7 @@ class IdentityRequestValidationMatrixTests {
                         .content("{\"reset_token\":\"" + RESET_TOKEN + "\",\"new_password\":\""
                                 + resetPassword + "\"}"))
                 .andExpect(status().isNoContent());
-        verify(passwordResetService).resetPassword(RESET_TOKEN, resetPassword);
+        verify(accountVerificationService).resetPassword(RESET_TOKEN, resetPassword);
     }
 
     private void assertBadRequest(String route, String body, String label) throws Exception {
@@ -304,13 +297,11 @@ class IdentityRequestValidationMatrixTests {
     }
 
     private void clearServiceInteractions() {
-        clearInvocations(registerService, emailVerificationService, loginService,
-                refreshSessionService, passwordResetService);
+        clearInvocations(authService, accountVerificationService);
     }
 
     private void verifyNoServiceInteractions() {
-        verifyNoInteractions(registerService, emailVerificationService, loginService,
-                refreshSessionService, passwordResetService);
+        verifyNoInteractions(authService, accountVerificationService);
     }
 
     private record Probe(String suffix, String body, String label) { }

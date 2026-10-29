@@ -4,41 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.logging.CorrelationIdFilter;
+
+import com.stylemind.identity.entity.Account;
 import com.stylemind.identity.entity.AccountRole;
 import com.stylemind.identity.entity.EmailVerificationChallengeRow;
-import com.stylemind.identity.repository.account.AccountRepository;
-import com.stylemind.identity.repository.account.AccountRoleRepository;
-import com.stylemind.identity.repository.emailverification.EmailVerificationRepository;
+import com.stylemind.identity.logging.CorrelationIdFilter;
+import com.stylemind.identity.repository.AccountRepository;
+import com.stylemind.identity.repository.AccountRoleRepository;
+import com.stylemind.identity.repository.EmailVerificationRepository;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.SecureRandom;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -54,9 +33,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.GenericContainer;
@@ -66,6 +45,31 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.MountableFile;
+
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.UUID;
 
 @SpringBootTest(properties = {"management.health.db.enabled=false"})
 @AutoConfigureMockMvc
@@ -451,7 +455,7 @@ class RegisterPostgresIntegrationTests {
     void challengeInsertFailureRollsBackAccountAndRole() throws Exception {
         String email = email();
         doThrow(new IllegalStateException("test-only challenge write failure"))
-                .when(challengeRepository).saveAndFlush(any(EmailVerificationChallengeRow.class));
+                .when(challengeRepository).save(any(EmailVerificationChallengeRow.class));
 
         MvcResult result = register(email);
 
@@ -466,7 +470,7 @@ class RegisterPostgresIntegrationTests {
     void roleInsertFailureRollsBackAccountBeforeChallengeAndEmail() throws Exception {
         String email = email();
         org.mockito.Mockito.doThrow(new IllegalStateException("test-only role write failure"))
-                .when(roleRepository).saveAndFlush(any(AccountRole.class));
+                .when(roleRepository).save(any(AccountRole.class));
 
         MvcResult result = register(email);
 

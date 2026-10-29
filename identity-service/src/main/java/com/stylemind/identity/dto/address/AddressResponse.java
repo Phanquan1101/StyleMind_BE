@@ -3,7 +3,6 @@ package com.stylemind.identity.dto.address;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.stylemind.identity.model.address.AddressSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 
@@ -19,8 +18,4 @@ public record AddressResponse(
         @JsonProperty("ward_code") String wardCode,
         @JsonProperty("is_default") boolean isDefault) {
 
-    public static AddressResponse from(AddressSnapshot value) {
-        return new AddressResponse(value.addressId(), value.label(), value.recipientName(), value.recipientPhone(),
-                value.addressLine(), value.wardCode(), value.isDefault());
-    }
 }

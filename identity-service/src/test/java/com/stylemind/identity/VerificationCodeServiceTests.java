@@ -1,11 +1,14 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.stylemind.identity.security.VerificationCodeService;
+
+import com.stylemind.identity.security.verification.VerificationCodeService;
+
+import org.junit.jupiter.api.Test;
+
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
 
 class VerificationCodeServiceTests {
 

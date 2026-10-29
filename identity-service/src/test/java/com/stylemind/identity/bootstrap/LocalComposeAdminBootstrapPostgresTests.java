@@ -4,14 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.stylemind.identity.entity.Account;
 import com.stylemind.identity.entity.AccountRole;
-import com.stylemind.identity.repository.account.AccountRepository;
-import com.stylemind.identity.repository.account.AccountRoleRepository;
-import com.stylemind.identity.repository.emailverification.EmailVerificationRepository;
-import com.stylemind.identity.repository.passwordreset.PasswordResetRepository;
+import com.stylemind.identity.repository.AccountRepository;
+import com.stylemind.identity.repository.AccountRoleRepository;
+import com.stylemind.identity.repository.EmailVerificationRepository;
+import com.stylemind.identity.repository.PasswordResetRepository;
+
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import java.time.Clock;
-import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -27,6 +26,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

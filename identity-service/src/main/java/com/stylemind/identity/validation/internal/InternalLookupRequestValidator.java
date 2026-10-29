@@ -5,7 +5,7 @@ import com.stylemind.identity.errors.ApiOperationException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
+import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -38,7 +38,6 @@ public class InternalLookupRequestValidator {
     }
 
     private ApiOperationException invalidRequest() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
-                "Request is missing or malformed", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is missing or malformed");
     }
 }

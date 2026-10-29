@@ -3,19 +3,21 @@ package com.stylemind.identity.bootstrap;
 import com.stylemind.identity.dto.register.RegisterRequest;
 import com.stylemind.identity.entity.Account;
 import com.stylemind.identity.entity.AccountRole;
-import com.stylemind.identity.repository.account.AccountRepository;
-import com.stylemind.identity.repository.account.AccountRoleRepository;
+import com.stylemind.identity.repository.AccountRepository;
+import com.stylemind.identity.repository.AccountRoleRepository;
+
 import jakarta.validation.Validator;
-import java.time.Clock;
-import java.time.OffsetDateTime;
-import java.util.Locale;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Local Compose-only first-admin provisioning. The trusted bootstrap credentials are

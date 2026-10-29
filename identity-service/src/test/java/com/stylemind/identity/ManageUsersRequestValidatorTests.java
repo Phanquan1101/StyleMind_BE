@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.users.ManageUserListCriteria;
+import com.stylemind.identity.dto.users.ManageUsersListRequest;
 import com.stylemind.identity.validation.users.ManageUsersRequestValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -25,14 +25,14 @@ class ManageUsersRequestValidatorTests {
 
     @Test
     void listDefaultsAndApprovedFiltersAreParsedWithoutCoercion() {
-        ManageUserListCriteria defaults = validator.listCriteria(request(Map.of()));
-        assertThat(defaults).isEqualTo(new ManageUserListCriteria(null, null, null, 0, 20));
+        ManageUsersListRequest defaults = validator.listCriteria(request(Map.of()));
+        assertThat(defaults).isEqualTo(new ManageUsersListRequest(null, null, null, 0, 20));
 
-        ManageUserListCriteria filtered = validator.listCriteria(request(Map.of(
+        ManageUsersListRequest filtered = validator.listCriteria(request(Map.of(
                 "status", new String[] {"SUSPENDED"}, "role", new String[] {"ADMIN"},
                 "email_contains", new String[] {"  Example_%  "}, "page", new String[] {"2"},
                 "size", new String[] {"100"})));
-        assertThat(filtered).isEqualTo(new ManageUserListCriteria("SUSPENDED", "ADMIN", "Example_%", 2, 100));
+        assertThat(filtered).isEqualTo(new ManageUsersListRequest("SUSPENDED", "ADMIN", "Example_%", 2, 100));
     }
 
     @Test

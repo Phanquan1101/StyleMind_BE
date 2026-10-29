@@ -7,6 +7,7 @@ import com.stylemind.identity.dto.address.ProvinceResponse;
 import com.stylemind.identity.dto.address.WardListResponse;
 import com.stylemind.identity.dto.address.WardResponse;
 import com.stylemind.identity.errors.ApiOperationException;
+import com.stylemind.identity.errors.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -15,7 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -51,7 +51,7 @@ public final class VietnamAdministrativeDirectory {
     public WardListResponse wards(String provinceCode) {
         List<WardResponse> values = wardsByProvince.get(provinceCode);
         if (values == null) {
-            throw new ApiOperationException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource was not found", 0);
+            throw new ApiOperationException(ErrorCode.RESOURCE_NOT_FOUND, "Resource was not found");
         }
         return new WardListResponse(datasetVersion, provinceCode, values);
     }
