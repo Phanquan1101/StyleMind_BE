@@ -13,6 +13,7 @@ import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import com.stylemind.payment.service.PaymentAttemptService;
+import com.stylemind.payment.service.impl.PaymentAttemptServiceImpl;
 import com.stylemind.payment.service.SepayQrPayloadBuilder;
 import java.time.Instant;
 import java.util.Optional;
@@ -23,7 +24,7 @@ class PaymentOrderAttemptServiceTests {
     final PaymentAttemptRepository repository = mock(PaymentAttemptRepository.class);
     final CommerceOrderClient commerce = mock(CommerceOrderClient.class);
     final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
-    final PaymentAttemptService service = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
+    final PaymentAttemptService service = new PaymentAttemptServiceImpl(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
             new SepayQrPayloadBuilder(properties), properties, commerce);
     final UUID order = UUID.randomUUID();
     final UUID owner = UUID.randomUUID();
