@@ -1,0 +1,76 @@
+package com.stylemind.notification.errors;
+
+import com.stylemind.notification.security.ApiProblemDetails;
+import com.stylemind.notification.service.MailDeliveryException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
+            MissingServletRequestParameterException.class})
+    public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
+                "INVALID_REQUEST", request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> methodNotAllowed(
+            HttpRequestMethodNotSupportedException exception, HttpServletRequest request) {
+        return response(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", "HTTP method is not supported",
+                "METHOD_NOT_ALLOWED", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> unsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type",
+                "Request media type is not supported", "UNSUPPORTED_MEDIA_TYPE", request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ProblemDetail> notFound(NoResourceFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "Not Found", "Resource was not found", "RESOURCE_NOT_FOUND", request);
+    }
+
+    @ExceptionHandler(MailDeliveryException.class)
+    public ResponseEntity<ProblemDetail> mailFailure(MailDeliveryException exception, HttpServletRequest request) {
+        HttpStatus status = exception.unknown() ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.SERVICE_UNAVAILABLE;
+        String code = exception.unknown() ? "EMAIL_DELIVERY_UNKNOWN" : "EMAIL_DELIVERY_FAILED";
+        return response(status, status.getReasonPhrase(), "Email delivery could not be confirmed", code, request);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ProblemDetail> unexpected(Exception exception, HttpServletRequest request) {
+        log.error("Unhandled request failure correlationId={} exceptionType={}",
+                MDC.get("correlationId"), exception.getClass().getSimpleName());
+        return response(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                "An unexpected error occurred", "INTERNAL_ERROR", request);
+    }
+
+    private ResponseEntity<ProblemDetail> response(
+            HttpStatus status,
+            String title,
+            String detail,
+            String code,
+            HttpServletRequest request) {
+        return ResponseEntity.status(status)
+                .body(ApiProblemDetails.create(status, title, detail, code, request));
+    }
+}

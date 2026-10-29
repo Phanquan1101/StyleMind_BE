@@ -1,0 +1,181 @@
+{
+  "info": {
+    "name": "StyleMind Commerce US-03.05-03.10 Branch Cart Order",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080/commerce"},
+    {"key": "customerToken", "value": ""},
+    {"key": "adminToken", "value": ""},
+    {"key": "guestSessionKey", "value": "guest-session-00000001"},
+    {"key": "branchId", "value": ""},
+    {"key": "variantId", "value": ""},
+    {"key": "cartItemId", "value": ""},
+    {"key": "shippingAddressId", "value": ""},
+    {"key": "orderId", "value": ""},
+    {"key": "cancellationRequestId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Branches",
+      "item": [
+        {
+          "name": "Admin Create Branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "body": {"mode": "raw", "raw": "{\n  \"branch_code\": \"HN01\",\n  \"name\": \"Ha Noi\",\n  \"address_line\": \"1 Main St, Ha Noi\",\n  \"contact_phone\": null,\n  \"branch_status\": \"ACTIVE\"\n}"}
+          }
+        },
+        {
+          "name": "List Active Branches",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerToken}}"}],
+            "url": "{{baseUrl}}/api/v1/branches"
+          }
+        },
+        {
+          "name": "Admin Replace Branch Inactive",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{branchId}}",
+            "body": {"mode": "raw", "raw": "{\n  \"branch_code\": \"HN01\",\n  \"name\": \"Ha Noi\",\n  \"address_line\": \"1 Main St, Ha Noi\",\n  \"contact_phone\": null,\n  \"branch_status\": \"INACTIVE\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Guest Add Cart Item",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/api/v1/cart/items",
+            "body": {"mode": "raw", "raw": "{\n  \"variant_id\": \"{{variantId}}\",\n  \"quantity\": 2,\n  \"guest_session_key\": \"{{guestSessionKey}}\"\n}"}
+          }
+        },
+        {
+          "name": "Customer Add Cart Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{customerToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/cart/items",
+            "body": {"mode": "raw", "raw": "{\n  \"variant_id\": \"{{variantId}}\",\n  \"quantity\": 1,\n  \"guest_session_key\": null\n}"}
+          }
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/api/v1/cart/items/{{cartItemId}}",
+            "body": {"mode": "raw", "raw": "{\n  \"quantity\": 3,\n  \"guest_session_key\": \"{{guestSessionKey}}\"\n}"}
+          }
+        },
+        {
+          "name": "Merge Guest Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{customerToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/cart/merge",
+            "body": {"mode": "raw", "raw": "{\n  \"guest_session_key\": \"{{guestSessionKey}}\"\n}"}
+          }
+        },
+        {
+          "name": "Clear Guest Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/cart/items?guest_session_key={{guestSessionKey}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Preview Checkout Prices",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerToken}}"}],
+            "url": "{{baseUrl}}/api/v1/checkout/prices"
+          }
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{customerToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/orders",
+            "body": {"mode": "raw", "raw": "{\n  \"checkout_key\": \"checkout-key-00000001\",\n  \"shipping_address_id\": \"{{shippingAddressId}}\",\n  \"payment_method\": \"COD\"\n}"}
+          }
+        },
+        {
+          "name": "Customer Get Order",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{customerToken}}"}],
+            "url": "{{baseUrl}}/api/v1/orders/{{orderId}}"
+          }
+        },
+        {
+          "name": "Admin Update Order Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/orders/{{orderId}}/status",
+            "body": {"mode": "raw", "raw": "{\n  \"order_status\": \"PROCESSING\",\n  \"reason\": \"Accepted for fulfillment\"\n}"}
+          }
+        },
+        {
+          "name": "Request Cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{customerToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/orders/{{orderId}}/cancellation-requests",
+            "body": {"mode": "raw", "raw": "{\n  \"reason\": \"Customer changed delivery plan\"\n}"}
+          }
+        },
+        {
+          "name": "Admin Review Cancellation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/cancellation-requests/{{cancellationRequestId}}",
+            "body": {"mode": "raw", "raw": "{\n  \"request_status\": \"REJECTED\",\n  \"decision_reason\": \"Order is already being processed\"\n}"}
+          }
+        }
+      ]
+    }
+  ]
+}

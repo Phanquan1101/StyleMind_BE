@@ -1,0 +1,726 @@
+{
+  "info": {
+    "_postman_id": "98d687a6-8d3d-4c7d-b034-5e0f735460de",
+    "name": "StyleMind Identity - Complete Auth Flow",
+    "description": "Manual end-to-end collection for the Identity auth APIs in this repository: Register, email verification, Login, refresh/logout, and Forgot Password. Client-facing requests use the local API Gateway at http://localhost:8080, which proxies the current Identity APIs without changing their paths. Internal Notification endpoints are not routed through the Gateway. Use a new, reachable mailbox for each registration run. The collection deliberately does not auto-generate an email or OTP. Register and Forgot Password send real mail through the configured SMTP provider. Run requests in order and pause to copy each OTP from email into the matching collection variable. Do not share/export a populated collection because it captures tokens and test credentials.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Register and verify email",
+      "description": "Run manually in order. Set email to a new address you can access and password to a value that meets the current Identity password policy. Register sends a real verification email. Set emailVerificationCode from that email before Verify Email.",
+      "item": [
+        {
+          "name": "Register account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "register" ]
+            },
+            "description": "Expected 201. SMTP delivery failure can return 503/504 after the account is committed; use Resend Verification after its cooldown instead of retrying Register."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Register creates a pending account', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.account_id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.account_status).to.eql('PENDING_VERIFICATION');",
+                  "  pm.collectionVariables.set('accountId', body.account_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login while email is pending (expected 403)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "login" ]
+            },
+            "description": "Optional state check: after successful Register and before Verify Email, correct credentials must not issue tokens for a pending account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pending account cannot log in', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify email",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{emailVerificationCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-email",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "verify-email" ]
+            },
+            "description": "Copy the latest six-digit registration OTP from the mailbox into the collection variable emailVerificationCode. Success returns 204 and activates the account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Email verification succeeds with 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  pm.collectionVariables.unset('emailVerificationCode');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Login and refresh/logout",
+      "description": "Requires a verified ACTIVE account from section 01. The scripts capture and rotate tokens in collection variables; do not share this collection after running it.",
+      "item": [
+        {
+          "name": "Login with incorrect password (expected 401)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "login" ]
+            },
+            "description": "Negative credential test. Keep wrongPassword non-empty and different from password."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Incorrect password returns 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "login" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login issues access and refresh tokens', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.token_type).to.eql('Bearer');",
+                  "  pm.expect(body.expires_in).to.be.a('number');",
+                  "  pm.collectionVariables.set('accessToken', body.access_token);",
+                  "  pm.collectionVariables.set('refreshToken', body.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token (rotates the current token)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('previousRefreshToken', pm.collectionVariables.get('refreshToken') || '');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh rotates tokens successfully', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refresh_token).not.to.eql(pm.collectionVariables.get('previousRefreshToken'));",
+                  "  pm.collectionVariables.set('accessToken', body.access_token);",
+                  "  pm.collectionVariables.set('refreshToken', body.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "refresh" ]
+            }
+          }
+        },
+        {
+          "name": "Replay consumed refresh token (expected 401)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{previousRefreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "refresh" ]
+            },
+            "description": "The token used before rotation must be rejected and must not revoke the new session."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Consumed refresh token is rejected', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Forgot Password and recovery",
+      "description": "Requires the verified account from section 01. Forgot Password sends an email through the configured SMTP provider. Copy its six-digit OTP into passwordResetCode before verification. Set newPassword to a policy-compliant value different from password so the old-password rejection check is meaningful.",
+      "item": [
+        {
+          "name": "Request password reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "forgot-password" ]
+            },
+            "description": "Expected 202 with the same generic response for eligible and ineligible addresses. Check the mailbox for the OTP."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Forgot Password returns generic 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "  pm.expect(pm.response.json().message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify reset OTP and capture one-use token",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{passwordResetCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-password-reset",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "verify-password-reset" ]
+            },
+            "description": "Copy the latest six-digit reset OTP from email into passwordResetCode. The test script stores reset_token for the next request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reset OTP returns a five-minute token', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.reset_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.expires_in).to.eql(300);",
+                  "  pm.collectionVariables.set('resetToken', body.reset_token);",
+                  "  pm.collectionVariables.unset('passwordResetCode');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('consumedResetToken', pm.collectionVariables.get('resetToken') || '');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Password reset succeeds with 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  pm.collectionVariables.unset('resetToken');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reset_token\": \"{{resetToken}}\",\n  \"new_password\": \"{{newPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "reset-password" ]
+            }
+          }
+        },
+        {
+          "name": "Reuse consumed reset token (expected 400)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reset_token\": \"{{consumedResetToken}}\",\n  \"new_password\": \"{{newPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "reset-password" ]
+            },
+            "description": "Checks one-use behavior after a successful password reset."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Consumed reset token is rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh session from before reset is revoked (expected 401)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "refresh" ]
+            },
+            "description": "The refresh token captured before the reset should be invalid after the successful reset transaction."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pre-reset refresh session is revoked', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old password is rejected (expected 401)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "login" ]
+            },
+            "description": "Checks the former password no longer authenticates after recovery."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Old password returns 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with new password",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{newPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "login" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('New password logs in and receives tokens', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('accessToken', body.access_token);",
+                  "  pm.collectionVariables.set('refreshToken', body.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout current refresh session",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "logout" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout returns 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh after logout is rejected (expected 401)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "refresh" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logged-out refresh token is rejected', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.collectionVariables.unset('accessToken');",
+                  "pm.collectionVariables.unset('refreshToken');",
+                  "pm.collectionVariables.unset('previousRefreshToken');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Optional - negative API checks",
+      "description": "These requests are independent checks and can be run manually when their collection variables are set.",
+      "item": [
+        {
+          "name": "Register duplicate email (expected 409)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "register" ]
+            },
+            "description": "Run after Register has created the account. This must not send a second verification email."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Duplicate email returns 409 Conflict', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password for unknown email (expected generic 202)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{unknownEmail}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "forgot-password" ]
+            },
+            "description": "Use an email address known not to have an account. No email is sent, and the public response should still be generic 202."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unknown email receives generic 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "  pm.expect(pm.response.json().message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Optional - resend registration verification email",
+      "description": "Run manually only while the account is still PENDING_VERIFICATION, after the 60-second resend cooldown, and before Verify Email. It sends a real email and rotates the code, so use the newest code for verification.",
+      "item": [
+        {
+          "name": "Resend email verification",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/resend-email-verification",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "auth", "resend-email-verification" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Resend succeeds with 204 after cooldown', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Optional - public JWKS",
+      "description": "Checks the public key discovery endpoint used to validate Identity access tokens.",
+      "item": [
+        {
+          "name": "Get public JWKS",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Accept", "value": "application/json" } ],
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/jwks.json",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ ".well-known", "jwks.json" ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWKS is public and exposes a key set', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.keys).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string", "description": "Local API Gateway; requests retain the Identity API path." },
+    { "key": "email", "value": "", "type": "string", "description": "Use a new reachable email for Register. The address must be unique for each complete registration run." },
+    { "key": "unknownEmail", "value": "", "type": "string", "description": "An email address known not to have an account, for the generic Forgot Password response check." },
+    { "key": "password", "value": "", "type": "string", "description": "Registration/current password; set a value matching the Identity policy." },
+    { "key": "wrongPassword", "value": "NotTheRealPassword-987!", "type": "string", "description": "Non-empty password different from `password`, for the expected 401 test." },
+    { "key": "emailVerificationCode", "value": "", "type": "string", "description": "Six-digit code from the registration verification email." },
+    { "key": "passwordResetCode", "value": "", "type": "string", "description": "Six-digit code from the password reset email." },
+    { "key": "newPassword", "value": "", "type": "string", "description": "New password for Forgot Password; use a value matching the Identity policy." },
+    { "key": "accountId", "value": "", "type": "string", "description": "Captured from Register." },
+    { "key": "accessToken", "value": "", "type": "string", "description": "Captured from Login/Refresh; treat as secret." },
+    { "key": "refreshToken", "value": "", "type": "string", "description": "Current refresh token; automatically rotated by Refresh." },
+    { "key": "previousRefreshToken", "value": "", "type": "string", "description": "Captured before rotation to test replay rejection." },
+    { "key": "resetToken", "value": "", "type": "string", "description": "Captured from OTP verification; one use, five-minute expiry." },
+    { "key": "consumedResetToken", "value": "", "type": "string", "description": "Saved before reset to test one-use rejection." }
+  ]
+}

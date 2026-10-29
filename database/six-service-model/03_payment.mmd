@@ -1,0 +1,44 @@
+erDiagram
+    %% Revised user scope: payment only; no refund capability or refund references.
+    %% Order can have multiple payment attempts; successful money movements are immutable.
+    PAYMENT_ATTEMPT {
+        uuid payment_attempt_id PK
+        uuid order_id "REF commerce.ORDER.order_id"
+        uuid customer_id "REF identity.ACCOUNT.account_id"
+        string payment_reference UK
+        string request_key "UQ with order_id"
+        string payment_method "COD or SEPAY_VIETQR"
+        bigint expected_amount_vnd "Whole VND"
+        string attempt_status
+        datetime generated_at
+        datetime expires_at "NULL for COD; online attempt is 15 minutes"
+        string provider_order_reference "NULL"
+        string provider_bank_account_reference "NULL"
+        string provider_virtual_account "NULL"
+        text qr_payload "NULL"
+        string transfer_content "NULL"
+    }
+    FINANCIAL_TRANSACTION {
+        uuid transaction_id PK
+        uuid payment_attempt_id FK, UK "Required; one settled payment per attempt"
+        bigint actual_amount_vnd "Nonnegative settled payment; immutable"
+        string provider_transaction_reference "NULL; UQ within provider when present"
+        string provider_name "NULL for manual recorded movement"
+        uuid recorded_by_user_id "REF identity.ACCOUNT.account_id; NULL for provider"
+        datetime settled_at
+    }
+    PAYMENT_EXCEPTION {
+        uuid exception_id PK
+        uuid payment_attempt_id FK "NULL when unmatched"
+        string provider_name
+        string provider_event_id "UQ with provider_name"
+        string received_reference "NULL"
+        bigint received_amount_vnd "Not credited as a successful payment"
+        string exception_reason
+        string reconciliation_status "Detailed admin workflow TBD"
+        uuid reviewed_by_user_id "REF identity.ACCOUNT.account_id; NULL"
+        datetime detected_at
+    }
+
+    PAYMENT_ATTEMPT ||--o| FINANCIAL_TRANSACTION : settles_payment
+    PAYMENT_ATTEMPT o|--o{ PAYMENT_EXCEPTION : requires_reconciliation
