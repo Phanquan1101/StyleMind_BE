@@ -2,7 +2,7 @@ package com.stylemind.identity.validation.users;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.users.ManageUserListCriteria;
+import com.stylemind.identity.dto.users.ManageUsersListRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,7 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
+import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -23,7 +23,7 @@ public class ManageUsersRequestValidator {
     private static final Set<String> ROLES = Set.of("CUSTOMER", "ADMIN");
     private static final String UUID_PATTERN = "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-    public ManageUserListCriteria listCriteria(HttpServletRequest request) {
+    public ManageUsersListRequest listCriteria(HttpServletRequest request) {
         Map<String, String[]> parameters = request.getParameterMap();
         if (!QUERY_FIELDS.containsAll(parameters.keySet())) {
             throw invalidRequest();
@@ -54,7 +54,7 @@ public class ManageUsersRequestValidator {
         if (page < 0 || size < 1 || size > 100) {
             throw invalidRequest();
         }
-        return new ManageUserListCriteria(status, role, email, page, size);
+        return new ManageUsersListRequest(status, role, email, page, size);
     }
 
     public UUID accountId(String raw) {
@@ -117,7 +117,6 @@ public class ManageUsersRequestValidator {
     }
 
     private ApiOperationException invalidRequest() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
-                "Request is missing or malformed", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is missing or malformed");
     }
 }

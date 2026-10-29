@@ -7,7 +7,7 @@ import com.stylemind.identity.client.notification.NotificationEmailClient;
 import com.stylemind.identity.client.notification.NotificationFeignClient;
 import com.stylemind.identity.client.notification.payload.EmailDispatch;
 import com.stylemind.identity.client.notification.payload.PasswordResetEmailDispatch;
-import com.stylemind.identity.errors.EmailDeliveryException;
+import com.stylemind.identity.errors.ApiOperationException;
 import feign.Feign;
 import feign.Request;
 import feign.Retryer;
@@ -45,7 +45,7 @@ class NotificationEmailClientTests {
         for (int status : new int[] {200, 204}) {
             try (HttpResponseServer server = new HttpResponseServer(status, 0)) {
                 assertThatThrownBy(() -> client(server, Duration.ofSeconds(2)).send(dispatch()))
-                        .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                        .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                             org.assertj.core.api.Assertions.assertThat(failure.status().value()).isEqualTo(504);
                             org.assertj.core.api.Assertions.assertThat(failure.code())
                                     .isEqualTo("EMAIL_DELIVERY_UNKNOWN");
@@ -65,7 +65,7 @@ class NotificationEmailClientTests {
         try (HttpResponseServer server = new HttpResponseServer(202, 600)) {
             NotificationEmailClient client = client(server, Duration.ofMillis(100));
             assertThatThrownBy(() -> client.send(dispatch()))
-                    .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                    .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                         org.assertj.core.api.Assertions.assertThat(failure.status().value()).isEqualTo(504);
                         org.assertj.core.api.Assertions.assertThat(failure.code()).isEqualTo("EMAIL_DELIVERY_UNKNOWN");
                     });
@@ -86,7 +86,7 @@ class NotificationEmailClientTests {
             try (HttpResponseServer server = new HttpResponseServer(status, 0)) {
                 assertThatThrownBy(() -> client(server, Duration.ofSeconds(2)).sendPasswordReset(
                         new PasswordResetEmailDispatch("reset@example.test", "012345")))
-                        .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                        .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                             org.assertj.core.api.Assertions.assertThat(failure.status().value()).isEqualTo(504);
                             org.assertj.core.api.Assertions.assertThat(failure.code())
                                     .isEqualTo("EMAIL_DELIVERY_UNKNOWN");
@@ -161,7 +161,7 @@ class NotificationEmailClientTests {
         try (HttpResponseServer server = new HttpResponseServer(upstreamStatus, 0)) {
             NotificationEmailClient client = client(server, readTimeout);
             assertThatThrownBy(() -> client.send(dispatch()))
-                    .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                    .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                         org.assertj.core.api.Assertions.assertThat(failure.status().value()).isEqualTo(expectedStatus);
                         org.assertj.core.api.Assertions.assertThat(failure.code()).isEqualTo(expectedCode);
                     });

@@ -3,28 +3,52 @@ package com.stylemind.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.errors.handler.ApiExceptionHandler;
+import com.stylemind.identity.logging.CorrelationIdFilter;
+import com.stylemind.identity.repository.AccountRepository;
+import com.stylemind.identity.repository.RefreshSessionRepository;
+import com.stylemind.identity.security.jwt.JwtTokenService;
+
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jwt.SignedJWT;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
-import com.stylemind.identity.errors.ApiExceptionHandler;
-import com.stylemind.identity.logging.CorrelationIdFilter;
-import com.stylemind.identity.model.login.LoginAccount;
-import com.stylemind.identity.repository.account.AccountRepository;
-import com.stylemind.identity.repository.session.RefreshSessionRepository;
-import com.stylemind.identity.entity.Account;
-import com.stylemind.identity.entity.RefreshSessionRow;
-import com.stylemind.identity.security.JwtTokenService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -34,36 +58,13 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "management.health.db.enabled=false")
 @AutoConfigureMockMvc
 @Testcontainers
+@Import(RepositoryCallHooks.ConfigurationForTests.class)
 class LoginPostgresIntegrationTests {
 
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
@@ -93,8 +94,6 @@ class LoginPostgresIntegrationTests {
     @Autowired private JwtDecoder jwtDecoder;
     @LocalServerPort private int serverPort;
 
-    @MockitoSpyBean private AccountRepository accountRepository;
-    @MockitoSpyBean private RefreshSessionRepository refreshSessionRepository;
     @MockitoSpyBean private JwtTokenService jwtTokenService;
 
     @BeforeEach
@@ -281,32 +280,38 @@ class LoginPostgresIntegrationTests {
     @Test
     void statusChangedAfterCredentialCheckIsRevalidatedUnderLock() throws Exception {
         AccountFixture account = createAccount("ACTIVE", true, "Correct account password", "CUSTOMER");
-        doAnswer(invocation -> {
-            Optional<Account> snapshot = (Optional<Account>) invocation.callRealMethod();
-            jdbcTemplate.update("UPDATE public.account SET account_status = 'LOCKED' WHERE account_id = ?",
-                    account.accountId());
-            return snapshot;
-        }).when(accountRepository).findByEmail(account.email());
-
-        postLogin(account.email(), "Correct account password")
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("accountRepository".equals(bean) && "findByEmail".equals(method.getName())
+                    && account.email().equals(arguments[0])) {
+                jdbcTemplate.update("UPDATE public.account SET account_status = 'LOCKED' WHERE account_id = ?",
+                        account.accountId());
+            }
+            return result;
+        })) {
+            postLogin(account.email(), "Correct account password")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+        }
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session", Integer.class)).isZero();
     }
 
     @Test
     void passwordHashChangedAfterCredentialCheckIsRejectedWithoutSession() throws Exception {
         AccountFixture account = createAccount("ACTIVE", true, "Original correct password", "CUSTOMER");
-        doAnswer(invocation -> {
-            Optional<Account> snapshot = (Optional<Account>) invocation.callRealMethod();
-            jdbcTemplate.update("UPDATE public.account SET password_hash = ? WHERE account_id = ?",
-                    passwordEncoder.encode("new password value"), account.accountId());
-            return snapshot;
-        }).when(accountRepository).findByEmail(account.email());
-
-        postLogin(account.email(), "Original correct password")
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("accountRepository".equals(bean) && "findByEmail".equals(method.getName())
+                    && account.email().equals(arguments[0])) {
+                jdbcTemplate.update("UPDATE public.account SET password_hash = ? WHERE account_id = ?",
+                        passwordEncoder.encode("new password value"), account.accountId());
+            }
+            return result;
+        })) {
+            postLogin(account.email(), "Original correct password")
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+        }
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session", Integer.class)).isZero();
     }
 
@@ -337,12 +342,17 @@ class LoginPostgresIntegrationTests {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session", Integer.class)).isZero();
 
         org.mockito.Mockito.reset(jwtTokenService);
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only session write failure");
-        }).when(refreshSessionRepository).saveAndFlush(any(RefreshSessionRow.class));
-        MvcResult insertFailure = postLogin(account.email(), "Correct account password")
-                .andExpect(status().isInternalServerError()).andReturn();
+        MvcResult insertFailure;
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("refreshSessionRepository".equals(bean) && "save".equals(method.getName())) {
+                throw new IllegalStateException("test-only session write failure");
+            }
+            return result;
+        })) {
+            insertFailure = postLogin(account.email(), "Correct account password")
+                    .andExpect(status().isInternalServerError()).andReturn();
+        }
         assertThat(insertFailure.getResponse().getContentAsString()).doesNotContain("access_token", "refresh_token");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session", Integer.class)).isZero();
     }

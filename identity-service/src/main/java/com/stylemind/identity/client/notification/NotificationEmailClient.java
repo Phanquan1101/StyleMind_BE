@@ -2,7 +2,8 @@ package com.stylemind.identity.client.notification;
 
 import com.stylemind.identity.client.notification.payload.EmailDispatch;
 import com.stylemind.identity.client.notification.payload.PasswordResetEmailDispatch;
-import com.stylemind.identity.errors.EmailDeliveryException;
+import com.stylemind.identity.errors.ApiOperationException;
+import com.stylemind.identity.errors.ErrorCode;
 import feign.FeignException;
 import feign.RetryableException;
 import java.nio.charset.StandardCharsets;
@@ -63,12 +64,14 @@ public class NotificationEmailClient {
         }
     }
 
-    private EmailDeliveryException failedDelivery() {
-        return new EmailDeliveryException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_DELIVERY_FAILED");
+    private ApiOperationException failedDelivery() {
+        return new ApiOperationException(ErrorCode.EMAIL_DELIVERY_FAILED,
+                "Email delivery failed with a definite rejection");
     }
 
-    private EmailDeliveryException unknownDelivery() {
-        return new EmailDeliveryException(HttpStatus.GATEWAY_TIMEOUT, "EMAIL_DELIVERY_UNKNOWN");
+    private ApiOperationException unknownDelivery() {
+        return new ApiOperationException(ErrorCode.EMAIL_DELIVERY_UNKNOWN,
+                "Email delivery could not be confirmed");
     }
 
     @FunctionalInterface
