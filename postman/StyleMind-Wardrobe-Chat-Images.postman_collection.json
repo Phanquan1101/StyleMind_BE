@@ -1,0 +1,2138 @@
+{
+  "info": {
+    "name": "StyleMind — Chat Images",
+    "description": "Private image upload/read through backend. Explicit fixture/upload/unfriend opt-ins; real cloud setup is separate. See EP06_CHAT_IMAGES_RUN_GUIDE.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "runAccountIdA",
+      "value": ""
+    },
+    {
+      "key": "runAccountIdB",
+      "value": ""
+    },
+    {
+      "key": "runAccountIdC",
+      "value": ""
+    },
+    {
+      "key": "runChatId",
+      "value": ""
+    },
+    {
+      "key": "chatFixtureValidated",
+      "value": ""
+    },
+    {
+      "key": "unfriendFixtureValidated",
+      "value": ""
+    },
+    {
+      "key": "unfriendCompleted",
+      "value": ""
+    },
+    {
+      "key": "runImageKey",
+      "value": ""
+    },
+    {
+      "key": "runImageMessageId",
+      "value": ""
+    },
+    {
+      "key": "runImageAttachmentId",
+      "value": ""
+    },
+    {
+      "key": "runImageSequence",
+      "value": ""
+    },
+    {
+      "key": "runImageMessage",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Identify dedicated accounts",
+      "item": [
+        {
+          "name": "Identify dedicated CUSTOMER A",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "cc.set(\"runImageKey\",\"\");",
+                  "cc.set(\"runImageMessageId\",\"\");",
+                  "cc.set(\"runImageAttachmentId\",\"\");",
+                  "cc.set(\"runImageMessage\",\"\");",
+                  "cc.set(\"runImageSequence\",\"\");",
+                  "cc.set(\"runAccessTokenA\", \"\");",
+                  "cc.set(\"runAccessTokenB\", \"\");",
+                  "cc.set(\"runAccessTokenC\", \"\");",
+                  "cc.set(\"runMessageKey\",\"\");",
+                  "cc.set(\"runMessageId\",\"\");",
+                  "cc.set(\"runMessageSequence\",\"\");",
+                  "cc.set(\"runSentMessage\",\"\");",
+                  "cc.set(\"runAccountIdA\", \"\");",
+                  "cc.set(\"runAccountIdB\", \"\");",
+                  "cc.set(\"runAccountIdC\", \"\");",
+                  "cc.set(\"runChatId\", \"\");",
+                  "cc.set(\"chatFixtureValidated\", \"\");",
+                  "cc.set(\"unfriendFixtureValidated\", \"\");",
+                  "cc.set(\"unfriendCompleted\", \"\");",
+                  "cc.set(\"runChatMetadataA\", \"\");",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "const id=pm.response.json().account_id;",
+                  "pm.test(\"Server returns account UUID\",()=>pm.expect(id).to.match(/^[0-9a-f-]{36}$/i));",
+                  "if (!/^[0-9a-f-]{36}$/i.test(id || \"\")) {pm.execution.setNextRequest(null);throw new Error(\"Identity preflight failed\");}",
+                  "pm.collectionVariables.set(\"runAccountIdA\",id);",
+                  "pm.collectionVariables.set(\"runAccessTokenA\",pm.request.headers.get(\"Authorization\").slice(7));",
+                  "const known=[\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)).filter(Boolean);",
+                  "if(new Set(known).size!==known.length){pm.execution.setNextRequest(null);throw new Error(\"Use three distinct dedicated accounts\");}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/identity/api/v1/me"
+          },
+          "response": []
+        },
+        {
+          "name": "Identify dedicated CUSTOMER B",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenB\") : cc.get(\"runAccessTokenB\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "const id=pm.response.json().account_id;",
+                  "pm.test(\"Server returns account UUID\",()=>pm.expect(id).to.match(/^[0-9a-f-]{36}$/i));",
+                  "if (!/^[0-9a-f-]{36}$/i.test(id || \"\")) {pm.execution.setNextRequest(null);throw new Error(\"Identity preflight failed\");}",
+                  "pm.collectionVariables.set(\"runAccountIdB\",id);",
+                  "pm.collectionVariables.set(\"runAccessTokenB\",pm.request.headers.get(\"Authorization\").slice(7));",
+                  "const known=[\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)).filter(Boolean);",
+                  "if(new Set(known).size!==known.length){pm.execution.setNextRequest(null);throw new Error(\"Use three distinct dedicated accounts\");}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/identity/api/v1/me"
+          },
+          "response": []
+        },
+        {
+          "name": "Identify dedicated CUSTOMER C",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenC\") : cc.get(\"runAccessTokenC\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "const id=pm.response.json().account_id;",
+                  "pm.test(\"Server returns account UUID\",()=>pm.expect(id).to.match(/^[0-9a-f-]{36}$/i));",
+                  "if (!/^[0-9a-f-]{36}$/i.test(id || \"\")) {pm.execution.setNextRequest(null);throw new Error(\"Identity preflight failed\");}",
+                  "pm.collectionVariables.set(\"runAccountIdC\",id);",
+                  "pm.collectionVariables.set(\"runAccessTokenC\",pm.request.headers.get(\"Authorization\").slice(7));",
+                  "const known=[\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)).filter(Boolean);",
+                  "if(new Set(known).size!==known.length){pm.execution.setNextRequest(null);throw new Error(\"Use three distinct dedicated accounts\");}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/identity/api/v1/me"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - Current friendship and session preflight (opt-in)",
+      "item": [
+        {
+          "name": "Preflight accepted A-B friendship",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.collectionVariables.set(\"chatFixtureValidated\",\"\");",
+                  "pm.collectionVariables.set(\"unfriendFixtureValidated\",\"\");",
+                  "const page=pm.response.json();",
+                  "const peer=pm.collectionVariables.get(\"runAccountIdB\");",
+                  "const active=page.items.some(row=>row.friend_account_id===peer);",
+                  "pm.test(\"A and B are current friends\",()=>pm.expect(active).to.equal(true));",
+                  "if(!active){pm.execution.setNextRequest(null);throw new Error(\"The run needs an existing accepted A/B friendship in a disposable fixture.\");}",
+                  "pm.collectionVariables.set(\"chatFixtureValidated\",JSON.stringify([\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s))));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "A opens or creates A-B session",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the current A/B accepted friendship preflight first.\");",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [201,200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.test(\"No-store response\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\"));",
+                  "function safeSession(row) {",
+                  "  pm.expect(Object.keys(row).sort()).to.eql([\"chat_session_id\",\"friend_account_id\",\"created_at\",\"updated_at\"].sort());",
+                  "  pm.expect(row.chat_session_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(row.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.created_at))).to.equal(false);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.updated_at))).to.equal(false);",
+                  "}",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Safe session resource\", () => safeSession(data));",
+                  "const fixture=JSON.stringify([\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)));",
+                  "if(pm.collectionVariables.get(\"chatFixtureValidated\")!==fixture){pm.execution.setNextRequest(null);throw new Error(\"Run the accepted friendship preflight first\");}",
+                  "pm.test(\"Peer is B\",()=>pm.expect(data.friend_account_id).to.equal(pm.collectionVariables.get(\"runAccountIdB\")));",
+                  "if(pm.response.code===201){pm.test(\"Created Location\",()=>pm.expect(pm.response.headers.get(\"Location\")).to.equal(\"/api/v1/chats/\"+data.chat_session_id));}",
+                  "pm.collectionVariables.set(\"runChatId\",data.chat_session_id);",
+                  "pm.collectionVariables.set(\"runChatMetadataA\",JSON.stringify(data));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/chats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"friend_account_id\":\"{{runAccountIdB}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Private images and payload idempotency (opt-in)",
+      "item": [
+        {
+          "name": "A sends an image-only message",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{runImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "cc.set(\"runImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=201;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "const data=pm.response.json();",
+                  "function safeMessage(row){pm.expect(Object.keys(row).sort()).to.eql([\"chat_message_id\",\"chat_session_id\",\"sender_account_id\",\"client_message_id\",\"sequence_number\",\"content\",\"created_at\",\"attachments\"].sort());row.attachments.forEach(a=>pm.expect(Object.keys(a).sort()).to.eql([\"chat_attachment_id\",\"display_order\",\"content_type\",\"size_bytes\"].sort()));}",
+                  "pm.test(\"Safe private message\",()=>{safeMessage(data);pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");});",
+                  "pm.test(\"One image and no caption\",()=>{pm.expect(data.content).to.equal(null);pm.expect(data.attachments.length).to.equal(1);});",
+                  "pm.collectionVariables.set(\"runImageMessageId\",data.chat_message_id);pm.collectionVariables.set(\"runImageSequence\",String(data.sequence_number));pm.collectionVariables.set(\"runImageAttachmentId\",data.attachments[0].chat_attachment_id);pm.collectionVariables.set(\"runImageMessage\",JSON.stringify(data));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identical multipart retry returns original",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{runImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=200;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "const data=pm.response.json();",
+                  "function safeMessage(row){pm.expect(Object.keys(row).sort()).to.eql([\"chat_message_id\",\"chat_session_id\",\"sender_account_id\",\"client_message_id\",\"sequence_number\",\"content\",\"created_at\",\"attachments\"].sort());row.attachments.forEach(a=>pm.expect(Object.keys(a).sort()).to.eql([\"chat_attachment_id\",\"display_order\",\"content_type\",\"size_bytes\"].sort()));}",
+                  "pm.test(\"Safe private message\",()=>{safeMessage(data);pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");});",
+                  "pm.test(\"Original message unchanged\",()=>pm.expect(data).to.eql(JSON.parse(pm.collectionVariables.get(\"runImageMessage\"))));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same key with changed caption conflicts",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{runImageKey}}\",\"content\":\"changed\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=409;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"IDEMPOTENCY_CONFLICT\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Text payload cannot reuse the image client key",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"client_message_id\":\"{{runImageKey}}\",\"content\":\"different mode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=409;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"IDEMPOTENCY_CONFLICT\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A reads private image",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=200;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Private PNG response\",()=>{pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/png\");pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");pm.expect(pm.response.headers.get(\"X-Content-Type-Options\")).to.equal(\"nosniff\");pm.expect(Array.from(pm.response.stream).slice(0,8)).to.eql([137,80,78,71,13,10,26,10]);});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B reads private image",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenB\") : cc.get(\"runAccessTokenB\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=200;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Private PNG response\",()=>{pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/png\");pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");pm.expect(pm.response.headers.get(\"X-Content-Type-Options\")).to.equal(\"nosniff\");pm.expect(Array.from(pm.response.stream).slice(0,8)).to.eql([137,80,78,71,13,10,26,10]);});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C cannot read A-B image",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenC\") : cc.get(\"runAccessTokenC\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Image cannot be read through a different chat",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{unknownChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C cannot upload into A-B",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{freshImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenC\") : cc.get(\"runAccessTokenC\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Five images commit as one message",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{freshImageKey}}\",\"content\":\"Five image fixture\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=201;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "const data=pm.response.json();",
+                  "function safeMessage(row){pm.expect(Object.keys(row).sort()).to.eql([\"chat_message_id\",\"chat_session_id\",\"sender_account_id\",\"client_message_id\",\"sequence_number\",\"content\",\"created_at\",\"attachments\"].sort());row.attachments.forEach(a=>pm.expect(Object.keys(a).sort()).to.eql([\"chat_attachment_id\",\"display_order\",\"content_type\",\"size_bytes\"].sort()));}",
+                  "pm.test(\"Safe private message\",()=>{safeMessage(data);pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");});",
+                  "pm.test(\"Exactly five images\",()=>pm.expect(data.attachments.length).to.equal(5));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Six images are rejected",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{freshImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=400;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"INVALID_REQUEST\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Image MIME spoof is rejected",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{freshImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/jpeg"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=400;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"INVALID_REQUEST\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Blank supplied caption is rejected",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{freshImageKey}}\",\"content\":\" \"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=400;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"INVALID_REQUEST\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Original image retry remains unchanged",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{runImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=200;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "const data=pm.response.json();",
+                  "function safeMessage(row){pm.expect(Object.keys(row).sort()).to.eql([\"chat_message_id\",\"chat_session_id\",\"sender_account_id\",\"client_message_id\",\"sequence_number\",\"content\",\"created_at\",\"attachments\"].sort());row.attachments.forEach(a=>pm.expect(Object.keys(a).sort()).to.eql([\"chat_attachment_id\",\"display_order\",\"content_type\",\"size_bytes\"].sort()));}",
+                  "pm.test(\"Safe private message\",()=>{safeMessage(data);pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\");});",
+                  "pm.test(\"Original message unchanged\",()=>pm.expect(data).to.eql(JSON.parse(pm.collectionVariables.get(\"runImageMessage\"))));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Unfriend blocks private images (separate opt-in)",
+      "item": [
+        {
+          "name": "Fresh unfriend preflight for this dedicated pair",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.collectionVariables.set(\"unfriendFixtureValidated\",\"\");",
+                  "const page=pm.response.json();",
+                  "const peer=pm.collectionVariables.get(\"runAccountIdB\");",
+                  "const active=page.items.some(row=>row.friend_account_id===peer);",
+                  "pm.test(\"A and B are current friends\",()=>pm.expect(active).to.equal(true));",
+                  "if(!active){pm.execution.setNextRequest(null);throw new Error(\"The run needs an existing accepted A/B friendship in a disposable fixture.\");}",
+                  "pm.collectionVariables.set(\"unfriendFixtureValidated\",JSON.stringify([\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)))+\"|\"+pm.collectionVariables.get(\"runChatId\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "A unfriends only verified test account B",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendFixtureValidated\") !== fixture + \"|\" + chat) stop(\"Run the fresh unfriend preflight immediately before DELETE.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [204];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.collectionVariables.set(\"unfriendFixtureValidated\",\"\");",
+                  "pm.collectionVariables.set(\"unfriendCompleted\",JSON.stringify([\"A\",\"B\",\"C\"].map(s=>pm.collectionVariables.get(\"runAccountId\"+s)))+\"|\"+pm.collectionVariables.get(\"runChatId\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{runAccountIdB}}"
+          },
+          "response": []
+        },
+        {
+          "name": "A cannot open detail after unfriend",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [404];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.test(\"Problem Details code\", () => { const p=pm.response.json(); pm.expect(p.status).to.equal(pm.response.code); pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "B cannot open detail after unfriend",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenB\") : cc.get(\"runAccessTokenB\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [404];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.test(\"Problem Details code\", () => { const p=pm.response.json(); pm.expect(p.status).to.equal(pm.response.code); pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "A no longer lists this session",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.test(\"No-store response\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\"));",
+                  "function safeSession(row) {",
+                  "  pm.expect(Object.keys(row).sort()).to.eql([\"chat_session_id\",\"friend_account_id\",\"created_at\",\"updated_at\"].sort());",
+                  "  pm.expect(row.chat_session_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(row.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.created_at))).to.equal(false);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.updated_at))).to.equal(false);",
+                  "}",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Safe stable page\", () => {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  data.items.forEach(safeSession);",
+                  "  pm.expect(data.total_elements).to.be.at.least(data.items.length);",
+                  "});",
+                  "pm.test(\"Complete list hides the retained session\",()=>{pm.expect(data.total_elements).to.be.at.most(100);pm.expect(data.items.length).to.equal(data.total_elements);pm.expect(data.items.some(r=>r.chat_session_id===pm.collectionVariables.get(\"runChatId\"))).to.equal(false);});",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/chats?size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "B no longer lists this session",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenB\") : cc.get(\"runAccessTokenB\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected = [200];",
+                  "pm.test(\"Expected HTTP status\", () => pm.expect(expected).to.include(pm.response.code));",
+                  "if (!expected.includes(pm.response.code)) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected status; stop this run and inspect locally without exporting secrets.\"); }",
+                  "pm.test(\"No-store response\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.equal(\"no-store\"));",
+                  "function safeSession(row) {",
+                  "  pm.expect(Object.keys(row).sort()).to.eql([\"chat_session_id\",\"friend_account_id\",\"created_at\",\"updated_at\"].sort());",
+                  "  pm.expect(row.chat_session_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(row.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.created_at))).to.equal(false);",
+                  "  pm.expect(Number.isNaN(Date.parse(row.updated_at))).to.equal(false);",
+                  "}",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Safe stable page\", () => {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  data.items.forEach(safeSession);",
+                  "  pm.expect(data.total_elements).to.be.at.least(data.items.length);",
+                  "});",
+                  "pm.test(\"Complete list hides the retained session\",()=>{pm.expect(data.total_elements).to.be.at.most(100);pm.expect(data.items.length).to.equal(data.total_elements);pm.expect(data.items.some(r=>r.chat_session_id===pm.collectionVariables.get(\"runChatId\"))).to.equal(false);});",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/chats?size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "A cannot read image after unfriend",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B cannot read image after unfriend",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/attachments/{{runImageAttachmentId}}/content"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenB\") : cc.get(\"runAccessTokenB\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "if(!uuid.test(cc.get(\"runImageAttachmentId\")||\"\"))stop(\"Send the image fixture first.\");",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Multipart retry cannot bypass unfriend",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/chats/{{runChatId}}/messages",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "message",
+                  "value": "{\"client_message_id\":\"{{runImageKey}}\"}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "contentType": "image/png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "function stop(message) {",
+                  "  if (pm.execution && pm.execution.setNextRequest) pm.execution.setNextRequest(null);",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "  throw new Error(message);",
+                  "}",
+                  "const cc = pm.collectionVariables;",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+                  "const ids = [\"A\",\"B\",\"C\"].map(s => cc.get(\"runAccountId\" + s));",
+                  "if (ids.some(id => !uuid.test(id || \"\")) || new Set(ids).size !== 3) stop(\"Run folder 00 to identify three distinct dedicated accounts first.\");",
+                  "const fixture = JSON.stringify(ids);",
+                  "if (pm.environment.get(\"allowChatImageTest\") !== \"true\") stop(\"Set allowChatImageTest=true only for disposable A/B test accounts.\");",
+                  "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") stop(\"Unfriend is disabled. Use only a disposable dedicated friendship.\");",
+                  "const chat = cc.get(\"runChatId\");",
+                  "if (!uuid.test(chat || \"\") || cc.get(\"chatFixtureValidated\") !== fixture) stop(\"Run the complete session preflight/open flow for these A/B/C accounts first.\");",
+                  "pm.variables.set(\"runChatId\", chat);",
+                  "if (cc.get(\"unfriendCompleted\") !== fixture + \"|\" + chat) stop(\"The dedicated unfriend step has not completed.\");",
+                  "[\"A\",\"B\",\"C\"].forEach(s => pm.variables.set(\"runAccountId\" + s, cc.get(\"runAccountId\" + s)));",
+                  "pm.variables.set(\"unknownChatId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if(!uuid.test(cc.get(\"runImageKey\")||\"\"))stop(\"Run the first text send before retrying this client key.\");",
+                  "[\"runImageKey\",\"runImageMessageId\",\"runImageSequence\"].forEach(k=>pm.variables.set(k,cc.get(k)||\"\"));",
+                  "const token = pm.info.requestName.startsWith(\"Identify dedicated CUSTOMER \") ? pm.environment.get(\"accessTokenA\") : cc.get(\"runAccessTokenA\");",
+                  "if (typeof token !== \"string\" || token.trim() === \"\") stop(\"Supply the real current access token locally. Do not export populated values.\");",
+                  "pm.request.headers.upsert({key:\"Authorization\", value:\"Bearer \" + token});",
+                  "pm.variables.set(\"runImageAttachmentId\",cc.get(\"runImageAttachmentId\")||\"\");",
+                  "const imagePath=pm.environment.get(\"imagePath\");",
+                  "if(typeof imagePath!==\"string\"||imagePath.trim()===\"\")stop(\"Set imagePath to a readable dedicated PNG fixture before uploading.\");",
+                  "pm.request.headers.remove(\"Content-Type\");",
+                  "pm.request.body.formdata.all().filter(p=>p.key===\"images\").forEach(p=>p.src=imagePath);",
+                  "pm.variables.set(\"freshImageKey\",pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const expected=404;pm.test(\"Expected HTTP status\",()=>pm.expect(pm.response.code).to.equal(expected));",
+                  "if(pm.response.code!==expected){pm.execution.setNextRequest(null);throw new Error(\"Unexpected status; stop this dedicated fixture run.\");}",
+                  "pm.test(\"Problem code\",()=>{const p=pm.response.json();pm.expect(p.status).to.equal(expected);pm.expect(p.code).to.equal(\"RESOURCE_NOT_FOUND\");});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

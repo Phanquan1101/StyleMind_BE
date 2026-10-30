@@ -28,13 +28,14 @@ public class InternalServiceTokenFilter extends OncePerRequestFilter {
             @Qualifier("internalEmailVerificationPostMatcher") RequestMatcher emailVerificationPostMatcher,
             @Qualifier("internalPasswordResetPostMatcher") RequestMatcher internalPasswordResetPostMatcher,
             @Qualifier("internalOutfitShareInvitationPostMatcher") RequestMatcher internalOutfitShareInvitationPostMatcher,
+            @Qualifier("internalFriendInvitationPostMatcher") RequestMatcher internalFriendInvitationPostMatcher,
             ObjectMapper objectMapper) {
         this.expectedToken = token.getBytes(StandardCharsets.UTF_8);
         if (expectedToken.length < 32) {
             throw new IllegalStateException("STYLEMIND_SERVICE_TOKEN must contain at least 32 bytes");
         }
         this.internalPostMatchers = List.of(emailVerificationPostMatcher, internalPasswordResetPostMatcher,
-                internalOutfitShareInvitationPostMatcher);
+                internalOutfitShareInvitationPostMatcher, internalFriendInvitationPostMatcher);
         this.objectMapper = objectMapper;
     }
 

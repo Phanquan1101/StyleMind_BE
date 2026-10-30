@@ -26,8 +26,13 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/v3/api-docs", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/ws/chat").permitAll()
                         .requestMatchers("/api/v1/me/outfits", "/api/v1/me/outfits/**").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers("/api/v1/me/shared-outfits", "/api/v1/me/shared-outfits/**").hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers("/api/v1/me/friends", "/api/v1/me/friends/**",
+                                "/api/v1/me/friend-invitations", "/api/v1/me/friend-invitations/**").hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers("/api/v1/me/chats", "/api/v1/me/chats/**",
+                                "/api/v1/chats", "/api/v1/chats/**").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/public/outfits/*").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

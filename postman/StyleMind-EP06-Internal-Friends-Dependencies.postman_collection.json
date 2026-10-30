@@ -1,0 +1,453 @@
+{
+  "info": {
+    "_postman_id": "b7f01c2b-709e-48b8-9843-20604146e0ac",
+    "name": "StyleMind — EP06 Internal Friends Dependencies",
+    "description": "Internal backend-only contract checks. Never expose service token to frontend. Dedicated local fixture and SMTP test recorder/Mailpit only. Examples contain no secrets.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "00 — Missing service token (no mail)",
+      "item": [
+        {
+          "name": "Identity missing token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(401));",
+                  "if (pm.response.code !== 401) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "",
+                  "pm.test(\"Service token required\",()=>pm.expect(pm.response.json().code).to.eql(\"INTERNAL_SERVICE_UNAUTHORIZED\"));",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_ids\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/internal/v1/accounts/email-verification-lookup",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "accounts",
+                "email-verification-lookup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Notification missing token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(401));",
+                  "if (pm.response.code !== 401) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "",
+                  "pm.test(\"Service token required\",()=>pm.expect(pm.response.json().code).to.eql(\"INTERNAL_SERVICE_UNAUTHORIZED\"));",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{notificationBaseUrl}}/internal/v1/friend-invitations",
+              "host": [
+                "{{notificationBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "friend-invitations"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 — Account verification lookup (explicit read opt-in)",
+      "item": [
+        {
+          "name": "Known fixture verification facts",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "if (String(pm.environment.get(\"allowInternalLookup\")) !== \"true\") { pm.execution.skipRequest(); throw new Error(\"Enable explicit test opt-in first\"); }",
+                  "const token = pm.environment.get(\"internalServiceToken\");",
+                  "if (!token || token.length < 32) { pm.execution.skipRequest(); throw new Error(\"Set internal service token locally\"); }",
+                  "pm.request.headers.upsert({key:\"X-StyleMind-Service-Token\",value:token});",
+                  "const id=pm.environment.get(\"fixtureAccountId\");",
+                  "if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id||\"\")) { pm.execution.skipRequest(); throw new Error(\"Set dedicated fixture account UUID\"); }",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "const data=pm.response.json(); pm.test(\"Safe verification facts\",()=>{pm.expect(data.items).to.be.an(\"array\"); data.items.forEach(item=>pm.expect(Object.keys(item).sort()).to.eql([\"account_id\",\"account_status\",\"email\",\"email_verified_at\"]));});",
+                  "",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_ids\": [\n    \"{{fixtureAccountId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/internal/v1/accounts/email-verification-lookup",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "accounts",
+                "email-verification-lookup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invalid account ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "if (String(pm.environment.get(\"allowInternalLookup\")) !== \"true\") { pm.execution.skipRequest(); throw new Error(\"Enable explicit test opt-in first\"); }",
+                  "const token = pm.environment.get(\"internalServiceToken\");",
+                  "if (!token || token.length < 32) { pm.execution.skipRequest(); throw new Error(\"Set internal service token locally\"); }",
+                  "pm.request.headers.upsert({key:\"X-StyleMind-Service-Token\",value:token});",
+                  "const id=pm.environment.get(\"fixtureAccountId\");",
+                  "if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id||\"\")) { pm.execution.skipRequest(); throw new Error(\"Set dedicated fixture account UUID\"); }",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(400));",
+                  "if (pm.response.code !== 400) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_ids\": [\n    \"invalid\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/internal/v1/accounts/email-verification-lookup",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "accounts",
+                "email-verification-lookup"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Mailpit or SMTP test only (explicit send opt-in)",
+      "item": [
+        {
+          "name": "Invalid URL cannot send",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "if (String(pm.environment.get(\"allowInternalMailTest\")) !== \"true\") { pm.execution.skipRequest(); throw new Error(\"Enable explicit test opt-in first\"); }",
+                  "const token = pm.environment.get(\"internalServiceToken\");",
+                  "if (!token || token.length < 32) { pm.execution.skipRequest(); throw new Error(\"Set internal service token locally\"); }",
+                  "pm.request.headers.upsert({key:\"X-StyleMind-Service-Token\",value:token});",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(400));",
+                  "if (pm.response.code !== 400) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientEmail\": \"friend@example.test\",\n  \"senderName\": \"Fixture Test\",\n  \"invitationUrl\": \"javascript:invalid\",\n  \"expiresAt\": \"2026-11-04T01:02:03Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{notificationBaseUrl}}/internal/v1/friend-invitations",
+              "host": [
+                "{{notificationBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "friend-invitations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "SMTP accepts friend invitation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.request.headers.remove(\"Authorization\");",
+                  "pm.request.headers.remove(\"X-StyleMind-Service-Token\");",
+                  "if (String(pm.environment.get(\"allowInternalMailTest\")) !== \"true\") { pm.execution.skipRequest(); throw new Error(\"Enable explicit test opt-in first\"); }",
+                  "const token = pm.environment.get(\"internalServiceToken\");",
+                  "if (!token || token.length < 32) { pm.execution.skipRequest(); throw new Error(\"Set internal service token locally\"); }",
+                  "pm.request.headers.upsert({key:\"X-StyleMind-Service-Token\",value:token});",
+                  "",
+                  "",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(202));",
+                  "if (pm.response.code !== 202) { pm.execution.setNextRequest(null); throw new Error(\"Stop on unexpected status\"); }",
+                  "",
+                  "",
+                  "pm.test(\"SMTP acceptance response is private\",()=>pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\"));",
+                  "",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientEmail\": \"friend@example.test\",\n  \"senderName\": \"Fixture Test\",\n  \"invitationUrl\": \"https://app.example.test/friends/invitations#test-fixture-only\",\n  \"expiresAt\": \"2026-11-04T01:02:03Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{notificationBaseUrl}}/internal/v1/friend-invitations",
+              "host": [
+                "{{notificationBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "v1",
+                "friend-invitations"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

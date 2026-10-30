@@ -28,7 +28,8 @@ public class SecurityConfiguration {
             InternalServiceTokenFilter internalServiceTokenFilter,
             @Qualifier("internalEmailVerificationPostMatcher") RequestMatcher internalEmailVerificationPostMatcher,
             @Qualifier("internalPasswordResetPostMatcher") RequestMatcher internalPasswordResetPostMatcher,
-            @Qualifier("internalOutfitShareInvitationPostMatcher") RequestMatcher internalOutfitShareInvitationPostMatcher)
+            @Qualifier("internalOutfitShareInvitationPostMatcher") RequestMatcher internalOutfitShareInvitationPostMatcher,
+            @Qualifier("internalFriendInvitationPostMatcher") RequestMatcher internalFriendInvitationPostMatcher)
             throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -39,6 +40,7 @@ public class SecurityConfiguration {
                         .requestMatchers(internalEmailVerificationPostMatcher).permitAll()
                         .requestMatchers(internalPasswordResetPostMatcher).permitAll()
                         .requestMatchers(internalOutfitShareInvitationPostMatcher).permitAll()
+                        .requestMatchers(internalFriendInvitationPostMatcher).permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
@@ -80,6 +82,16 @@ public class SecurityConfiguration {
         }
         return PathPatternRequestMatcher.withPathPatternParser(handlerMapping.getPatternParser())
                 .matcher(HttpMethod.POST, "/internal/v1/outfit-share-invitations");
+    }
+
+    @Bean("internalFriendInvitationPostMatcher")
+    RequestMatcher internalFriendInvitationPostMatcher(
+            @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping) {
+        if (handlerMapping.getPatternParser() == null) {
+            throw new IllegalStateException("Notification internal route requires Spring MVC PathPatternParser");
+        }
+        return PathPatternRequestMatcher.withPathPatternParser(handlerMapping.getPatternParser())
+                .matcher(HttpMethod.POST, "/internal/v1/friend-invitations");
     }
 
     @Bean

@@ -10,5 +10,6 @@ public record OutfitSummaryResponse(
         @JsonProperty("creation_source") String creationSource,
         @JsonProperty("item_count") long itemCount,
         @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
+        @JsonProperty("updated_at") OffsetDateTime updatedAt,
+        String visibility) {
 }

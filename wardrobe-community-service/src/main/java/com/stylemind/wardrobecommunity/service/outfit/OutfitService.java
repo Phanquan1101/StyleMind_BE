@@ -220,7 +220,7 @@ public class OutfitService {
 
     private OutfitSummaryResponse summary(Outfit outfit, long itemCount) {
         return new OutfitSummaryResponse(outfit.getOutfitId(), outfit.getName(), outfit.getCreationSource(),
-                itemCount, outfit.getCreatedAt(), outfit.getUpdatedAt());
+                itemCount, outfit.getCreatedAt(), outfit.getUpdatedAt(), outfit.getVisibility());
     }
 
     private OutfitDetailResponse detail(Outfit outfit, List<OutfitItem> rows, Map<UUID, VariantLookupItem> catalogItems) {
@@ -230,7 +230,7 @@ public class OutfitService {
                 .map(row -> itemResponse(row, catalogItems.get(row.getVariantId())))
                 .toList();
         return new OutfitDetailResponse(outfit.getOutfitId(), outfit.getName(), outfit.getCreationSource(),
-                outfit.getCreatedAt(), outfit.getUpdatedAt(), items, outfit.getPublicToken());
+                outfit.getCreatedAt(), outfit.getUpdatedAt(), items, outfit.getPublicToken(), outfit.getVisibility());
     }
 
     /** A variant Commerce no longer returns keeps its row: product fields are null and available is false. */

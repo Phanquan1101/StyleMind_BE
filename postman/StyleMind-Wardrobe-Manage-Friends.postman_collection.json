@@ -1,0 +1,1738 @@
+{
+  "info": {
+    "name": "StyleMind - EP06 Manage Friends (Task 02 A)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Verified locally 2026-10-28: 28 requests/89 assertions for list friends/outgoing/unfriend. Companion invitation collection has 10 verified requests/20 assertions across separate fixtures. Dedicated disposable accounts/SMTP only; mutation opt-in required. Read EP06_MANAGE_FRIENDS_RUN_GUIDE.md. Never log/export runtime credentials."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "runAccountIdA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "runAccountIdB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "runAccountIdC",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendsSnapshotA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendsSnapshotB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendsSnapshotC",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "unfriendFixtureValidated",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "validatedFixtureAccounts",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "snapshotCompleteA",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "snapshotCompleteB",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "snapshotCompleteC",
+      "value": "false",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Identify dedicated accounts (read only)",
+      "item": [
+        {
+          "name": "Identify A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/identity/api/v1/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.collectionVariables.unset(\"runAccountIdA\");",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Identity returns the authenticated account\", function () { pm.response.to.have.status(200); });",
+                  "const id = pm.response.json().account_id;",
+                  "pm.test(\"Account ID is present\", function () { pm.expect(id).to.match(/^[0-9a-f-]{36}$/i); });",
+                  "pm.collectionVariables.set(\"runAccountIdA\", id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identify B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/identity/api/v1/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.collectionVariables.unset(\"runAccountIdB\");",
+                  "const bearer = pm.environment.get(\"accessTokenB\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenB in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Identity returns the authenticated account\", function () { pm.response.to.have.status(200); });",
+                  "const id = pm.response.json().account_id;",
+                  "pm.test(\"Account ID is present\", function () { pm.expect(id).to.match(/^[0-9a-f-]{36}$/i); });",
+                  "pm.collectionVariables.set(\"runAccountIdB\", id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Identify C",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/identity/api/v1/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.collectionVariables.unset(\"runAccountIdC\");",
+                  "const bearer = pm.environment.get(\"accessTokenC\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenC in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Identity returns the authenticated account\", function () { pm.response.to.have.status(200); });",
+                  "const id = pm.response.json().account_id;",
+                  "pm.test(\"Account ID is present\", function () { pm.expect(id).to.match(/^[0-9a-f-]{36}$/i); });",
+                  "pm.collectionVariables.set(\"runAccountIdC\", id);",
+                  "pm.test(\"A, B and C are distinct\", function () { const ids = [\"A\",\"B\",\"C\"].map(function (a) { return pm.collectionVariables.get(\"runAccountId\" + a); }); pm.expect(ids.every(Boolean)).to.eql(true); pm.expect(new Set(ids).size).to.eql(3); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Read Friends and sent invitations",
+      "item": [
+        {
+          "name": "A - active friends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B - active friends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenB\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenB in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A - outgoing invitations only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Outgoing invitation metadata has no credential or delivery claim\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friend_invitation_id\",\"recipient_email\",\"status\",\"created_at\",\"expires_at\",\"accepted_at\"].sort());",
+                  "    pm.expect([\"PENDING\",\"ACCEPTED\",\"EXPIRED\"]).to.include(item.status);",
+                  "  });",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A - stable page size one",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=1",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Validation (no state change)",
+      "item": [
+        {
+          "name": "Friend size above 100",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?size=101",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invitation negative page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations?page=-1",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate page parameter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&page=1",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject owner query override",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?owner_id=not-an-owner-input",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject sender query override",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations?sender_account_id=not-an-owner-input",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed peer UUID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/not-a-uuid",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Authentication failures",
+      "item": [
+        {
+          "name": "No bearer - friends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No bearer - outgoing invitations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No bearer - unfriend",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/00000000-0000-0000-0000-000000000002",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed bearer is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "invalid-test-bearer",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_BEARER_TOKEN\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Unfriend dedicated fixture (explicit opt-in)",
+      "description": "Requires dedicated A-B friendship and C not linked to B. Changes only A-B. No public API can recreate the fixture yet.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "(function () {",
+              "if (pm.environment.get(\"allowUnfriendTest\") !== \"true\") { throw new Error(\"Set allowUnfriendTest=true locally only for a disposable fixture, or deselect folder 04\"); }",
+              "const ids = [\"A\",\"B\",\"C\"].map(function (actor) { return pm.collectionVariables.get(\"runAccountId\" + actor); });",
+              "if (!ids.every(Boolean) || new Set(ids).size !== 3) { throw new Error(\"Run folder 00 for three distinct dedicated accounts\"); }",
+              "const snapshotRequest = pm.info.requestName.startsWith(\"Snapshot \");",
+              "if (pm.info.requestName === \"Snapshot A and validate fixture\") {",
+              "  pm.collectionVariables.set(\"unfriendFixtureValidated\", \"false\");",
+              "  [\"A\",\"B\",\"C\"].forEach(function (a) { pm.collectionVariables.unset(\"friendsSnapshot\" + a); pm.collectionVariables.set(\"snapshotComplete\" + a, \"false\"); });",
+              "}",
+              "if (!snapshotRequest && (pm.collectionVariables.get(\"unfriendFixtureValidated\") !== \"true\" || pm.collectionVariables.get(\"validatedFixtureAccounts\") !== ids.join(\"|\"))) {",
+              "  throw new Error(\"Complete all three fixture snapshots successfully before testing unfriend\");",
+              "}",
+              "})();"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Snapshot A and validate fixture",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "pm.test(\"Complete dedicated fixture fits one page\", function () { pm.expect(data.total_elements).to.be.at.most(100); pm.expect(data.items.length).to.eql(data.total_elements); });",
+                  "pm.test(\"Required A-B friendship exists\", function () { pm.expect(data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdB\"); })).to.eql(true); });",
+                  "pm.collectionVariables.set(\"friendsSnapshotA\", JSON.stringify(normalized(data.items)));",
+                  "const complete = data.total_elements <= 100 && data.items.length === data.total_elements;",
+                  "if (!complete || !data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdB\"); })) { throw new Error(\"Required dedicated A-B fixture is missing or incomplete\"); }",
+                  "pm.collectionVariables.set(\"snapshotCompleteA\", \"true\");",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot B and validate fixture",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenB\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenB in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "pm.test(\"Complete dedicated fixture fits one page\", function () { pm.expect(data.total_elements).to.be.at.most(100); pm.expect(data.items.length).to.eql(data.total_elements); });",
+                  "pm.test(\"Required A-B friendship exists\", function () { pm.expect(data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdA\"); })).to.eql(true); });",
+                  "pm.collectionVariables.set(\"friendsSnapshotB\", JSON.stringify(normalized(data.items)));",
+                  "const complete = data.total_elements <= 100 && data.items.length === data.total_elements;",
+                  "if (!complete || !data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdA\"); })) { throw new Error(\"Required dedicated A-B fixture is missing or incomplete\"); }",
+                  "pm.collectionVariables.set(\"snapshotCompleteB\", \"true\");",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot C and validate fixture",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenC\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenC in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "pm.test(\"Complete dedicated fixture fits one page\", function () { pm.expect(data.total_elements).to.be.at.most(100); pm.expect(data.items.length).to.eql(data.total_elements); });",
+                  "pm.test(\"C is not a friend of B\", function () { pm.expect(data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdB\"); })).to.eql(false); });",
+                  "pm.collectionVariables.set(\"friendsSnapshotC\", JSON.stringify(normalized(data.items)));",
+                  "const complete = data.total_elements <= 100 && data.items.length === data.total_elements;",
+                  "if (!complete || data.items.some(function (item) { return item.friend_account_id === pm.collectionVariables.get(\"runAccountIdB\"); })) { throw new Error(\"C must not be a friend of B and the full fixture must fit one page\"); }",
+                  "pm.collectionVariables.set(\"snapshotCompleteC\", \"true\");",
+                  "if (![\"A\",\"B\",\"C\"].every(function (a) { return pm.collectionVariables.get(\"snapshotComplete\" + a) === \"true\"; })) { throw new Error(\"All fixture preflights must succeed\"); }",
+                  "pm.collectionVariables.set(\"validatedFixtureAccounts\", [\"A\",\"B\",\"C\"].map(function (a) { return pm.collectionVariables.get(\"runAccountId\" + a); }).join(\"|\"));",
+                  "pm.collectionVariables.set(\"unfriendFixtureValidated\", \"true\");",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Self-unfriend is rejected",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{selfAccountId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "",
+                  "function runId(actor) {",
+                  "  const id = pm.collectionVariables.get(\"runAccountId\" + actor);",
+                  "  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { throw new Error(\"Run folder 00 to identify account \" + actor); }",
+                  "  return id;",
+                  "}",
+                  "pm.variables.set(\"selfAccountId\", runId(\"A\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C cannot unfriend A-B",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{targetAccountId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenC\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenC in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "",
+                  "function runId(actor) {",
+                  "  const id = pm.collectionVariables.get(\"runAccountId\" + actor);",
+                  "  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { throw new Error(\"Run folder 00 to identify account \" + actor); }",
+                  "  return id;",
+                  "}",
+                  "pm.variables.set(\"targetAccountId\", runId(\"B\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"RESOURCE_NOT_FOUND\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A unchanged after C denial",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "const saved = pm.collectionVariables.get(\"friendsSnapshotA\");",
+                  "if (!saved) { throw new Error(\"Run the fixture snapshot requests first\"); }",
+                  "const baseline = JSON.parse(saved);",
+                  "const expected = baseline;",
+                  "pm.test(\"Relationship snapshot matches expected state\", function () { pm.expect(normalized(data.items)).to.eql(expected); pm.expect(data.total_elements).to.eql(expected.length); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A unfriends B",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{targetAccountId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "",
+                  "function runId(actor) {",
+                  "  const id = pm.collectionVariables.get(\"runAccountId\" + actor);",
+                  "  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { throw new Error(\"Run folder 00 to identify account \" + actor); }",
+                  "  return id;",
+                  "}",
+                  "pm.variables.set(\"targetAccountId\", runId(\"B\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Unfriend succeeded\", function () { pm.response.to.have.status(204); pm.expect(pm.response.text()).to.eql(\"\"); });",
+                  "pm.test(\"No cache\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A list after unfriend",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "const saved = pm.collectionVariables.get(\"friendsSnapshotA\");",
+                  "if (!saved) { throw new Error(\"Run the fixture snapshot requests first\"); }",
+                  "const baseline = JSON.parse(saved);",
+                  "const removedId = pm.collectionVariables.get(\"runAccountIdB\");",
+                  "const expected = baseline.filter(function (item) { return item.friend_account_id !== removedId; });",
+                  "pm.test(\"Relationship snapshot matches expected state\", function () { pm.expect(normalized(data.items)).to.eql(expected); pm.expect(data.total_elements).to.eql(expected.length); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B list after unfriend",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenB\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenB in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "const saved = pm.collectionVariables.get(\"friendsSnapshotB\");",
+                  "if (!saved) { throw new Error(\"Run the fixture snapshot requests first\"); }",
+                  "const baseline = JSON.parse(saved);",
+                  "const removedId = pm.collectionVariables.get(\"runAccountIdA\");",
+                  "const expected = baseline.filter(function (item) { return item.friend_account_id !== removedId; });",
+                  "pm.test(\"Relationship snapshot matches expected state\", function () { pm.expect(normalized(data.items)).to.eql(expected); pm.expect(data.total_elements).to.eql(expected.length); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C list after unfriend",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends?page=0&size=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenC\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenC in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Private response is not cached\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"); });",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Page envelope is consistent\", function () {",
+                  "  pm.expect(Object.keys(data).sort()).to.eql([\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"].sort());",
+                  "  pm.expect(data.items).to.be.an(\"array\");",
+                  "  pm.expect(data.page).to.be.at.least(0);",
+                  "  pm.expect(data.size).to.be.within(1,100);",
+                  "  pm.expect(data.items.length).to.be.at.most(data.size);",
+                  "  pm.expect(data.total_pages).to.eql(Math.ceil(data.total_elements / data.size));",
+                  "});",
+                  "",
+                  "pm.test(\"Only safe friend fields are returned\", function () {",
+                  "  data.items.forEach(function (item) {",
+                  "    pm.expect(Object.keys(item).sort()).to.eql([\"friendship_id\",\"friend_account_id\",\"display_name\",\"established_at\"].sort());",
+                  "    pm.expect(item.friend_account_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(item.display_name === null || typeof item.display_name === \"string\").to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "function normalized(items) { return items.map(function (item) { return {friendship_id:item.friendship_id,friend_account_id:item.friend_account_id,established_at:item.established_at}; }).sort(function (a,b) { return a.friendship_id.localeCompare(b.friendship_id); }); }",
+                  "",
+                  "const saved = pm.collectionVariables.get(\"friendsSnapshotC\");",
+                  "if (!saved) { throw new Error(\"Run the fixture snapshot requests first\"); }",
+                  "const baseline = JSON.parse(saved);",
+                  "const expected = baseline;",
+                  "pm.test(\"Relationship snapshot matches expected state\", function () { pm.expect(normalized(data.items)).to.eql(expected); pm.expect(data.total_elements).to.eql(expected.length); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repeated unfriend returns not found",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{targetAccountId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{runtimeBearer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "const bearer = pm.environment.get(\"accessTokenA\");",
+                  "if (!bearer) { throw new Error(\"Set accessTokenA in local environment Current Value\"); }",
+                  "pm.variables.set(\"runtimeBearer\", bearer);",
+                  "",
+                  "function runId(actor) {",
+                  "  const id = pm.collectionVariables.get(\"runAccountId\" + actor);",
+                  "  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) { throw new Error(\"Run folder 00 to identify account \" + actor); }",
+                  "  return id;",
+                  "}",
+                  "pm.variables.set(\"targetAccountId\", runId(\"B\"));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "pm.test(\"Expected HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Expected Problem Details code\", function () { pm.expect(pm.response.json().code).to.eql(\"RESOURCE_NOT_FOUND\"); });",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

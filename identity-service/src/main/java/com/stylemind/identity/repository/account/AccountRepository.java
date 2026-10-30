@@ -30,6 +30,25 @@ public interface AccountRepository extends JpaRepository<Account, UUID>, JpaSpec
 
     List<Account> findByAccountIdIn(Collection<UUID> accountIds);
 
+    /** Current verification facts, including accounts with no UserProfile; no password fields selected. */
+    @Query("""
+            select new com.stylemind.identity.model.internal.AccountEmailVerificationSnapshot(
+                a.accountId, a.email, a.accountStatus, a.emailVerifiedAt)
+            from Account a
+            where a.accountId in :accountIds
+            order by a.accountId
+            """)
+    List<com.stylemind.identity.model.internal.AccountEmailVerificationSnapshot> findEmailVerificationFacts(
+            @Param("accountIds") Collection<UUID> accountIds);
+
+    @Query("""
+            select new com.stylemind.identity.model.internal.AccountEmailVerificationSnapshot(
+                a.accountId, a.email, a.accountStatus, a.emailVerifiedAt)
+            from Account a where a.email = :email
+            """)
+    List<com.stylemind.identity.model.internal.AccountEmailVerificationSnapshot> findEmailVerificationFactsByEmail(
+            @Param("email") String email);
+
     /** Rows of (account_id, email, display_name, account_status) for the internal batch lookup. */
     @Query("""
             select a.accountId, a.email, p.displayName, a.accountStatus

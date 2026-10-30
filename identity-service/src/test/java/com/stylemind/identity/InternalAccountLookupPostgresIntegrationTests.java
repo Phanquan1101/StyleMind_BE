@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = "management.health.db.enabled=false")
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 @Testcontainers
 class InternalAccountLookupPostgresIntegrationTests {
 
@@ -129,6 +129,111 @@ class InternalAccountLookupPostgresIntegrationTests {
     private JsonNode items(String body) throws Exception {
         return mapper.readTree(internal(body).andExpect(status().isOk()).andReturn().getResponse()
                 .getContentAsByteArray()).path("items");
+    }
+
+    @Test
+    void verificationLookupIncludesAccountsWithoutAProfileAndDoesNotInferVerificationFromActive() throws Exception {
+        jdbc.update("DELETE FROM public.user_profile WHERE account_id IN (?, ?)", activeId, pendingId);
+        JsonNode facts = verificationItems(body(activeId, pendingId));
+        assertThat(facts).hasSize(2);
+        assertThat(find(facts, activeId).path("email_verified_at").isNull()).isTrue();
+        assertThat(find(facts, activeId).path("account_status").asText()).isEqualTo("ACTIVE");
+        assertThat(find(facts, pendingId).path("email_verified_at").isNull()).isTrue();
+        // Existing four-field directory contract and join semantics remain unchanged.
+        assertThat(items(body(activeId, pendingId))).isEmpty();
+    }
+
+    @Test
+    void verificationFactsTrackCurrentEmailTimestampAndStatusWithoutSensitiveFields() throws Exception {
+        OffsetDateTime verified = OffsetDateTime.parse("2026-10-28T01:02:03Z");
+        jdbc.update("UPDATE public.account SET email_verified_at = ?, email = ?, account_status = ? WHERE account_id = ?",
+                verified, "current@example.test", "SUSPENDED", activeId);
+        JsonNode item = find(verificationItems(body(activeId)), activeId);
+        assertThat(item.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "account_id", "email", "account_status", "email_verified_at");
+        assertThat(item.path("email").asText()).isEqualTo("current@example.test");
+        assertThat(item.path("account_status").asText()).isEqualTo("SUSPENDED");
+        assertThat(OffsetDateTime.parse(item.path("email_verified_at").asText()).toInstant()).isEqualTo(verified.toInstant());
+        assertThat(item.toString()).doesNotContain("password", "roles", "token", "display_name");
+    }
+
+    @Test
+    void verificationLookupSkipsUnknownCollapsesDuplicatesAndDoesNotMutateAccountOrProfile() throws Exception {
+        var before = jdbc.queryForMap("SELECT * FROM public.account WHERE account_id = ?", activeId);
+        assertThat(verificationItems(body(activeId, activeId, UUID.randomUUID()))).hasSize(1);
+        assertThat(verificationItems(body(UUID.randomUUID()))).isEmpty();
+        assertThat(jdbc.queryForMap("SELECT * FROM public.account WHERE account_id = ?", activeId)).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.user_profile", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void verificationLookupRequiresServiceTokenAndRejectsMalformedRequests() throws Exception {
+        String path = "/internal/v1/accounts/email-verification-lookup";
+        for (String token : List.of("", "wrong-internal-token")) {
+            perform(post(path).header(TOKEN_HEADER, token), body(activeId)).andExpect(status().isUnauthorized());
+        }
+        for (String invalid : List.of("{}", "null", "{", "{\"account_ids\":[]}", "{\"account_ids\":[null]}",
+                "{\"account_ids\":[\"invalid\"]}")) {
+            perform(post(path).header(TOKEN_HEADER, SERVICE_TOKEN), invalid).andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void verificationFactsAndDtoStringsDoNotExposeEmailInDiagnostics() {
+        var facts = new com.stylemind.identity.dto.internal.AccountEmailVerificationItem(
+                activeId, "private@example.test", "ACTIVE", null);
+        var snapshot = new com.stylemind.identity.model.internal.AccountEmailVerificationSnapshot(
+                activeId, "private@example.test", "ACTIVE", null);
+        assertThat(facts.toString()).doesNotContain("private@example.test");
+        assertThat(snapshot.toString()).doesNotContain("private@example.test");
+    }
+
+    private JsonNode verificationItems(String body) throws Exception {
+        var result = perform(post("/internal/v1/accounts/email-verification-lookup")
+                .header(TOKEN_HEADER, SERVICE_TOKEN), body).andExpect(status().isOk()).andReturn();
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+        return mapper.readTree(result.getResponse().getContentAsByteArray()).path("items");
+    }
+
+    @Test
+    void byEmailLookupUsesCurrentNormalizedFactsWithoutAProfile() throws Exception {
+        jdbc.update("DELETE FROM public.user_profile WHERE account_id = ?", activeId);
+        jdbc.update("UPDATE public.account SET email = 'new-email@example.test', email_verified_at = ? WHERE account_id = ?",
+                OffsetDateTime.parse("2026-10-28T01:00:00Z"), activeId);
+        var before = jdbc.queryForMap("SELECT * FROM public.account WHERE account_id = ?", activeId);
+        var result = perform(post("/internal/v1/accounts/email-verification-lookup-by-email")
+                .header(TOKEN_HEADER, SERVICE_TOKEN), "{\"email\":\" NEW-EMAIL@EXAMPLE.TEST \"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].account_id").value(activeId.toString()))
+                .andExpect(jsonPath("$.items[0].email_verified_at").isNotEmpty()).andReturn();
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+        var item = mapper.readTree(result.getResponse().getContentAsByteArray()).path("items").get(0);
+        assertThat(item.fieldNames()).toIterable().containsExactlyInAnyOrder("account_id", "email", "account_status", "email_verified_at");
+        assertThat(jdbc.queryForMap("SELECT * FROM public.account WHERE account_id = ?", activeId)).isEqualTo(before);
+    }
+
+    @Test
+    void byEmailLookupReturnsUnknownOrUnverifiedWithoutInventingAccountFacts() throws Exception {
+        String path = "/internal/v1/accounts/email-verification-lookup-by-email";
+        perform(post(path).header(TOKEN_HEADER, SERVICE_TOKEN), "{\"email\":\"unknown@example.test\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+        String email = jdbc.queryForObject("SELECT email FROM public.account WHERE account_id = ?", String.class, pendingId);
+        perform(post(path).header(TOKEN_HEADER, SERVICE_TOKEN), mapper.writeValueAsString(Map.of("email", email)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].account_status").value("PENDING_VERIFICATION"))
+                .andExpect(jsonPath("$.items[0].email_verified_at").isEmpty());
+    }
+
+    @Test
+    void byEmailLookupRequiresServiceTokenAndStrictSingleEmailJson() throws Exception {
+        String path = "/internal/v1/accounts/email-verification-lookup-by-email";
+        perform(post(path), "{\"email\":\"a@example.test\"}").andExpect(status().isUnauthorized());
+        perform(post(path).header(TOKEN_HEADER,"wrong-internal-token"), "{\"email\":\"a@example.test\"}")
+                .andExpect(status().isUnauthorized());
+        for (String body : List.of("{}", "null", "[]", "{\"email\":null}", "{\"email\":12}", "{\"email\":\"invalid\"}",
+                "{\"email\":\"a@example.test\",\"account_ids\":[]}",
+                "{\"email\":\"a@example.test\",\"email\":\"b@example.test\"}", "{\"email\":\"a@example.test\"} {}")) {
+            perform(post(path).header(TOKEN_HEADER, SERVICE_TOKEN), body).andExpect(status().isBadRequest());
+        }
     }
 
     private ResultActions internal(String body) throws Exception {
