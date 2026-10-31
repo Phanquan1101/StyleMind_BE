@@ -67,14 +67,10 @@ public class BranchServiceImpl implements BranchService {
 
     @Transactional
     public void delete(UUID branchId) {
-        try {
-            if (!repository.existsById(branchId)) {
-                throw notFound();
-            }
-            repository.deleteById(branchId);
-        } catch (DataIntegrityViolationException exception) {
-            throw new ApiOperationException(HttpStatus.CONFLICT, "BRANCH_IN_USE",
-                    "Branch is used by existing data");
+        Branch branch = repository.findById(branchId).orElseThrow(this::notFound);
+        if (!"INACTIVE".equals(branch.getBranchStatus())) {
+            branch.setBranchStatus("INACTIVE");
+            repository.saveAndFlush(branch);
         }
     }
 

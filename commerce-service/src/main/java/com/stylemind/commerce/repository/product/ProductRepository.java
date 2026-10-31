@@ -16,6 +16,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query(value = """
             select p from Product p
             where p.productStatus = 'ACTIVE'
+              and exists (select c.categoryId from Category c where c.categoryId = p.categoryId and c.active = true)
+              and exists (select b.brandId from Brand b where b.brandId = p.brandId and b.active = true)
               and (:keyword is null or lower(p.name) like :keyword or lower(coalesce(p.description, '')) like :keyword)
               and (:categoryId is null or p.categoryId = :categoryId)
               and (:demographic is null or p.demographicSegment = :demographic)
@@ -25,6 +27,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             countQuery = """
             select count(p) from Product p
             where p.productStatus = 'ACTIVE'
+              and exists (select c.categoryId from Category c where c.categoryId = p.categoryId and c.active = true)
+              and exists (select b.brandId from Brand b where b.brandId = p.brandId and b.active = true)
               and (:keyword is null or lower(p.name) like :keyword or lower(coalesce(p.description, '')) like :keyword)
               and (:categoryId is null or p.categoryId = :categoryId)
               and (:demographic is null or p.demographicSegment = :demographic)

@@ -68,12 +68,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Transactional
     public void deleteProduct(UUID productId) {
-        try {
-            Product product = products.findById(productId).orElseThrow(this::notFound);
-            products.delete(product);
-            products.flush();
-        } catch (DataIntegrityViolationException exception) {
-            throw conflict("PRODUCT_IN_USE", "Product is used by one or more variants or orders");
+        Product product = products.findById(productId).orElseThrow(this::notFound);
+        if (!"INACTIVE".equals(product.getProductStatus())) {
+            product.setProductStatus("INACTIVE");
+            products.saveAndFlush(product);
         }
     }
 
@@ -133,8 +131,10 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public void deleteVariant(UUID variantId) {
         ProductVariant variant = variants.findById(variantId).orElseThrow(this::notFound);
-        variants.delete(variant);
-        variants.flush();
+        if (!"INACTIVE".equals(variant.getVariantStatus())) {
+            variant.setVariantStatus("INACTIVE");
+            variants.saveAndFlush(variant);
+        }
     }
 
     @Transactional(readOnly = true)

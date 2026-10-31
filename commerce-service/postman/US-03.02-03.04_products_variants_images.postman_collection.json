@@ -53,7 +53,7 @@
           }
         },
         {
-          "name": "Delete Product",
+          "name": "Soft-delete Product (sets product_status=INACTIVE)",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"}
         }
       ]
@@ -98,7 +98,7 @@
           }
         },
         {
-          "name": "Delete Variant",
+          "name": "Soft-delete Variant (sets variant_status=INACTIVE)",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}"}
         }
       ]
@@ -145,7 +145,24 @@
               ]
             },
             "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}/images"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cloudinary image was created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.image_url).to.match(/^https:\\/\\//);",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql(body.image_url);",
+                  "  pm.collectionVariables.set('imageId', body.image_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Reorder Images",
@@ -160,7 +177,7 @@
           }
         },
         {
-          "name": "Delete Image",
+          "name": "Permanently Delete Image Metadata and Cloudinary Asset",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variant-images/{{imageId}}"}
         }
       ]

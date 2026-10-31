@@ -2,7 +2,7 @@
   "info": {
     "name": "StyleMind Commerce US-03.01 Categories and Brands",
     "_postman_id": "2b62d79f-0c5a-4e3b-bd86-0a706a3d7b28",
-    "description": "Importable requests for Commerce Category and Brand CRUD. Set baseUrl to the Gateway or local commerce-service URL and bearerToken to an ADMIN JWT for admin routes.",
+    "description": "Importable requests for Commerce Category and Brand CRUD with soft-delete. Public reads return active records; Admin reads include inactive records.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -84,6 +84,14 @@
           }
         },
         {
+          "name": "Admin List Categories Including Inactive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/categories"
+          }
+        },
+        {
           "name": "Get Category",
           "request": {
             "method": "GET",
@@ -100,6 +108,14 @@
                 "{{categoryId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "Admin Get Category Including Inactive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/categories/{{categoryId}}"
           }
         },
         {
@@ -132,7 +148,7 @@
           }
         },
         {
-          "name": "Delete Category (ADMIN)",
+          "name": "Soft-delete Category (ADMIN, sets is_active=false)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -231,6 +247,14 @@
           }
         },
         {
+          "name": "Admin List Brands Including Inactive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/brands"
+          }
+        },
+        {
           "name": "Get Brand",
           "request": {
             "method": "GET",
@@ -247,6 +271,14 @@
                 "{{brandId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "Admin Get Brand Including Inactive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/brands/{{brandId}}"
           }
         },
         {
@@ -279,7 +311,7 @@
           }
         },
         {
-          "name": "Delete Brand (ADMIN)",
+          "name": "Soft-delete Brand (ADMIN, sets is_active=false)",
           "request": {
             "method": "DELETE",
             "header": [],

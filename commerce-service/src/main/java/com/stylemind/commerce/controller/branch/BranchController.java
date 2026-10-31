@@ -67,7 +67,7 @@ public class BranchController {
     }
 
     @DeleteMapping("/api/v1/admin/branches/{branchId}")
-    @Operation(summary = "Delete branch (ADMIN only)")
+    @Operation(summary = "Soft-delete branch by marking it inactive (ADMIN only)")
     public ResponseEntity<Void> delete(@PathVariable String branchId) {
         service.delete(validator.pathId(branchId));
         return ResponseEntity.noContent().build();
