@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.stylemind.commerce.client.payment.OrderPaymentRequest;
 import com.stylemind.commerce.client.payment.PaymentClient;
-import com.stylemind.commerce.service.order.OrderPaymentHandoff;
+import com.stylemind.commerce.service.order.impl.OrderPaymentHandoffImpl;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -68,7 +68,7 @@ class OrderPaymentHandoffTests {
     @EnableTransactionManagement
     static class Config {
         @Bean PaymentClient client() { return mock(PaymentClient.class); }
-        @Bean OrderPaymentHandoff listener(PaymentClient client) { return new OrderPaymentHandoff(client, mock(com.stylemind.commerce.service.order.CodOrderConfirmationService.class)); }
+        @Bean OrderPaymentHandoffImpl listener(PaymentClient client) { return new OrderPaymentHandoffImpl(client, mock(com.stylemind.commerce.service.order.CodOrderConfirmationService.class)); }
         @Bean TestTransactions transactionManager() { return new TestTransactions(); }
     }
 
