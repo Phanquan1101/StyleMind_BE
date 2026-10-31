@@ -88,7 +88,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/products/{productId}")
-    @Operation(summary = "Delete product (ADMIN only)")
+    @Operation(summary = "Soft-delete product by marking it inactive (ADMIN only)")
     public ResponseEntity<Void> deleteProduct(@PathVariable String productId) {
         productService.deleteProduct(validator.pathId(productId));
         return ResponseEntity.noContent().build();
@@ -111,7 +111,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/variants/{variantId}")
-    @Operation(summary = "Delete product variant (ADMIN only)")
+    @Operation(summary = "Soft-delete product variant by marking it inactive (ADMIN only)")
     public ResponseEntity<Void> deleteVariant(@PathVariable String variantId) {
         productService.deleteVariant(validator.pathId(variantId));
         return ResponseEntity.noContent().build();
@@ -119,7 +119,7 @@ public class ProductController {
 
     @PostMapping(path = "/api/v1/admin/variants/{variantId}/images",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Upload variant image to local Commerce storage (ADMIN only)",
+    @Operation(summary = "Upload variant image to Cloudinary (ADMIN only)",
             responses = {
                     @ApiResponse(responseCode = "201", description = "Image metadata created"),
                     @ApiResponse(responseCode = "400", description = "Invalid image file"),
@@ -146,14 +146,14 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/variant-images/{imageId}")
-    @Operation(summary = "Delete variant image (ADMIN only)")
+    @Operation(summary = "Permanently delete variant image metadata and Cloudinary asset (ADMIN only)")
     public ResponseEntity<Void> deleteImage(@PathVariable String imageId) {
         productService.deleteImage(validator.pathId(imageId));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/v1/variant-images/{imageId}/content")
-    @Operation(summary = "Read locally stored variant image content")
+    @Operation(summary = "Read legacy locally stored variant image content")
     public ResponseEntity<Resource> imageContent(@PathVariable String imageId) {
         UUID id = validator.pathId(imageId);
         Resource resource = imageStorage.load(id).orElseThrow(() ->

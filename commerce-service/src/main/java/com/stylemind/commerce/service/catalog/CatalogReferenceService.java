@@ -12,6 +12,10 @@ public interface CatalogReferenceService {
 
     CatalogReferenceResponse get(CatalogReferenceType type, UUID id);
 
+    CatalogReferenceListResponse listAdmin(CatalogReferenceType type);
+
+    CatalogReferenceResponse getAdmin(CatalogReferenceType type, UUID id);
+
     CatalogReferenceResponse create(CatalogReferenceType type, CatalogReferenceRequest command);
 
     CatalogReferenceResponse replace(CatalogReferenceType type, UUID id, CatalogReferenceRequest command);

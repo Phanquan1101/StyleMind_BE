@@ -27,12 +27,27 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
     @Transactional(readOnly = true)
     public CatalogReferenceListResponse list(CatalogReferenceType type) {
         return new CatalogReferenceListResponse(type == CatalogReferenceType.CATEGORY
+                ? categories.findAllByActiveTrueOrderByNameAscCategoryIdAsc().stream().map(this::response).toList()
+                : brands.findAllByActiveTrueOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
+    }
+
+    @Transactional(readOnly = true)
+    public CatalogReferenceResponse get(CatalogReferenceType type, UUID id) {
+        if (type == CatalogReferenceType.CATEGORY) {
+            return categories.findByCategoryIdAndActiveTrue(id).map(this::response).orElseThrow(this::notFound);
+        }
+        return brands.findByBrandIdAndActiveTrue(id).map(this::response).orElseThrow(this::notFound);
+    }
+
+    @Transactional(readOnly = true)
+    public CatalogReferenceListResponse listAdmin(CatalogReferenceType type) {
+        return new CatalogReferenceListResponse(type == CatalogReferenceType.CATEGORY
                 ? categories.findAllByOrderByNameAscCategoryIdAsc().stream().map(this::response).toList()
                 : brands.findAllByOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
-    public CatalogReferenceResponse get(CatalogReferenceType type, UUID id) {
+    public CatalogReferenceResponse getAdmin(CatalogReferenceType type, UUID id) {
         if (type == CatalogReferenceType.CATEGORY) {
             return categories.findById(id).map(this::response).orElseThrow(this::notFound);
         }
@@ -69,15 +84,19 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
 
     @Transactional
     public void delete(CatalogReferenceType type, UUID id) {
-        boolean exists = type == CatalogReferenceType.CATEGORY ? categories.existsById(id) : brands.existsById(id);
-        if (!exists) {
-            throw notFound();
+        if (type == CatalogReferenceType.CATEGORY) {
+            Category entity = categories.findById(id).orElseThrow(this::notFound);
+            if (entity.isActive()) {
+                entity.setActive(false);
+                categories.saveAndFlush(entity);
+            }
+            return;
         }
-        if (type == CatalogReferenceType.CATEGORY ? categories.isReferenced(id) : brands.isReferenced(id)) {
-            throw new ApiOperationException(HttpStatus.CONFLICT, "CATALOG_REFERENCE_IN_USE",
-                    "Catalog reference is used by one or more products");
+        Brand entity = brands.findById(id).orElseThrow(this::notFound);
+        if (entity.isActive()) {
+            entity.setActive(false);
+            brands.saveAndFlush(entity);
         }
-        if (type == CatalogReferenceType.CATEGORY) categories.deleteById(id); else brands.deleteById(id);
     }
 
     private void apply(Category entity, CatalogReferenceRequest request) {

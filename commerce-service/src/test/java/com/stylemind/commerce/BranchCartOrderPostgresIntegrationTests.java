@@ -154,6 +154,21 @@ class BranchCartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.branch_status").value("INACTIVE"));
+        mockMvc.perform(put("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(branchBody("HN01", "ACTIVE")))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT branch_status FROM public.branch WHERE branch_id = ?",
+                String.class, branchId)).isEqualTo("INACTIVE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.branch WHERE branch_id = ?",
+                Integer.class, branchId)).isEqualTo(1);
     }
 
     @Test

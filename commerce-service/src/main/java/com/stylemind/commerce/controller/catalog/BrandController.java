@@ -55,6 +55,18 @@ public class BrandController {
         return service.get(CatalogReferenceType.BRAND, id(brandId));
     }
 
+    @GetMapping(path = "/api/v1/admin/brands", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List brands including soft-deleted brands (ADMIN only)")
+    public CatalogReferenceListResponse listAdmin() {
+        return service.listAdmin(CatalogReferenceType.BRAND);
+    }
+
+    @GetMapping(path = "/api/v1/admin/brands/{brandId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get brand including a soft-deleted brand (ADMIN only)")
+    public CatalogReferenceResponse getAdmin(@PathVariable String brandId) {
+        return service.getAdmin(CatalogReferenceType.BRAND, id(brandId));
+    }
+
     @PostMapping(path = "/api/v1/admin/brands", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Create brand (ADMIN only)",
@@ -87,14 +99,13 @@ public class BrandController {
     }
 
     @DeleteMapping("/api/v1/admin/brands/{brandId}")
-    @Operation(summary = "Delete brand (ADMIN only)",
+    @Operation(summary = "Soft-delete brand by marking it inactive (ADMIN only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Brand deleted"),
+                    @ApiResponse(responseCode = "204", description = "Brand marked inactive"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
                     @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "403", description = "ADMIN role required"),
-                    @ApiResponse(responseCode = "404", description = "Brand not found"),
-                    @ApiResponse(responseCode = "409", description = "Brand is referenced by products")
+                    @ApiResponse(responseCode = "404", description = "Brand not found")
             })
     public ResponseEntity<Void> delete(@PathVariable String brandId) {
         service.delete(CatalogReferenceType.BRAND, id(brandId));

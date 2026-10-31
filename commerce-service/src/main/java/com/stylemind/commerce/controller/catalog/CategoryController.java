@@ -56,6 +56,18 @@ public class CategoryController {
         return service.get(CatalogReferenceType.CATEGORY, id(categoryId));
     }
 
+    @GetMapping(path = "/api/v1/admin/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List categories including soft-deleted categories (ADMIN only)")
+    public CatalogReferenceListResponse listAdmin() {
+        return service.listAdmin(CatalogReferenceType.CATEGORY);
+    }
+
+    @GetMapping(path = "/api/v1/admin/categories/{categoryId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get category including a soft-deleted category (ADMIN only)")
+    public CatalogReferenceResponse getAdmin(@PathVariable String categoryId) {
+        return service.getAdmin(CatalogReferenceType.CATEGORY, id(categoryId));
+    }
+
     @PostMapping(path = "/api/v1/admin/categories", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Create category (ADMIN only)",
@@ -88,14 +100,13 @@ public class CategoryController {
     }
 
     @DeleteMapping("/api/v1/admin/categories/{categoryId}")
-    @Operation(summary = "Delete category (ADMIN only)",
+    @Operation(summary = "Soft-delete category by marking it inactive (ADMIN only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Category deleted"),
+                    @ApiResponse(responseCode = "204", description = "Category marked inactive"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
                     @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "403", description = "ADMIN role required"),
-                    @ApiResponse(responseCode = "404", description = "Category not found"),
-                    @ApiResponse(responseCode = "409", description = "Category is referenced by products")
+                    @ApiResponse(responseCode = "404", description = "Category not found")
             })
     public ResponseEntity<Void> delete(@PathVariable String categoryId) {
         service.delete(CatalogReferenceType.CATEGORY, id(categoryId));

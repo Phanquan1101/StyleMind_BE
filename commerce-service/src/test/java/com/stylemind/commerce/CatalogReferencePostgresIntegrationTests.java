@@ -103,13 +103,34 @@ class CatalogReferencePostgresIntegrationTests {
         mockMvc.perform(put("/api/v1/admin/categories/{id}", categoryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Outerwear\",\"slug\":\"outerwear\",\"is_active\":false}"))
+                        .content("{\"name\":\"Outerwear\",\"slug\":\"outerwear\",\"is_active\":true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("outerwear"))
-                .andExpect(jsonPath("$.is_active").value(false));
+                .andExpect(jsonPath("$.is_active").value(true));
         mockMvc.perform(delete("/api/v1/admin/categories/{id}", categoryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/categories/{id}", categoryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/categories/{id}", categoryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/categories/{id}", categoryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.is_active").value(false));
+        mockMvc.perform(get("/api/v1/categories")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+        mockMvc.perform(get("/api/v1/admin/categories")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(categoryId.toString()))
+                .andExpect(jsonPath("$.items[0].is_active").value(false));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.category WHERE category_id = ?",
+                Integer.class, categoryId)).isEqualTo(1);
 
         JsonNode brand = create("/api/v1/admin/brands",
                 "{\"name\":\"StyleMind\",\"slug\":\"stylemind\",\"is_active\":true}");
@@ -121,6 +142,13 @@ class CatalogReferencePostgresIntegrationTests {
         mockMvc.perform(delete("/api/v1/admin/brands/{id}", brandId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/brands/{id}", brandId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/brands/{id}", brandId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.is_active").value(false));
     }
 
     @Test
@@ -134,6 +162,10 @@ class CatalogReferencePostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Tops\",\"slug\":\"tops\",\"is_active\":true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mockMvc.perform(get("/api/v1/admin/categories")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.category", Integer.class)).isZero();
@@ -182,7 +214,7 @@ class CatalogReferencePostgresIntegrationTests {
     }
 
     @Test
-    void referencedCategoryAndBrandCannotBeDeleted() throws Exception {
+    void referencedCategoryAndBrandAreSoftDeletedAndHideTheirProduct() throws Exception {
         JsonNode category = create("/api/v1/admin/categories",
                 "{\"name\":\"Dresses\",\"slug\":\"dresses\",\"is_active\":true}");
         JsonNode brand = create("/api/v1/admin/brands",
@@ -197,12 +229,19 @@ class CatalogReferencePostgresIntegrationTests {
 
         mockMvc.perform(delete("/api/v1/admin/categories/{id}", categoryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("CATALOG_REFERENCE_IN_USE"));
+                .andExpect(status().isNoContent());
         mockMvc.perform(delete("/api/v1/admin/brands/{id}", brandId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("CATALOG_REFERENCE_IN_USE"));
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT is_active FROM public.category WHERE category_id = ?",
+                Boolean.class, categoryId)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT is_active FROM public.brand WHERE brand_id = ?",
+                Boolean.class, brandId)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.product", Integer.class)).isEqualTo(1);
+        mockMvc.perform(get("/api/v1/products")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test
@@ -213,7 +252,9 @@ class CatalogReferencePostgresIntegrationTests {
         JsonNode paths = objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("paths");
         assertThat(paths.path("/api/v1/categories").has("get")).isTrue();
         assertThat(paths.path("/api/v1/admin/categories").has("post")).isTrue();
+        assertThat(paths.path("/api/v1/admin/categories").has("get")).isTrue();
         assertThat(paths.path("/api/v1/admin/categories/{categoryId}").has("put")).isTrue();
+        assertThat(paths.path("/api/v1/admin/categories/{categoryId}").has("get")).isTrue();
         assertThat(paths.path("/api/v1/admin/categories/{categoryId}").has("delete")).isTrue();
         assertThat(paths.path("/api/v1/brands").has("get")).isTrue();
         assertThat(paths.path("/api/v1/admin/brands").has("post")).isTrue();
