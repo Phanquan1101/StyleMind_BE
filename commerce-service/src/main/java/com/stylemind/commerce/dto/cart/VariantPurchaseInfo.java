@@ -11,5 +11,6 @@ public record VariantPurchaseInfo(
         String size,
         String material,
         long unitPriceVnd,
-        String imageUrl) {
+        String imageUrl,
+        int availableQuantity) {
 }

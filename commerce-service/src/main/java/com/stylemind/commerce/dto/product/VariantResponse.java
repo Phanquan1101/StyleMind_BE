@@ -13,5 +13,6 @@ public record VariantResponse(
         String material,
         @JsonProperty("unit_price_vnd") long unitPriceVnd,
         @JsonProperty("variant_status") String variantStatus,
+        @JsonProperty("available_quantity") int availableQuantity,
         List<VariantImageResponse> images) {
 }

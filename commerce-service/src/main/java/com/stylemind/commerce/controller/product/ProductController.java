@@ -16,6 +16,7 @@ import com.stylemind.commerce.validation.product.ProductRequestValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
@@ -45,6 +46,7 @@ public class ProductController {
     private final ProductRequestValidator validator;
 
     @GetMapping(path = "/api/v1/products", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "List active products",
             description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, page and size filters.")
     public ProductListResponse listProducts(HttpServletRequest request) {
@@ -53,6 +55,7 @@ public class ProductController {
     }
 
     @GetMapping(path = "/api/v1/products/{productId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Get active product detail")
     public ProductResponse getProduct(@PathVariable String productId) {
         return productService.getPublicProduct(validator.pathId(productId));
@@ -60,6 +63,7 @@ public class ProductController {
 
     @PostMapping(path = "/api/v1/variants/batch-lookup", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Batch lookup active variants with current prices")
     public VariantBatchLookupResponse batchLookup(@RequestBody VariantBatchLookupRequest request) {
         return productService.activeVariantLookup(validator.variantIds(request));
@@ -153,6 +157,7 @@ public class ProductController {
     }
 
     @GetMapping("/api/v1/variant-images/{imageId}/content")
+    @SecurityRequirements
     @Operation(summary = "Read legacy locally stored variant image content")
     public ResponseEntity<Resource> imageContent(@PathVariable String imageId) {
         UUID id = validator.pathId(imageId);

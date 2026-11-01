@@ -11,6 +11,7 @@ import com.stylemind.commerce.validation.catalog.CatalogReferenceRequestValidato
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,21 +36,21 @@ public class CategoryController {
     private final CatalogReferenceRequestValidator validator;
 
     @GetMapping(path = "/api/v1/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "List categories",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Category list"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid")
+                    @ApiResponse(responseCode = "200", description = "Category list")
             })
     public CatalogReferenceListResponse list() {
         return service.list(CatalogReferenceType.CATEGORY);
     }
 
     @GetMapping(path = "/api/v1/categories/{categoryId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Get category",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Category"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "404", description = "Category not found")
             })
     public CatalogReferenceResponse get(@PathVariable String categoryId) {

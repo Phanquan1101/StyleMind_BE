@@ -73,6 +73,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false",
         "spring.datasource.hikari.initialization-fail-timeout=-1",
         "spring.flyway.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
@@ -104,6 +105,12 @@ class CommerceServiceApplicationTests {
 
     @MockBean
     private VariantImageRepository variantImageRepository;
+
+    @MockBean
+    private com.stylemind.commerce.repository.product.ImageAssetRepository imageAssetRepository;
+
+    @MockBean
+    private com.stylemind.commerce.repository.inventory.InventoryRepository inventoryRepository;
 
     @MockBean
     private CartRepository cartRepository;

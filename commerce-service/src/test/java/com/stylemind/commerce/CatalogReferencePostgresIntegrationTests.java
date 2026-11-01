@@ -49,7 +49,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "management.health.db.enabled=false")
+@SpringBootTest(properties = {"management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 @Import(CatalogReferencePostgresIntegrationTests.JwtTestConfiguration.class)
@@ -78,6 +79,8 @@ class CatalogReferencePostgresIntegrationTests {
     @BeforeEach
     void clearDisposableDatabase() {
         jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.image_asset");
+        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
@@ -92,12 +95,11 @@ class CatalogReferencePostgresIntegrationTests {
         assertThat(category.path("name").asText()).isEqualTo("Tops");
         assertThat(category.path("slug").asText()).isEqualTo("tops");
 
-        mockMvc.perform(get("/api/v1/categories").header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].id").value(categoryId.toString()))
                 .andExpect(jsonPath("$.items[0].is_active").value(true));
-        mockMvc.perform(get("/api/v1/categories/{id}", categoryId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/categories/{id}", categoryId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Tops"));
         mockMvc.perform(put("/api/v1/admin/categories/{id}", categoryId)
@@ -113,15 +115,13 @@ class CatalogReferencePostgresIntegrationTests {
         mockMvc.perform(delete("/api/v1/admin/categories/{id}", categoryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/v1/categories/{id}", categoryId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/categories/{id}", categoryId))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/admin/categories/{id}", categoryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.is_active").value(false));
-        mockMvc.perform(get("/api/v1/categories")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(0));
         mockMvc.perform(get("/api/v1/admin/categories")
@@ -135,15 +135,13 @@ class CatalogReferencePostgresIntegrationTests {
         JsonNode brand = create("/api/v1/admin/brands",
                 "{\"name\":\"StyleMind\",\"slug\":\"stylemind\",\"is_active\":true}");
         UUID brandId = UUID.fromString(brand.path("id").asText());
-        mockMvc.perform(get("/api/v1/brands/{id}", brandId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/brands/{id}", brandId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("stylemind"));
         mockMvc.perform(delete("/api/v1/admin/brands/{id}", brandId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/v1/brands/{id}", brandId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/brands/{id}", brandId))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/admin/brands/{id}", brandId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
@@ -201,8 +199,7 @@ class CatalogReferencePostgresIntegrationTests {
                         .content("{\"name\":\"Bad\",\"slug\":\"bad\",\"is_active\":true,\"extra\":1}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-        mockMvc.perform(get("/api/v1/categories/not-a-uuid")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/categories/not-a-uuid"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         mockMvc.perform(put("/api/v1/admin/categories/{id}", id)
@@ -238,8 +235,7 @@ class CatalogReferencePostgresIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT is_active FROM public.brand WHERE brand_id = ?",
                 Boolean.class, brandId)).isFalse();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.product", Integer.class)).isEqualTo(1);
-        mockMvc.perform(get("/api/v1/products")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+        mockMvc.perform(get("/api/v1/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(0));
     }

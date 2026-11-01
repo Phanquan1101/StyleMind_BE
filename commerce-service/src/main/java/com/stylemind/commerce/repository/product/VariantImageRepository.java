@@ -9,5 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface VariantImageRepository extends JpaRepository<VariantImage, UUID> {
     List<VariantImage> findByVariantIdInOrderByVariantIdAscDisplayOrderAscImageIdAsc(Collection<UUID> variantIds);
     int countByVariantId(UUID variantId);
+    int countByImageAssetId(UUID imageAssetId);
     java.util.Optional<VariantImage> findTopByVariantIdOrderByDisplayOrderDesc(UUID variantId);
 }
