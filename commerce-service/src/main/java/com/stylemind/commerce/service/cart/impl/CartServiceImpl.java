@@ -42,7 +42,8 @@ public class CartServiceImpl implements CartService {
     public CartResponse addItem(CartOwner owner, CartItemCommand command) {
         VariantPurchaseInfo variant = activeVariant(command.variantId());
         UUID cartId = findOrCreateActiveCart(owner);
-        upsertItem(cartId, variant.variantId(), command.quantity(), variant.unitPriceVnd(), true);
+        upsertItem(cartId, variant.variantId(), command.quantity(), variant.unitPriceVnd(),
+                variant.availableQuantity(), true);
         return response(cart(cartId));
     }
 
@@ -53,6 +54,7 @@ public class CartServiceImpl implements CartService {
         CartItem existing = items(cartId).stream()
                 .filter(item -> item.cartItemId().equals(cartItemId)).findFirst().orElseThrow(this::notFound);
         VariantPurchaseInfo variant = activeVariant(existing.variantId());
+        requireAvailable(command.quantity(), variant.availableQuantity());
         if (updateItem(cartItemId, command.quantity(), variant.unitPriceVnd()) != 1) {
             throw notFound();
         }
@@ -92,7 +94,8 @@ public class CartServiceImpl implements CartService {
         }
         for (CartItem item : guestItems) {
             VariantPurchaseInfo variant = active.get(item.variantId());
-            upsertItem(customerCartId, item.variantId(), item.quantity(), variant.unitPriceVnd(), true);
+            upsertItem(customerCartId, item.variantId(), item.quantity(), variant.unitPriceVnd(),
+                    variant.availableQuantity(), true);
         }
         markMerged(guestCartId);
         return response(cart(customerCartId));
@@ -143,12 +146,14 @@ public class CartServiceImpl implements CartService {
                 .map(c -> c.getCustomerId() == null ? CartOwner.guest(c.getGuestSessionKey()) : CartOwner.customer(c.getCustomerId()));
     }
 
-    private void upsertItem(UUID cartId, UUID variantId, int quantity, long price, boolean add) {
+    private void upsertItem(UUID cartId, UUID variantId, int quantity, long price, int available, boolean add) {
         com.stylemind.commerce.entity.CartItem item = cartItems.findByCartIdAndVariantId(cartId, variantId).orElseGet(() -> {
             com.stylemind.commerce.entity.CartItem created = new com.stylemind.commerce.entity.CartItem(); created.setCartItemId(UUID.randomUUID());
             created.setCartId(cartId); created.setVariantId(variantId); created.setAddedAt(OffsetDateTime.now()); return created;
         });
-        item.setQuantity(add && item.getQuantity() > 0 ? item.getQuantity() + quantity : quantity);
+        int requested = add && item.getQuantity() > 0 ? item.getQuantity() + quantity : quantity;
+        requireAvailable(requested, available);
+        item.setQuantity(requested);
         item.setLastSeenPriceVnd(price); item.setUpdatedAt(OffsetDateTime.now()); cartItems.saveAndFlush(item); touch(cartId);
     }
 
@@ -176,7 +181,14 @@ public class CartServiceImpl implements CartService {
     private void markMerged(UUID id) { carts.findById(id).filter(c -> "ACTIVE".equals(c.getCartStatus())).ifPresent(c -> { c.setCartStatus("MERGED"); c.setMergedAt(OffsetDateTime.now()); c.setUpdatedAt(OffsetDateTime.now()); carts.saveAndFlush(c); }); }
 
     private CartItem item(Object[] row) { return new CartItem((UUID) row[0], (UUID) row[1], (UUID) row[2], (String) row[3], (String) row[4], (String) row[5], (String) row[6], (String) row[7], (String) row[8], ((Number) row[9]).intValue(), ((Number) row[10]).longValue(), ((Number) row[11]).longValue()); }
-    private VariantPurchaseInfo variantInfo(Object[] row) { return new VariantPurchaseInfo((UUID) row[0], (String) row[1], (String) row[2], (String) row[3], (String) row[4], (String) row[5], (String) row[6], ((Number) row[7]).longValue(), (String) row[8]); }
+    private VariantPurchaseInfo variantInfo(Object[] row) { return new VariantPurchaseInfo((UUID) row[0], (String) row[1], (String) row[2], (String) row[3], (String) row[4], (String) row[5], (String) row[6], ((Number) row[7]).longValue(), (String) row[8], ((Number) row[9]).intValue()); }
+
+    private void requireAvailable(int requested, int available) {
+        if (requested > available) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK",
+                    "Requested quantity exceeds available stock");
+        }
+    }
 
     private CartItemResponse itemResponse(CartItem item) {
         return new CartItemResponse(item.cartItemId(), item.variantId(), item.sku(), item.productName(),

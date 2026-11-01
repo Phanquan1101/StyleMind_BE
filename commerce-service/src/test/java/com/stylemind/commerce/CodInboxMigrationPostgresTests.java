@@ -26,7 +26,7 @@ class CodInboxMigrationPostgresTests {
         assertThatThrownBy(() -> insert(jdbc, UUID.randomUUID(), "COD"))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         var upgrade = Flyway.configure().dataSource(source).load().migrate();
-        assertThat(upgrade.migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrationsExecuted).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT checksum::text FROM flyway_schema_history WHERE version='7'", String.class)).isEqualTo(checksum);
         assertThat(jdbc.queryForObject("SELECT payment_reference FROM public.payment_event_inbox WHERE event_id=?", String.class, existing)).isEqualTo("MIGRATION-TEST");
         insert(jdbc, UUID.randomUUID(), "COD");

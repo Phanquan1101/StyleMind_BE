@@ -20,7 +20,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "stylemind.payment.ingress-token=event-test-only-key")
+        properties = {"stylemind.payment.ingress-token=event-test-only-key",
+                "stylemind.commerce.inventory.expiry-enabled=false"})
 @Testcontainers
 class PaymentEventPostgresIntegrationTests {
     @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")

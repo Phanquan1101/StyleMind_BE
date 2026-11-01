@@ -26,6 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {"management.health.db.enabled=false", "spring.flyway.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false",
         "spring.datasource.hikari.initialization-fail-timeout=-1"})
 @AutoConfigureMockMvc
 class OrderPaymentRecoveryHttpTests {

@@ -5,9 +5,12 @@ import com.stylemind.commerce.dto.order.PaymentConfirmedEvent;
 import com.stylemind.commerce.dto.order.PaymentEventReceipt;
 import com.stylemind.commerce.errors.ApiOperationException;
 import com.stylemind.commerce.repository.order.PaymentEventRepository;
+import com.stylemind.commerce.repository.inventory.InventoryRepository;
 import com.stylemind.commerce.service.order.PaymentEventService;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentEventServiceImpl implements PaymentEventService {
     private final PaymentEventRepository repository;
     private final ObjectMapper mapper;
-    public PaymentEventServiceImpl(PaymentEventRepository repository, ObjectMapper mapper) {
-        this.repository = repository; this.mapper = mapper;
+    private final InventoryRepository inventory;
+    public PaymentEventServiceImpl(PaymentEventRepository repository, ObjectMapper mapper,
+            InventoryRepository inventory) {
+        this.repository = repository; this.mapper = mapper; this.inventory = inventory;
     }
     @Transactional
     public PaymentEventReceipt receive(PaymentConfirmedEvent event, Instant now) {
@@ -49,6 +54,7 @@ public class PaymentEventServiceImpl implements PaymentEventService {
             } else if (!"PENDING_PAYMENT".equals(order.get().status())) {
                 reason = "ORDER_NOT_PAYABLE";
             } else {
+                inventory.consumeSepay(event.order_id(), OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
                 repository.paid(event, now);
                 outcome = "APPLIED"; reason = "PAYMENT_CONFIRMED";
             }

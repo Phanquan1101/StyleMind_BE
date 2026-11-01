@@ -1,0 +1,4 @@
+kaggle==2.2.5
+pandas==2.3.3
+cloudinary==1.44.1
+python-dotenv==1.2.1

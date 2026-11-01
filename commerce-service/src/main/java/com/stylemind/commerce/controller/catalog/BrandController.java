@@ -11,6 +11,7 @@ import com.stylemind.commerce.validation.catalog.CatalogReferenceRequestValidato
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,21 +35,21 @@ public class BrandController {
     private final CatalogReferenceRequestValidator validator;
 
     @GetMapping(path = "/api/v1/brands", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "List brands",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Brand list"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid")
+                    @ApiResponse(responseCode = "200", description = "Brand list")
             })
     public CatalogReferenceListResponse list() {
         return service.list(CatalogReferenceType.BRAND);
     }
 
     @GetMapping(path = "/api/v1/brands/{brandId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Get brand",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Brand"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "404", description = "Brand not found")
             })
     public CatalogReferenceResponse get(@PathVariable String brandId) {

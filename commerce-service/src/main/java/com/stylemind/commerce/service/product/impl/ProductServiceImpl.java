@@ -16,6 +16,8 @@ import com.stylemind.commerce.entity.VariantImage;
 import com.stylemind.commerce.errors.ApiOperationException;
 import com.stylemind.commerce.repository.catalog.BrandRepository;
 import com.stylemind.commerce.repository.catalog.CategoryRepository;
+import com.stylemind.commerce.repository.inventory.InventoryRepository;
+import com.stylemind.commerce.repository.product.ImageAssetRepository;
 import com.stylemind.commerce.repository.product.ProductRepository;
 import com.stylemind.commerce.repository.product.ProductVariantRepository;
 import com.stylemind.commerce.repository.product.VariantImageRepository;
@@ -28,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -45,6 +48,8 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository products;
     private final ProductVariantRepository variants;
     private final VariantImageRepository images;
+    private final ImageAssetRepository imageAssets;
+    private final InventoryRepository inventory;
     private final CategoryRepository categories;
     private final BrandRepository brands;
     private final VariantImageStorageService imageStorage;
@@ -92,6 +97,8 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse getPublicProduct(UUID productId) {
         Product product = products.findById(productId)
                 .filter(this::isActiveProduct)
+                .filter(candidate -> variants.existsByProductIdAndVariantStatus(
+                        candidate.getProductId(), "ACTIVE"))
                 .orElseThrow(this::notFound);
         return productResponse(product, true);
     }
@@ -111,7 +118,9 @@ public class ProductServiceImpl implements ProductService {
         variant.setProductId(productId);
         apply(variant, command);
         try {
-            return variantResponse(variants.saveAndFlush(variant), List.of());
+            ProductVariant saved = variants.saveAndFlush(variant);
+            inventory.initialize(saved.getVariantId(), 0, OffsetDateTime.now());
+            return variantResponse(saved, 0, List.of());
         } catch (DataIntegrityViolationException exception) {
             throw conflict("DUPLICATE_SKU", "A product variant with this SKU already exists");
         }
@@ -122,7 +131,9 @@ public class ProductServiceImpl implements ProductService {
         ProductVariant variant = variants.findById(variantId).orElseThrow(this::notFound);
         apply(variant, command);
         try {
-            return variantResponse(variants.saveAndFlush(variant), imageResponses(variantId));
+            ProductVariant saved = variants.saveAndFlush(variant);
+            int available = inventory.available(List.of(variantId)).getOrDefault(variantId, 0);
+            return variantResponse(saved, available, imageResponses(variantId));
         } catch (DataIntegrityViolationException exception) {
             throw conflict("DUPLICATE_SKU", "A product variant with this SKU already exists");
         }
@@ -144,8 +155,10 @@ public class ProductServiceImpl implements ProductService {
                 .filter(variant -> products.findById(variant.getProductId()).filter(this::isActiveProduct).isPresent())
                 .toList();
         Map<UUID, List<VariantImageResponse>> imagesByVariant = imageResponsesByVariant(active);
+        Map<UUID, Integer> availability = inventory.available(
+                active.stream().map(ProductVariant::getVariantId).toList());
         return new VariantBatchLookupResponse(active.stream()
-                .map(variant -> variantResponse(variant,
+                .map(variant -> variantResponse(variant, availability.getOrDefault(variant.getVariantId(), 0),
                         imagesByVariant.getOrDefault(variant.getVariantId(), List.of())))
                 .toList());
     }
@@ -156,20 +169,22 @@ public class ProductServiceImpl implements ProductService {
             throw notFound();
         }
         UUID imageId = UUID.randomUUID();
-        String imageUrl = imageStorage.store(imageId, file);
+        UUID imageAssetId = UUID.randomUUID();
+        String imageUrl = imageStorage.store(imageAssetId, file);
         int displayOrder = images.findTopByVariantIdOrderByDisplayOrderDesc(variantId)
                 .map(image -> image.getDisplayOrder() + 1).orElse(0);
         VariantImage image = new VariantImage();
         image.setImageId(imageId);
         image.setVariantId(variantId);
-        image.setImageUrl(imageUrl);
+        image.setImageAssetId(imageAssetId);
         image.setAltText(altText);
         image.setDisplayOrder(displayOrder);
         image.setPrimary(images.countByVariantId(variantId) == 0);
         try {
-            return imageResponse(images.saveAndFlush(image));
+            imageAssets.insert(imageAssetId, imageUrl, OffsetDateTime.now());
+            return imageResponse(images.saveAndFlush(image), imageUrl);
         } catch (RuntimeException exception) {
-            imageStorage.delete(imageId);
+            imageStorage.delete(imageAssetId);
             throw exception;
         }
     }
@@ -198,17 +213,23 @@ public class ProductServiceImpl implements ProductService {
             byId.get(primaryImageId).setPrimary(true);
         }
         images.saveAllAndFlush(existing);
+        Map<UUID, String> urls = imageAssets.urls(
+                existing.stream().map(VariantImage::getImageAssetId).toList());
         return existing.stream().sorted(Comparator.comparingInt(VariantImage::getDisplayOrder)
                         .thenComparing(VariantImage::getImageId))
-                .map(this::imageResponse).toList();
+                .map(image -> imageResponse(image, urls.get(image.getImageAssetId()))).toList();
     }
 
     @Transactional
     public void deleteImage(UUID imageId) {
         VariantImage image = images.findById(imageId).orElseThrow(this::notFound);
+        UUID assetId = image.getImageAssetId();
         images.delete(image);
         images.flush();
-        imageStorage.delete(image.getImageId());
+        if (images.countByImageAssetId(assetId) == 0) {
+            imageAssets.delete(assetId);
+            imageStorage.delete(assetId);
+        }
     }
 
     private void validateReferences(ProductCommand command) {
@@ -235,10 +256,13 @@ public class ProductServiceImpl implements ProductService {
         List<ProductVariant> productVariants = variants.findByProductIdInOrderByProductIdAscSkuAscVariantIdAsc(productIds)
                 .stream().filter(variant -> !activeVariantsOnly || "ACTIVE".equals(variant.getVariantStatus())).toList();
         Map<UUID, List<VariantImageResponse>> imageMap = imageResponsesByVariant(productVariants);
+        Map<UUID, Integer> availability = inventory.available(
+                productVariants.stream().map(ProductVariant::getVariantId).toList());
         Map<UUID, List<VariantResponse>> variantsByProduct = new LinkedHashMap<>();
         for (ProductVariant variant : productVariants) {
             variantsByProduct.computeIfAbsent(variant.getProductId(), ignored -> new ArrayList<>())
-                    .add(variantResponse(variant, imageMap.getOrDefault(variant.getVariantId(), List.of())));
+                    .add(variantResponse(variant, availability.getOrDefault(variant.getVariantId(), 0),
+                            imageMap.getOrDefault(variant.getVariantId(), List.of())));
         }
         return products.stream().map(product -> {
             Category category = categories.findById(product.getCategoryId()).orElseThrow(this::notFound);
@@ -255,26 +279,35 @@ public class ProductServiceImpl implements ProductService {
             return Map.of();
         }
         List<UUID> variantIds = productVariants.stream().map(ProductVariant::getVariantId).toList();
+        List<VariantImage> found = images.findByVariantIdInOrderByVariantIdAscDisplayOrderAscImageIdAsc(variantIds);
+        Map<UUID, String> urls = imageAssets.urls(found.stream().map(VariantImage::getImageAssetId).toList());
         Map<UUID, List<VariantImageResponse>> result = new LinkedHashMap<>();
-        for (VariantImage image : images.findByVariantIdInOrderByVariantIdAscDisplayOrderAscImageIdAsc(variantIds)) {
-            result.computeIfAbsent(image.getVariantId(), ignored -> new ArrayList<>()).add(imageResponse(image));
+        for (VariantImage image : found) {
+            result.computeIfAbsent(image.getVariantId(), ignored -> new ArrayList<>())
+                    .add(imageResponse(image, urls.get(image.getImageAssetId())));
         }
         return result;
     }
 
     private List<VariantImageResponse> imageResponses(UUID variantId) {
-        return images.findByVariantIdInOrderByVariantIdAscDisplayOrderAscImageIdAsc(List.of(variantId)).stream()
-                .map(this::imageResponse).toList();
+        List<VariantImage> found = images.findByVariantIdInOrderByVariantIdAscDisplayOrderAscImageIdAsc(
+                List.of(variantId));
+        Map<UUID, String> urls = imageAssets.urls(found.stream().map(VariantImage::getImageAssetId).toList());
+        return found.stream().map(image -> imageResponse(image, urls.get(image.getImageAssetId()))).toList();
     }
 
-    private VariantResponse variantResponse(ProductVariant variant, List<VariantImageResponse> imageResponses) {
+    private VariantResponse variantResponse(ProductVariant variant, int availableQuantity,
+            List<VariantImageResponse> imageResponses) {
         return new VariantResponse(variant.getVariantId(), variant.getProductId(), variant.getSku(), variant.getSize(),
                 variant.getColor(), variant.getMaterial(), variant.getUnitPriceVnd(), variant.getVariantStatus(),
-                imageResponses);
+                availableQuantity, imageResponses);
     }
 
-    private VariantImageResponse imageResponse(VariantImage image) {
-        return new VariantImageResponse(image.getImageId(), image.getVariantId(), image.getImageUrl(), image.getAltText(),
+    private VariantImageResponse imageResponse(VariantImage image, String imageUrl) {
+        if (imageUrl == null) {
+            throw new IllegalStateException("Variant image asset is missing");
+        }
+        return new VariantImageResponse(image.getImageId(), image.getVariantId(), imageUrl, image.getAltText(),
                 image.getDisplayOrder(), image.isPrimary());
     }
 

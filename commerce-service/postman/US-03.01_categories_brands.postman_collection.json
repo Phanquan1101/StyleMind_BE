@@ -70,6 +70,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "auth": {"type": "noauth"},
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories",
               "host": [
@@ -96,6 +97,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "auth": {"type": "noauth"},
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
               "host": [
@@ -233,6 +235,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "auth": {"type": "noauth"},
             "url": {
               "raw": "{{baseUrl}}/api/v1/brands",
               "host": [
@@ -259,6 +262,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "auth": {"type": "noauth"},
             "url": {
               "raw": "{{baseUrl}}/api/v1/brands/{{brandId}}",
               "host": [

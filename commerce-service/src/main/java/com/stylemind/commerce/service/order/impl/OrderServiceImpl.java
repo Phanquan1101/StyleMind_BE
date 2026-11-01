@@ -28,6 +28,7 @@ import com.stylemind.commerce.repository.order.OrderAddressRepository;
 import com.stylemind.commerce.repository.order.OrderHistoryRepository;
 import com.stylemind.commerce.repository.order.OrderItemRepository;
 import com.stylemind.commerce.repository.order.OrderRepository;
+import com.stylemind.commerce.repository.inventory.InventoryRepository;
 import com.stylemind.commerce.service.order.IdentityAddressClient;
 import com.stylemind.commerce.service.order.OrderService;
 import com.stylemind.commerce.validation.order.OrderRequestValidator;
@@ -58,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderHistoryRepository historyRepository;
     private final CancellationRepository cancellationRepository;
+    private final InventoryRepository inventory;
     private final IdentityAddressClient identityAddressClient;
     private final ApplicationEventPublisher events;
 
@@ -89,6 +91,12 @@ public class OrderServiceImpl implements OrderService {
         try {
             insertOrder(orderId, orderNumber(orderId), customerId, command.checkoutKey(),
                     command.paymentMethod(), total, now);
+            Map<UUID, Integer> requested = items.stream().collect(Collectors.toMap(
+                    CartItem::variantId, CartItem::quantity));
+            if (!inventory.allocate(orderId, command.paymentMethod(), requested, now)) {
+                throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK",
+                        "One or more cart quantities exceed available stock");
+            }
             insertAddress(orderId, address);
             insertItems(orderId, items);
             markCartCheckedOut(cartId, now);
@@ -131,10 +139,14 @@ public class OrderServiceImpl implements OrderService {
             throw new ApiOperationException(HttpStatus.CONFLICT, "INVALID_ORDER_STATUS_TRANSITION",
                     "Order status transition is not allowed");
         }
+        OffsetDateTime now = OffsetDateTime.now();
         if (updateStatus(orderId, current.orderStatus(), command.orderStatus(), actorId,
-                command.reason(), OffsetDateTime.now()) != 1) {
+                command.reason(), now) != 1) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED",
                     "Order status changed concurrently");
+        }
+        if (command.orderStatus() == OrderStatus.CANCELLED) {
+            inventory.releaseForCancellation(orderId, now);
         }
         return response(detail(findSummary(orderId).orElseThrow()));
     }
@@ -168,8 +180,13 @@ public class OrderServiceImpl implements OrderService {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                         "Cancellation is not allowed for this order state");
             }
-            updateStatus(order.orderId(), order.orderStatus(), OrderStatus.CANCELLED, reviewerId,
-                    "Cancellation approved", OffsetDateTime.now());
+            OffsetDateTime now = OffsetDateTime.now();
+            if (updateStatus(order.orderId(), order.orderStatus(), OrderStatus.CANCELLED, reviewerId,
+                    "Cancellation approved", now) != 1) {
+                throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED",
+                        "Order status changed concurrently");
+            }
+            inventory.releaseForCancellation(order.orderId(), now);
         }
         if (reviewCancellation(requestId, command.requestStatus(), reviewerId,
                 command.decisionReason(), OffsetDateTime.now()) != 1) {
@@ -190,6 +207,10 @@ public class OrderServiceImpl implements OrderService {
         }
         return items.stream().map(item -> {
             VariantPurchaseInfo v = active.get(item.variantId());
+            if (item.quantity() > v.availableQuantity()) {
+                throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK",
+                        "One or more cart quantities exceed available stock");
+            }
             return new CartItem(item.cartItemId(), item.cartId(), item.variantId(), v.sku(), v.productName(),
                     v.brandName(), v.color(), v.size(), v.material(), item.quantity(), v.unitPriceVnd(),
                     item.quantity() * v.unitPriceVnd());
@@ -213,7 +234,7 @@ public class OrderServiceImpl implements OrderService {
         return variantIds.isEmpty() ? List.of() : cartRepository.findActiveVariantRows(variantIds).stream()
                 .map(row -> new VariantPurchaseInfo((UUID) row[0], (String) row[1], (String) row[2],
                         (String) row[3], (String) row[4], (String) row[5], (String) row[6],
-                        ((Number) row[7]).longValue(), (String) row[8])).toList();
+                        ((Number) row[7]).longValue(), (String) row[8], ((Number) row[9]).intValue())).toList();
     }
 
     private void lockCart(UUID cartId) {
