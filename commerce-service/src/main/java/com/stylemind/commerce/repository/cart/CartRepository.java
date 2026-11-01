@@ -17,11 +17,15 @@ public interface CartRepository extends JpaRepository<Cart, UUID> {
     Optional<Cart> findByGuestSessionKeyAndCartStatus(String guestSessionKey, String cartStatus);
     @Query(value = """
             select v.variant_id, v.sku, p.name, b.name, v.color, v.size, v.material, v.unit_price_vnd,
-                   (select i.image_url from public.variant_image i where i.variant_id = v.variant_id
-                    order by i.is_primary desc, i.display_order asc, i.image_id asc limit 1)
+                   (select a.image_url from public.variant_image i
+                    join public.image_asset a on a.image_asset_id = i.image_asset_id
+                    where i.variant_id = v.variant_id
+                    order by i.is_primary desc, i.display_order asc, i.image_id asc limit 1),
+                   inv.on_hand_quantity - inv.reserved_quantity
             from public.product_variant v join public.product p on p.product_id = v.product_id and p.product_status = 'ACTIVE'
             join public.category c on c.category_id = p.category_id and c.is_active
             join public.brand b on b.brand_id = p.brand_id and b.is_active
+            join public.variant_inventory inv on inv.variant_id = v.variant_id
             where v.variant_id in (:variantIds) and v.variant_status = 'ACTIVE'
             """, nativeQuery = true)
     List<Object[]> findActiveVariantRows(@Param("variantIds") Collection<UUID> variantIds);

@@ -50,7 +50,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "management.health.db.enabled=false")
+@SpringBootTest(properties = {"management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 @Import(BranchCartOrderPostgresIntegrationTests.TestConfig.class)
@@ -99,6 +100,7 @@ class BranchCartOrderPostgresIntegrationTests {
                     request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
         });
         jdbc.update("DELETE FROM public.cancellation_request");
+        jdbc.update("DELETE FROM public.inventory_reservation");
         jdbc.update("DELETE FROM public.order_status_history");
         jdbc.update("DELETE FROM public.order_item");
         jdbc.update("DELETE FROM public.order_address_snapshot");
@@ -106,6 +108,8 @@ class BranchCartOrderPostgresIntegrationTests {
         jdbc.update("DELETE FROM public.cart_item");
         jdbc.update("DELETE FROM public.cart");
         jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.image_asset");
+        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.branch");
@@ -132,6 +136,10 @@ class BranchCartOrderPostgresIntegrationTests {
                 INSERT INTO public.product_variant(variant_id, product_id, sku, unit_price_vnd, variant_status)
                 VALUES (?, ?, 'SKU-X', 90000, 'INACTIVE')
                 """, inactiveVariantId, productId);
+        jdbc.update("""
+                INSERT INTO public.variant_inventory(variant_id, on_hand_quantity, reserved_quantity, updated_at)
+                VALUES (?, 100, 0, now()), (?, 100, 0, now())
+                """, variantId, inactiveVariantId);
     }
 
     @Test
@@ -154,6 +162,21 @@ class BranchCartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.branch_status").value("INACTIVE"));
+        mockMvc.perform(put("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(branchBody("HN01", "ACTIVE")))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT branch_status FROM public.branch WHERE branch_id = ?",
+                String.class, branchId)).isEqualTo("INACTIVE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.branch WHERE branch_id = ?",
+                Integer.class, branchId)).isEqualTo(1);
     }
 
     @Test

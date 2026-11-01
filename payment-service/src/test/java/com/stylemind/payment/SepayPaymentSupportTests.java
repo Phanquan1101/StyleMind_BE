@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.service.SepayQrPayloadBuilder;
 import com.stylemind.payment.service.SepayWebhookAuthenticationService;
+import com.stylemind.payment.service.impl.SepayWebhookAuthenticationServiceImpl;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,7 +20,7 @@ class SepayPaymentSupportTests {
 
     @Test
     void hmacWebhookAuthenticationAcceptsValidSignature() throws Exception {
-        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationService(properties("hmac"));
+        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationServiceImpl(properties("hmac"));
         byte[] body = "{\"id\":92704,\"transferAmount\":5000000}".getBytes(StandardCharsets.UTF_8);
         long timestamp = 1_800_000_000L;
         HttpHeaders headers = new HttpHeaders();
@@ -31,7 +32,7 @@ class SepayPaymentSupportTests {
 
     @Test
     void hmacWebhookAuthenticationRejectsExpiredTimestamp() throws Exception {
-        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationService(properties("hmac"));
+        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationServiceImpl(properties("hmac"));
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
         long timestamp = 1_800_000_000L;
         HttpHeaders headers = new HttpHeaders();
@@ -43,7 +44,7 @@ class SepayPaymentSupportTests {
 
     @Test
     void apiKeyWebhookAuthenticationUsesAuthorizationHeader() {
-        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationService(properties("api-key"));
+        SepayWebhookAuthenticationService service = new SepayWebhookAuthenticationServiceImpl(properties("api-key"));
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.AUTHORIZATION, "Apikey test-api-key");
 

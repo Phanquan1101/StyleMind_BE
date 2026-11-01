@@ -1,6 +1,8 @@
 package com.stylemind.commerce;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -15,12 +17,14 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.stylemind.commerce.service.product.VariantImageStorageService;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +35,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,14 +49,17 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.multipart.MultipartFile;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = {
         "management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false",
         "stylemind.commerce.image-storage.local-directory=target/test-variant-images"
 })
 @AutoConfigureMockMvc
@@ -78,13 +86,21 @@ class ProductCatalogPostgresIntegrationTests {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
+    @MockitoBean private VariantImageStorageService imageStorage;
 
     private UUID categoryId;
     private UUID brandId;
 
     @BeforeEach
     void clearDisposableDatabase() {
+        when(imageStorage.store(any(UUID.class), any(MultipartFile.class))).thenAnswer(invocation ->
+                "https://res.cloudinary.com/stylemind-test/image/upload/stylemind/products/"
+                        + invocation.getArgument(0, UUID.class));
+        when(imageStorage.load(any(UUID.class)))
+                .thenReturn(Optional.of(new ByteArrayResource(new byte[] {(byte) 0x89, 'P', 'N', 'G'})));
         jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.image_asset");
+        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
@@ -136,9 +152,27 @@ class ProductCatalogPostgresIntegrationTests {
         mockMvc.perform(delete("/api/v1/admin/variants/{id}", variantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/variants/{id}", variantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT variant_status FROM public.product_variant WHERE variant_id = ?",
+                String.class, variantId)).isEqualTo("INACTIVE");
         mockMvc.perform(delete("/api/v1/admin/products/{id}", productId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/products/{id}", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT product_status FROM public.product WHERE product_id = ?",
+                String.class, productId)).isEqualTo("INACTIVE");
+        mockMvc.perform(get("/api/v1/products/{id}", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/products/{id}", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.product_status").value("INACTIVE"))
+                .andExpect(jsonPath("$.variants[0].variant_status").value("INACTIVE"));
     }
 
     @Test
@@ -148,6 +182,11 @@ class ProductCatalogPostgresIntegrationTests {
         UUID variantActive = variant(active, "SKU-ACTIVE", 150000, "ACTIVE");
         UUID variantInactive = variant(active, "SKU-HIDDEN", 99000, "INACTIVE");
         variant(inactive, "SKU-INACTIVE-PRODUCT", 120000, "ACTIVE");
+        UUID noActiveVariantProduct = product("No Active Linen", "ACTIVE", "WOMEN");
+        variant(noActiveVariantProduct, "SKU-NO-ACTIVE", 150000, "INACTIVE");
+        UUID splitPriceProduct = product("Split Price Linen", "ACTIVE", "WOMEN");
+        variant(splitPriceProduct, "SKU-LOW", 90000, "ACTIVE");
+        variant(splitPriceProduct, "SKU-HIGH", 210000, "ACTIVE");
 
         mockMvc.perform(get("/api/v1/products")
                         .queryParam("keyword", "linen")
@@ -156,8 +195,7 @@ class ProductCatalogPostgresIntegrationTests {
                         .queryParam("max_price_vnd", "200000")
                         .queryParam("demographic_segment", "WOMEN")
                         .queryParam("page", "0")
-                        .queryParam("size", "10")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                        .queryParam("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_elements").value(1))
                 .andExpect(jsonPath("$.items[0].product_id").value(active.toString()))
@@ -165,16 +203,18 @@ class ProductCatalogPostgresIntegrationTests {
                 .andExpect(jsonPath("$.items[0].variants[0].variant_id").value(variantActive.toString()));
 
         mockMvc.perform(get("/api/v1/products")
-                        .queryParam("keyword", "missing")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                        .queryParam("keyword", "missing"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_elements").value(0))
                 .andExpect(jsonPath("$.items.length()").value(0));
-        mockMvc.perform(get("/api/v1/products/{id}", inactive)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+        mockMvc.perform(get("/api/v1/products/{id}", active))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.product_id").value(active.toString()));
+        mockMvc.perform(get("/api/v1/products/{id}", inactive))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/products/{id}", noActiveVariantProduct))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/api/v1/variants/batch-lookup")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"variant_ids\":[\"" + variantActive + "\",\"" + variantInactive + "\"]}"))
                 .andExpect(status().isOk())
@@ -197,6 +237,8 @@ class ProductCatalogPostgresIntegrationTests {
         JsonNode second = uploadImage(variantId, "second.png", new byte[] {(byte) 0x89, 'P', 'N', 'G', 2});
         UUID firstId = UUID.fromString(first.path("image_id").asText());
         UUID secondId = UUID.fromString(second.path("image_id").asText());
+        assertThat(first.path("image_url").asText())
+                .startsWith("https://res.cloudinary.com/stylemind-test/image/upload/stylemind/products/");
         assertThat(first.path("is_primary").asBoolean()).isTrue();
         assertThat(second.path("is_primary").asBoolean()).isFalse();
 
@@ -212,8 +254,7 @@ class ProductCatalogPostgresIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].image_id").value(secondId.toString()))
                 .andExpect(jsonPath("$[0].is_primary").value(true));
-        mockMvc.perform(get("/api/v1/variant-images/{id}/content", secondId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+        mockMvc.perform(get("/api/v1/variant-images/{id}/content", secondId))
                 .andExpect(status().isOk());
         mockMvc.perform(delete("/api/v1/admin/variant-images/{id}", firstId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))

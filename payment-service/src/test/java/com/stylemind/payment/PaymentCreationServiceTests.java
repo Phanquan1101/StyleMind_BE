@@ -12,6 +12,7 @@ import com.stylemind.payment.errors.PaymentApiException;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import com.stylemind.payment.service.PaymentAttemptService;
+import com.stylemind.payment.service.impl.PaymentAttemptServiceImpl;
 import com.stylemind.payment.service.SepayQrPayloadBuilder;
 import java.time.Instant;
 import java.util.UUID;
@@ -23,7 +24,7 @@ class PaymentCreationServiceTests {
     final UUID order = UUID.randomUUID(), owner = UUID.randomUUID();
     final Instant now = Instant.parse("2026-10-22T00:00:00Z");
     final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
-    final PaymentAttemptService payments = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
+    final PaymentAttemptService payments = new PaymentAttemptServiceImpl(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
             new SepayQrPayloadBuilder(properties), properties, commerce);
 
     @Test
@@ -55,7 +56,7 @@ class PaymentCreationServiceTests {
     void missingBankConfigurationDoesNotInsertAttempt() {
         when(commerce.getPaymentSnapshot(order)).thenReturn(snapshot("PENDING_PAYMENT"));
         var empty = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", null, null, null, null);
-        var unconfigured = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class), new SepayQrPayloadBuilder(empty), empty, commerce);
+        var unconfigured = new PaymentAttemptServiceImpl(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class), new SepayQrPayloadBuilder(empty), empty, commerce);
         assertThatThrownBy(() -> unconfigured.createAttempt(request("config-test"), owner, now))
                 .isInstanceOf(IllegalStateException.class);
         verify(repository, never()).insert(any());

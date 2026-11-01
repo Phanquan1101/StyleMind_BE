@@ -35,10 +35,10 @@ public class SecurityConfiguration {
                         .requestMatchers("/internal/**").permitAll() // guarded by InternalServiceTokenFilter
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories", "/api/v1/categories/*",
                                 "/api/v1/brands", "/api/v1/brands/*",
-                                "/api/v1/branches", "/api/v1/branches/*",
                                 "/api/v1/products", "/api/v1/products/*",
-                                "/api/v1/variant-images/*/content").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/variants/batch-lookup").authenticated()
+                                "/api/v1/variant-images/*/content").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/variants/batch-lookup").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/branches", "/api/v1/branches/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/cart").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/cart/items").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/cart/items/*").permitAll()

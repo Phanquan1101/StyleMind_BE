@@ -10,3 +10,6 @@ Thumbs.db
 .env.*
 !.env.example
 .secrets/
+.venv-dataset/
+commerce-service/.seed-data/
+__pycache__/

@@ -11,6 +11,7 @@ import com.stylemind.commerce.validation.catalog.CatalogReferenceRequestValidato
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,25 +36,37 @@ public class CategoryController {
     private final CatalogReferenceRequestValidator validator;
 
     @GetMapping(path = "/api/v1/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "List categories",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Category list"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid")
+                    @ApiResponse(responseCode = "200", description = "Category list")
             })
     public CatalogReferenceListResponse list() {
         return service.list(CatalogReferenceType.CATEGORY);
     }
 
     @GetMapping(path = "/api/v1/categories/{categoryId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Get category",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Category"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
-                    @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "404", description = "Category not found")
             })
     public CatalogReferenceResponse get(@PathVariable String categoryId) {
         return service.get(CatalogReferenceType.CATEGORY, id(categoryId));
+    }
+
+    @GetMapping(path = "/api/v1/admin/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List categories including soft-deleted categories (ADMIN only)")
+    public CatalogReferenceListResponse listAdmin() {
+        return service.listAdmin(CatalogReferenceType.CATEGORY);
+    }
+
+    @GetMapping(path = "/api/v1/admin/categories/{categoryId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get category including a soft-deleted category (ADMIN only)")
+    public CatalogReferenceResponse getAdmin(@PathVariable String categoryId) {
+        return service.getAdmin(CatalogReferenceType.CATEGORY, id(categoryId));
     }
 
     @PostMapping(path = "/api/v1/admin/categories", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -88,14 +101,13 @@ public class CategoryController {
     }
 
     @DeleteMapping("/api/v1/admin/categories/{categoryId}")
-    @Operation(summary = "Delete category (ADMIN only)",
+    @Operation(summary = "Soft-delete category by marking it inactive (ADMIN only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Category deleted"),
+                    @ApiResponse(responseCode = "204", description = "Category marked inactive"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
                     @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "403", description = "ADMIN role required"),
-                    @ApiResponse(responseCode = "404", description = "Category not found"),
-                    @ApiResponse(responseCode = "409", description = "Category is referenced by products")
+                    @ApiResponse(responseCode = "404", description = "Category not found")
             })
     public ResponseEntity<Void> delete(@PathVariable String categoryId) {
         service.delete(CatalogReferenceType.CATEGORY, id(categoryId));
