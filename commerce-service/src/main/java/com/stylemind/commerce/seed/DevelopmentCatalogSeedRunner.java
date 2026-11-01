@@ -28,20 +28,25 @@ public class DevelopmentCatalogSeedRunner implements ApplicationRunner {
         this.transactions = transactions;
     }
 
-    record Manifest(int version, List<CategorySeed> categories, List<BrandSeed> brands,
+    record Manifest(int version, int sourceImageCount, List<CategorySeed> categories, List<BrandSeed> brands,
             List<ProductSeed> products) { }
     record CategorySeed(UUID categoryId, String name, String slug) { }
     record BrandSeed(UUID brandId, String name, String slug) { }
     record ProductSeed(UUID productId, UUID categoryId, UUID brandId, String name, String description,
-            String demographicSegment, UUID imageAssetId, String imageUrl, List<VariantSeed> variants) { }
-    record VariantSeed(UUID variantId, UUID imageId, String sku, String size, String color, String material,
-            long unitPriceVnd, int onHandQuantity) { }
+            String demographicSegment, List<VariantSeed> variants) { }
+    record VariantSeed(UUID variantId, String sku, String size, String color, String material,
+            long unitPriceVnd, int onHandQuantity, List<ImageSeed> images) { }
+    record ImageSeed(UUID imageId, UUID imageAssetId, String imageUrl, String altText,
+            int displayOrder, boolean primary) { }
 
     @Override
     public void run(ApplicationArguments args) {
         Manifest manifest = readManifest();
-        if (manifest.version() != 1 || manifest.products().size() != 600
-                || manifest.products().stream().mapToInt(product -> product.variants().size()).sum() != 2400) {
+        int imageCount = manifest.products().stream().flatMap(product -> product.variants().stream())
+                .flatMap(variant -> variant.images().stream()).map(ImageSeed::imageAssetId).collect(
+                        java.util.stream.Collectors.toSet()).size();
+        if (manifest.version() != 2 || manifest.products().isEmpty() || manifest.sourceImageCount() != 600
+                || imageCount != manifest.sourceImageCount()) {
             throw new IllegalStateException("Development catalog manifest has an unexpected shape");
         }
         transactions.executeWithoutResult(status -> seed(manifest));
@@ -57,6 +62,15 @@ public class DevelopmentCatalogSeedRunner implements ApplicationRunner {
 
     private void seed(Manifest manifest) {
         OffsetDateTime now = OffsetDateTime.now();
+        // Retire rows from older versions first. Upserts below reactivate every canonical
+        // product and variant in the current manifest without breaking historical FKs.
+        jdbc.sql("""
+                UPDATE public.product SET product_status='INACTIVE' WHERE product_id IN (
+                    SELECT DISTINCT product_id FROM public.product_variant WHERE sku LIKE 'MYNTRA-%'
+                )
+                """)
+                .update();
+        jdbc.sql("UPDATE public.product_variant SET variant_status='INACTIVE' WHERE sku LIKE 'MYNTRA-%'").update();
         manifest.categories().forEach(category -> jdbc.sql("""
                 INSERT INTO public.category(category_id,name,slug,is_active) VALUES (:id,:name,:slug,true)
                 ON CONFLICT (category_id) DO UPDATE SET name=EXCLUDED.name,slug=EXCLUDED.slug,is_active=true
@@ -76,10 +90,6 @@ public class DevelopmentCatalogSeedRunner implements ApplicationRunner {
                     """).param("id", product.productId()).param("category", product.categoryId())
                     .param("brand", product.brandId()).param("name", product.name())
                     .param("description", product.description()).param("demographic", product.demographicSegment()).update();
-            jdbc.sql("""
-                    INSERT INTO public.image_asset(image_asset_id,image_url,created_at) VALUES (:id,:url,:now)
-                    ON CONFLICT (image_asset_id) DO UPDATE SET image_url=EXCLUDED.image_url
-                    """).param("id", product.imageAssetId()).param("url", product.imageUrl()).param("now", now).update();
             for (VariantSeed variant : product.variants()) {
                 jdbc.sql("""
                         INSERT INTO public.product_variant(
@@ -96,15 +106,23 @@ public class DevelopmentCatalogSeedRunner implements ApplicationRunner {
                         VALUES (:id,:quantity,0,:now) ON CONFLICT (variant_id) DO NOTHING
                         """).param("id", variant.variantId()).param("quantity", variant.onHandQuantity())
                         .param("now", now).update();
-                jdbc.sql("""
-                        INSERT INTO public.variant_image(
-                            image_id,variant_id,image_asset_id,alt_text,display_order,is_primary)
-                        VALUES (:image,:variant,:asset,:alt,0,true)
-                        ON CONFLICT (image_id) DO UPDATE SET variant_id=EXCLUDED.variant_id,
-                            image_asset_id=EXCLUDED.image_asset_id,alt_text=EXCLUDED.alt_text,
-                            display_order=0,is_primary=true
-                        """).param("image", variant.imageId()).param("variant", variant.variantId())
-                        .param("asset", product.imageAssetId()).param("alt", product.name()).update();
+                for (ImageSeed image : variant.images()) {
+                    jdbc.sql("""
+                            INSERT INTO public.image_asset(image_asset_id,image_url,created_at) VALUES (:id,:url,:now)
+                            ON CONFLICT (image_asset_id) DO UPDATE SET image_url=EXCLUDED.image_url
+                            """).param("id", image.imageAssetId()).param("url", image.imageUrl())
+                            .param("now", now).update();
+                    jdbc.sql("""
+                            INSERT INTO public.variant_image(
+                                image_id,variant_id,image_asset_id,alt_text,display_order,is_primary)
+                            VALUES (:image,:variant,:asset,:alt,:displayOrder,:primary)
+                            ON CONFLICT (image_id) DO UPDATE SET variant_id=EXCLUDED.variant_id,
+                                image_asset_id=EXCLUDED.image_asset_id,alt_text=EXCLUDED.alt_text,
+                                display_order=EXCLUDED.display_order,is_primary=EXCLUDED.is_primary
+                            """).param("image", image.imageId()).param("variant", variant.variantId())
+                            .param("asset", image.imageAssetId()).param("alt", image.altText())
+                            .param("displayOrder", image.displayOrder()).param("primary", image.primary()).update();
+                }
             }
         }
     }
