@@ -56,7 +56,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Import(CatalogReferencePostgresIntegrationTests.JwtTestConfiguration.class)
 class CatalogReferencePostgresIntegrationTests {
 
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_commerce_catalog_test")
             .withUsername("commerce_catalog_test")
             .withPassword("test-only-not-a-secret");

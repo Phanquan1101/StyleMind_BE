@@ -76,6 +76,21 @@ class PaymentOrderAttemptServiceTests {
         verify(repository, never()).insert(any());
     }
 
+    @Test
+    void createsAndReplaysGuestSnapshotButRejectsCustomerOwnerMismatch() {
+        var anonymous = new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(order, null, PaymentMethod.COD,
+                125000, "PENDING_PAYMENT"), "initial-" + order);
+        when(repository.insert(any())).thenReturn(true);
+        assertThat(service.createOrderAttempt(anonymous, now).amountVnd()).isEqualTo(125000);
+        var existing = snapshot(null, 125000, "COD");
+        when(repository.findByOrderAndRequestKey(order, "initial-" + order)).thenReturn(Optional.of(existing));
+        assertThat(service.createOrderAttempt(anonymous, now).id()).isEqualTo(existing.paymentAttemptId());
+        assertThatThrownBy(() -> service.createOrderAttempt(request(PaymentMethod.COD, 125000), now))
+                .isInstanceOfSatisfying(PaymentApiException.class,
+                        failure -> assertThat(failure.code()).isEqualTo("DUPLICATE_PAYMENT_REQUEST_MISMATCH"));
+        verifyNoInteractions(commerce);
+    }
+
     private OrderPaymentRequest request(PaymentMethod method, long amount) {
         return new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(order, owner, method, amount,
                 method == PaymentMethod.COD ? "PLACED" : "PENDING_PAYMENT"), "initial-" + order);

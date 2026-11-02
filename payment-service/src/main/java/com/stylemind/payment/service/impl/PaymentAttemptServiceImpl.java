@@ -75,6 +75,9 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     @Transactional
     @Override
     public PaymentAttemptResponse createOrderAttempt(com.stylemind.payment.dto.OrderPaymentRequest request, Instant now) {
+        if (request == null || request.order() == null) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Order payment snapshot is invalid");
+        }
         CommerceOrderPaymentSnapshot order = request.order();
         repository.lockOrder(order.orderId());
         repository.expireStaleOnlineAttempts(now);
@@ -188,7 +191,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             CommerceOrderPaymentSnapshot order,
             UUID customerId) {
         if (existing.expectedAmountVnd() != order.acceptedTotalVnd()
-                || !existing.customerId().equals(customerId)
+                || !java.util.Objects.equals(existing.customerId(), customerId)
                 || !order.paymentMethod().name().equals(existing.paymentMethod())) {
             throw new PaymentApiException(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST_MISMATCH",
                     "Duplicate request key does not match the original payment attempt");
@@ -213,7 +216,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     }
 
     private void validateOrderSnapshot(CommerceOrderPaymentSnapshot order, UUID customerId) {
-        if (!order.customerId().equals(customerId)) {
+        if (customerId == null || !customerId.equals(order.customerId())) {
             throw new PaymentApiException(HttpStatus.FORBIDDEN, "ORDER_OWNERSHIP_MISMATCH",
                     "Order does not belong to the authenticated customer");
         }

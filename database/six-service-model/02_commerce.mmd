@@ -66,8 +66,9 @@ erDiagram
     ORDER {
         uuid order_id PK
         string order_number UK
-        uuid customer_id "REF identity.ACCOUNT.account_id"
-        string checkout_key "UQ with customer_id"
+        uuid customer_id "REF identity.ACCOUNT.account_id; NULL for guest checkout"
+        string guest_session_hash "SHA-256 guest owner; NULL for customer"
+        string checkout_key "UQ with customer_id or guest_session_hash"
         string order_status
         string payment_method "COD or SEPAY_VIETQR"
         bigint accepted_total_vnd "Immutable purchase commitment"

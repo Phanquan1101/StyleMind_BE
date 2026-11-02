@@ -23,7 +23,7 @@ public class CodOrderConfirmationServiceImpl implements CodOrderConfirmationServ
                 || request.acceptedTotalVnd() != attempt.amountVnd() || attempt.status() == null || !Set.of("PENDING", "PAID").contains(attempt.status()))
             throw new ApiOperationException(HttpStatus.BAD_GATEWAY, "PAYMENT_DELIVERY_UNKNOWN", "COD payment attempt was not confirmed");
         var order = repository.lock(request.orderId()).orElseThrow(() -> conflict());
-        if (!request.customerId().equals(order.customer()) || !"COD".equals(order.method())
+        if (!java.util.Objects.equals(request.customerId(), order.customer()) || !"COD".equals(order.method())
                 || request.acceptedTotalVnd() != order.amount()) throw conflict();
         if ("PENDING_PAYMENT".equals(order.status())) repository.confirm(request.orderId(), Instant.now());
         else if (!Set.of("PLACED", "PROCESSING", "SHIPPED", "COMPLETED").contains(order.status())) throw conflict();

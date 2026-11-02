@@ -69,6 +69,9 @@ public class ApiExceptionHandler {
             String code,
             HttpServletRequest request) {
         return ResponseEntity.status(status)
+                .headers(headers -> {
+                    if (request.getRequestURI().startsWith("/api/v1/guest/")) headers.setCacheControl("no-store");
+                })
                 .body(ApiProblemDetails.create(status, title, detail, code, request));
     }
 }

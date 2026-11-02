@@ -1,6 +1,8 @@
 package com.stylemind.commerce.repository.order;
 import com.stylemind.commerce.entity.Order; import java.util.List; import java.util.Optional; import java.util.UUID; import org.springframework.data.domain.Page; import org.springframework.data.domain.Pageable; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.data.jpa.repository.Lock; import jakarta.persistence.LockModeType;
 public interface OrderRepository extends JpaRepository<Order,UUID> {
+ Optional<Order> findByGuestSessionHashAndCheckoutKey(String guestSessionHash,String checkoutKey);
+ Optional<Order> findByOrderIdAndCustomerIdIsNullAndGuestSessionHash(UUID orderId,String guestSessionHash);
  Optional<Order> findByCustomerIdAndCheckoutKey(UUID customerId,String checkoutKey);
  long countByCustomerIdAndOrderStatus(UUID customerId,String status);
  long countByCustomerId(UUID customerId);

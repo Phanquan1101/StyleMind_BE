@@ -290,6 +290,23 @@ class GatewayRoutingTests {
         assertThat(server.requestCount()).isEqualTo(before);
     }
 
+    @Test
+    @Order(11)
+    void forwardsGuestCheckoutCredentialAndBodyWithoutIdentityCall() throws Exception {
+        int identityBefore=identityServer().requestCount();
+        String key="gateway-test-guest-session";
+        String body="{\"checkout_key\":\"guest-key-0001\",\"payment_method\":\"COD\"}";
+        var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(uri("/commerce/api/v1/guest/orders"))
+                .header("Content-Type","application/json").header("X-Guest-Session-Key",key)
+                .POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(202);
+        assertThat(commerceServer().lastPath()).isEqualTo("/api/v1/guest/orders");
+        assertThat(commerceServer().lastGuestKey.get()).isEqualTo(key);
+        assertThat(commerceServer().lastAuthorization()).isNull();
+        assertThat(commerceServer().lastBody()).isEqualTo(body);
+        assertThat(identityServer().requestCount()).isEqualTo(identityBefore);
+    }
+
     private URI uri(String path) {
         return URI.create("http://localhost:" + gatewayPort + path);
     }
@@ -326,6 +343,7 @@ class GatewayRoutingTests {
         private final AtomicReference<String> lastPath = new AtomicReference<>();
         private final AtomicReference<String> lastAuthorization = new AtomicReference<>();
         private final AtomicReference<String> lastCorrelationId = new AtomicReference<>();
+        private final AtomicReference<String> lastGuestKey = new AtomicReference<>();
         private final AtomicReference<String> lastBody = new AtomicReference<>();
         private final AtomicInteger requestCount = new AtomicInteger();
         private final AtomicBoolean stopped = new AtomicBoolean();
@@ -338,6 +356,7 @@ class GatewayRoutingTests {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/", exchange -> {
                 requestCount.incrementAndGet();
+                lastGuestKey.set(exchange.getRequestHeaders().getFirst("X-Guest-Session-Key"));
                 lastMethod.set(exchange.getRequestMethod());
                 lastPath.set(exchange.getRequestURI().toString());
                 lastAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));

@@ -44,6 +44,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/cart/items/*").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/cart/items", "/api/v1/cart/items/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/cart/merge").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/guest/checkout/prices", "/api/v1/guest/orders/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/guest/orders", "/api/v1/guest/orders/*/payment-attempt").permitAll()
                         .requestMatchers("/api/v1/admin/categories", "/api/v1/admin/categories/**",
                                 "/api/v1/admin/brands", "/api/v1/admin/brands/**",
                                 "/api/v1/admin/branches", "/api/v1/admin/branches/**",
