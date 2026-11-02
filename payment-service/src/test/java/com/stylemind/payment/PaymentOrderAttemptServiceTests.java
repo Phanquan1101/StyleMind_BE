@@ -9,6 +9,7 @@ import com.stylemind.payment.client.CommerceOrderPaymentSnapshot;
 import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.dto.OrderPaymentRequest;
 import com.stylemind.payment.errors.PaymentApiException;
+import com.stylemind.payment.mapper.PaymentMapper;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
@@ -25,7 +26,7 @@ class PaymentOrderAttemptServiceTests {
     final CommerceOrderClient commerce = mock(CommerceOrderClient.class);
     final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
     final PaymentAttemptService service = new PaymentAttemptServiceImpl(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
-            new SepayQrPayloadBuilder(properties), properties, commerce);
+            new SepayQrPayloadBuilder(properties), properties, commerce, new PaymentMapper(new com.fasterxml.jackson.databind.ObjectMapper()));
     final UUID order = UUID.randomUUID();
     final UUID owner = UUID.randomUUID();
     final Instant now = Instant.parse("2026-10-21T00:00:00Z");

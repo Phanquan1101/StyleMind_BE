@@ -27,7 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "stylemind.payment.sepay.qr-account-number=000-test-only"})
 @Testcontainers
 class OrderPaymentPostgresIntegrationTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("payment_handoff_test").withUsername("payment_test").withPassword("test-only");
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", DB::getJdbcUrl);
@@ -38,6 +38,7 @@ class OrderPaymentPostgresIntegrationTests {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;
     @Autowired ObjectMapper mapper;
+    @Autowired com.stylemind.payment.repository.PaymentAttemptRepository attempts;
 
     @Test
     void concurrentInitialRequestsCreateOneAttemptAndReturnSameId() throws Exception {
@@ -102,6 +103,39 @@ class OrderPaymentPostgresIntegrationTests {
         assertThat(expired.id()).isEqualTo(original.id());
         assertThat(expired.status()).isEqualTo("EXPIRED");
         assertThat(count(order)).isEqualTo(1);
+    }
+
+    @Test
+    void bulkExpiryAndSettlementInvalidatePreviouslyLoadedJpaState() throws Exception {
+        var now = Instant.now();
+        var request = request(UUID.randomUUID(), UUID.randomUUID(), 125000, "SEPAY_VIETQR", "PENDING_PAYMENT");
+        var id = payments.createOrderAttempt(request, now).id();
+        new TransactionTemplate(manager).executeWithoutResult(status -> {
+            assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("PENDING");
+            attempts.expireStaleOnlineAttempts(now.plusSeconds(900));
+            assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("EXPIRED");
+            attempts.markSettled(id, now.plusSeconds(900));
+            assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("SETTLED");
+            status.setRollbackOnly();
+        });
+        assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void duplicateJpaInsertDoesNotAbortTheSurroundingTransaction() throws Exception {
+        var now = Instant.now();
+        var id = payments.createOrderAttempt(request(UUID.randomUUID(), UUID.randomUUID(), 125000, "COD", "PLACED"), now).id();
+        new TransactionTemplate(manager).executeWithoutResult(status -> {
+            var saved = attempts.findById(id).orElseThrow();
+            var duplicate = new com.stylemind.payment.model.PaymentAttemptCreation(saved.paymentAttemptId(),
+                    saved.orderId(), saved.customerId(), saved.paymentReference(), saved.requestKey(),
+                    com.stylemind.payment.model.PaymentMethod.COD, saved.expectedAmountVnd(), saved.generatedAt(),
+                    null, null, null, null);
+            assertThat(attempts.insert(duplicate)).isFalse();
+            attempts.markSettled(id, now);
+            assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("SETTLED");
+        });
+        assertThat(attempts.findById(id).orElseThrow().attemptStatus()).isEqualTo("SETTLED");
     }
 
     private int count(UUID order) {
