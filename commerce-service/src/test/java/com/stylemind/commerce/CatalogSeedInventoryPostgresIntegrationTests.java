@@ -33,7 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class CatalogSeedInventoryPostgresIntegrationTests {
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_catalog_inventory_test")
             .withUsername("catalog_inventory_test")
             .withPassword("test-only-not-a-secret");

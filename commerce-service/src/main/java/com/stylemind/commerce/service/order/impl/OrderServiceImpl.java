@@ -71,29 +71,64 @@ public class OrderServiceImpl implements OrderService {
                 refreshed.stream().mapToLong(CartItem::lineTotalVnd).sum());
     }
 
+    @Transactional(readOnly = true)
+    public CheckoutPriceResponse previewGuest(String guestSessionKey) {
+        String key = com.stylemind.commerce.security.GuestOrderAccess.requireKey(guestSessionKey);
+        UUID cartId = findActiveCartId(CartOwner.guest(key)).orElseThrow(this::emptyCart);
+        List<CartItem> items = refreshedItems(cartId);
+        return new CheckoutPriceResponse(items.stream().map(this::cartItemResponse).toList(),
+                items.stream().mapToLong(CartItem::lineTotalVnd).sum());
+    }
+
+    @Transactional(readOnly = true)
+    public OrderResponse getGuest(String guestSessionKey, UUID orderId) {
+        String hash = com.stylemind.commerce.security.GuestOrderAccess.digest(guestSessionKey);
+        return response(detail(orderRepository.findByOrderIdAndCustomerIdIsNullAndGuestSessionHash(orderId, hash)
+                .map(this::summary).orElseThrow(this::notFound)));
+    }
+
+    @Transactional
+    public OrderResponse checkoutGuest(String guestSessionKey,
+            com.stylemind.commerce.validation.order.GuestCheckoutValidator.CheckoutCommand command) {
+        String key = com.stylemind.commerce.security.GuestOrderAccess.requireKey(guestSessionKey);
+        return createCheckout(CartOwner.guest(key), com.stylemind.commerce.security.GuestOrderAccess.digest(key),
+                command.checkoutKey(), command.paymentMethod(), command::address);
+    }
+
     @Transactional
     public OrderResponse checkout(UUID customerId, String authorizationHeader,
             OrderRequestValidator.CheckoutCommand command) {
-        findByCheckoutKey(customerId, command.checkoutKey()).ifPresent(existing -> {
+        return createCheckout(CartOwner.customer(customerId), null, command.checkoutKey(), command.paymentMethod(),
+                () -> identityAddressClient.getAddress(command.shippingAddressId(), authorizationHeader));
+    }
+
+    private OrderResponse createCheckout(CartOwner owner, String guestHash, String checkoutKey,
+            com.stylemind.commerce.enums.PaymentMethod paymentMethod,
+            java.util.function.Supplier<AddressSnapshot> addressSupplier) {
+        UUID customerId = owner.customerId();
+        boolean duplicate = owner.customer()
+                ? findByCheckoutKey(customerId, checkoutKey).isPresent()
+                : orderRepository.findByGuestSessionHashAndCheckoutKey(guestHash, checkoutKey).isPresent();
+        if (duplicate) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "DUPLICATE_CHECKOUT",
                     "Checkout key was already used for an order");
-        });
-        UUID cartId = findActiveCartId(CartOwner.customer(customerId)).orElseThrow(this::emptyCart);
+        }
+        UUID cartId = findActiveCartId(owner).orElseThrow(this::emptyCart);
         lockCart(cartId);
         List<CartItem> items = refreshedItems(cartId);
         if (items.isEmpty()) {
             throw emptyCart();
         }
-        AddressSnapshot address = identityAddressClient.getAddress(command.shippingAddressId(), authorizationHeader);
+        AddressSnapshot address = addressSupplier.get();
         long total = items.stream().mapToLong(CartItem::lineTotalVnd).sum();
         UUID orderId = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            insertOrder(orderId, orderNumber(orderId), customerId, command.checkoutKey(),
-                    command.paymentMethod(), total, now);
+            insertOrder(orderId, orderNumber(orderId), customerId, guestHash, checkoutKey,
+                    paymentMethod, total, now);
             Map<UUID, Integer> requested = items.stream().collect(Collectors.toMap(
                     CartItem::variantId, CartItem::quantity));
-            if (!inventory.allocate(orderId, command.paymentMethod(), requested, now)) {
+            if (!inventory.allocate(orderId, paymentMethod, requested, now)) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK",
                         "One or more cart quantities exceed available stock");
             }
@@ -122,7 +157,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderResponse get(UUID customerId, boolean admin, UUID orderId) {
         OrderSummary summary = findSummary(orderId).orElseThrow(this::notFound);
-        if (!admin && !summary.customerId().equals(customerId)) {
+        if (!admin && (customerId == null || !customerId.equals(summary.customerId()))) {
             throw notFound();
         }
         return response(detail(summary));
@@ -154,7 +189,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public CancellationRequestResponse requestCancellation(UUID customerId, UUID orderId, String reason) {
         OrderSummary order = findSummary(orderId).orElseThrow(this::notFound);
-        if (!order.customerId().equals(customerId)) {
+        if (customerId == null || !customerId.equals(order.customerId())) {
             throw notFound();
         }
         if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT).contains(order.orderStatus())) {
@@ -238,16 +273,17 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void lockCart(UUID cartId) {
-        cartRepository.findLockedByCartId(cartId);
+        if (!"ACTIVE".equals(cartRepository.lockStatus(cartId).orElseThrow(this::emptyCart))) throw emptyCart();
     }
 
-    private void insertOrder(UUID orderId, String orderNumber, UUID customerId, String checkoutKey,
+    private void insertOrder(UUID orderId, String orderNumber, UUID customerId, String guestHash, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod, long total, OffsetDateTime now) {
         OrderStatus status = OrderStatus.PENDING_PAYMENT;
         com.stylemind.commerce.entity.Order entity = new com.stylemind.commerce.entity.Order();
         entity.setOrderId(orderId);
         entity.setOrderNumber(orderNumber);
         entity.setCustomerId(customerId);
+        entity.setGuestSessionHash(guestHash);
         entity.setCheckoutKey(checkoutKey);
         entity.setOrderStatus(status.name());
         entity.setPaymentMethod(paymentMethod.name());

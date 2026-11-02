@@ -10,7 +10,6 @@ import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentExceptionView;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -50,14 +49,16 @@ public class PaymentMapper {
 
     public String toPaymentConfirmedPayload(PaymentAttemptSnapshot attempt, long amountVnd, Instant confirmedAt)
             throws JsonProcessingException {
-        return objectMapper.writeValueAsString(Map.of(
-                "payment_attempt_id", attempt.paymentAttemptId(),
-                "order_id", attempt.orderId(),
-                "customer_id", attempt.customerId(),
-                "payment_reference", attempt.paymentReference(),
-                "payment_method", attempt.paymentMethod(),
-                "amount_vnd", amountVnd,
-                "confirmed_at", confirmedAt.toString()));
+        var payload = objectMapper.createObjectNode();
+        payload.put("payment_attempt_id", attempt.paymentAttemptId().toString());
+        payload.put("order_id", attempt.orderId().toString());
+        if (attempt.customerId() == null) payload.putNull("customer_id");
+        else payload.put("customer_id", attempt.customerId().toString());
+        payload.put("payment_reference", attempt.paymentReference());
+        payload.put("payment_method", attempt.paymentMethod());
+        payload.put("amount_vnd", amountVnd);
+        payload.put("confirmed_at", confirmedAt.toString());
+        return objectMapper.writeValueAsString(payload);
     }
 
     private String toApiStatus(String status) {
