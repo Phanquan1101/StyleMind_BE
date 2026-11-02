@@ -15,6 +15,7 @@ import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.dto.ConfirmCodCollectionRequest;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.errors.PaymentApiException;
+import com.stylemind.payment.mapper.PaymentMapper;
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentMethod;
@@ -169,7 +170,7 @@ class PaymentWorkflowServiceTests {
                 outbox,
                 new SepayQrPayloadBuilder(properties),
                 properties,
-                commerce);
+                commerce, new PaymentMapper(new com.fasterxml.jackson.databind.ObjectMapper()));
     }
 
     private SepayWebhookService webhookService(PaymentReconciliationRepository repository, PaymentOutboxService outbox) {

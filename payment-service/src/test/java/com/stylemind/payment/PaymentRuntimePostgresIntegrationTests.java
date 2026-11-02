@@ -47,7 +47,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @Import(PaymentRuntimePostgresIntegrationTests.JwtConfig.class)
 class PaymentRuntimePostgresIntegrationTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("payment_runtime_test").withUsername("payment_test").withPassword("test-only");
     static final AtomicLong EVENTS = new AtomicLong(100000);
     static final RSAKey SIGNING_KEY = signingKey();
