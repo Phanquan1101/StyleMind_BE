@@ -1,0 +1,19 @@
+{
+  "diagrams": 8,
+  "services": 6,
+  "tables": 46,
+  "localFKAttributes": 41,
+  "explicitRemoteRefs": 30,
+  "syntax": "PASS",
+  "localFKTargets": "PASS",
+  "remoteFKIsolation": "PASS",
+  "snakeCase": "PASS",
+  "singleTableOwner": "PASS",
+  "systemEntityCoverage": "PASS",
+  "removedCapabilityIsolation": "PASS",
+  "requiredUniquePaymentSource": "PASS",
+  "markdownSourceSync": "PASS",
+  "svgFiles": 8,
+  "svgFieldCoverage": "PASS",
+  "readBack": "PASS"
+}

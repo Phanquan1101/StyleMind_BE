@@ -1,0 +1,29 @@
+erDiagram
+    %% In-app inbox and admin-visible delivery retry evidence are confirmed capabilities.
+    %% Additional channels, providers, trigger policies and retry timing remain TBD.
+    NOTIFICATION {
+        uuid notification_id PK
+        uuid recipient_user_id "REF identity.ACCOUNT.account_id"
+        string notification_type "Trigger vocabulary TBD"
+        string title
+        text message
+        string reference_type "NULL; logical target type"
+        uuid reference_id "NULL; logical target ID in owning service"
+        string source_event_key "UQ with recipient_user_id"
+        datetime issued_at
+        datetime read_at "NULL means unread"
+    }
+    NOTIFICATION_DELIVERY_ATTEMPT {
+        uuid delivery_attempt_id PK
+        uuid notification_id FK
+        string channel_code "IN_APP confirmed; other channels TBD"
+        int attempt_number "UQ with notification_id and channel_code"
+        string delivery_status
+        string provider_message_reference "NULL"
+        uuid retried_by_user_id "REF identity.ACCOUNT.account_id; NULL for system"
+        datetime attempted_at
+        datetime completed_at "NULL"
+        text failure_reason "NULL"
+    }
+
+    NOTIFICATION ||--o{ NOTIFICATION_DELIVERY_ATTEMPT : records_delivery_attempts

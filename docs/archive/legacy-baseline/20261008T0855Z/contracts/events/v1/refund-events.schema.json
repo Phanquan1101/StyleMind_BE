@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stylemind.local/contracts/events/v1/refund-events.schema.json",
+  "title": "StyleMind Refund Events V1",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "aggregateId", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "type": "string", "enum": ["RefundCompleted", "RefundFailed"] },
+    "eventVersion": { "type": "integer", "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "payload": {
+      "type": "object",
+      "required": ["refundId", "executionId", "orderId", "amountVnd", "result", "occurredAt"],
+      "properties": {
+        "refundId": { "type": "string", "format": "uuid" },
+        "executionId": { "type": "string", "format": "uuid" },
+        "orderId": { "type": "string", "format": "uuid" },
+        "amountVnd": { "type": "integer", "minimum": 1 },
+        "result": { "type": "string", "enum": ["COMPLETED", "FAILED"] },
+        "failureReason": { "type": "string" },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

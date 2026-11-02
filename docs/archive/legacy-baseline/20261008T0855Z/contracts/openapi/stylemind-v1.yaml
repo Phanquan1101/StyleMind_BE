@@ -1,0 +1,499 @@
+openapi: 3.0.3
+info:
+  title: StyleMind V1 API
+  version: 1.0.0
+  description: Implementation-grade baseline for the first service slices.
+servers:
+  - url: http://localhost
+tags:
+  - name: Identity
+  - name: Catalog
+  - name: Cart
+  - name: Checkout
+  - name: Payment
+  - name: Wardrobe
+  - name: Stylist
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Identity]
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Registered, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/auth/login:
+    post:
+      tags: [Identity]
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Logged in, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/catalog/products:
+    get:
+      tags: [Catalog]
+      operationId: browseProducts
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: brandId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Product page, content: { application/json: { schema: { $ref: '#/components/schemas/PageProduct' } } } }
+  /api/v1/catalog/products/{productId}:
+    get:
+      tags: [Catalog]
+      operationId: getProduct
+      parameters: [{ $ref: '#/components/parameters/ProductId' }]
+      responses:
+        '200': { description: Product, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/catalog/categories:
+    get:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: listCategories
+      responses: { '200': { description: Categories, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Category' } } } } } }
+    post:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: createCategory
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CategoryRequest' } } }
+      responses: { '201': { description: Category, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } } }
+  /api/v1/admin/catalog/categories/{categoryId}:
+    put:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: updateCategory
+      parameters: [{ $ref: '#/components/parameters/CategoryId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CategoryRequest' } } }
+      responses: { '200': { description: Category, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } } }
+    delete:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: deleteCategory
+      parameters: [{ $ref: '#/components/parameters/CategoryId' }]
+      responses: { '204': { description: Deleted } }
+  /api/v1/admin/catalog/brands:
+    get:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: listBrands
+      responses: { '200': { description: Brands, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Brand' } } } } } }
+    post:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: createBrand
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BrandRequest' } } }
+      responses: { '201': { description: Brand, content: { application/json: { schema: { $ref: '#/components/schemas/Brand' } } } } }
+  /api/v1/admin/catalog/brands/{brandId}:
+    put:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: updateBrand
+      parameters: [{ $ref: '#/components/parameters/BrandId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BrandRequest' } } }
+      responses: { '200': { description: Brand, content: { application/json: { schema: { $ref: '#/components/schemas/Brand' } } } } }
+    delete:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: deleteBrand
+      parameters: [{ $ref: '#/components/parameters/BrandId' }]
+      responses: { '204': { description: Deleted } }
+  /api/v1/admin/catalog/products:
+    post:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: createProduct
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ProductRequest' } } }
+      responses: { '201': { description: Product, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } } }
+  /api/v1/admin/catalog/products/{productId}:
+    put:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: updateProduct
+      parameters: [{ $ref: '#/components/parameters/ProductId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ProductRequest' } } }
+      responses: { '200': { description: Product, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } } }
+    delete:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: deleteProduct
+      parameters: [{ $ref: '#/components/parameters/ProductId' }]
+      responses: { '204': { description: Deleted } }
+  /api/v1/admin/catalog/products/{productId}/variants:
+    post:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: createVariant
+      parameters: [{ $ref: '#/components/parameters/ProductId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VariantRequest' } } }
+      responses: { '201': { description: Variant, content: { application/json: { schema: { $ref: '#/components/schemas/Variant' } } } } }
+  /api/v1/admin/catalog/variants/{variantId}:
+    put:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: updateVariant
+      parameters: [{ $ref: '#/components/parameters/VariantId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VariantRequest' } } }
+      responses: { '200': { description: Variant, content: { application/json: { schema: { $ref: '#/components/schemas/Variant' } } } } }
+    delete:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: deleteVariant
+      parameters: [{ $ref: '#/components/parameters/VariantId' }]
+      responses: { '204': { description: Deleted } }
+  /api/v1/admin/catalog/variants/{variantId}/inventory:
+    put:
+      tags: [Catalog]
+      security: [{ bearerAuth: [] }]
+      operationId: updateInventory
+      parameters: [{ $ref: '#/components/parameters/VariantId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InventoryRequest' } } }
+      responses: { '200': { description: Inventory, content: { application/json: { schema: { $ref: '#/components/schemas/Availability' } } } } }
+  /api/v1/carts/guest/{guestId}/items:
+    get:
+      tags: [Cart]
+      operationId: getGuestCart
+      parameters: [{ $ref: '#/components/parameters/GuestId' }]
+      responses: { '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+    put:
+      tags: [Cart]
+      operationId: updateGuestCartItem
+      parameters:
+        - { $ref: '#/components/parameters/GuestId' }
+        - { name: variantId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: quantity, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+    post:
+      tags: [Cart]
+      operationId: addGuestCartItem
+      parameters: [{ $ref: '#/components/parameters/GuestId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemRequest' }
+      responses: { '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+  /api/v1/carts/guest/{guestId}/merge:
+    post:
+      tags: [Cart]
+      security: [{ bearerAuth: [] }]
+      operationId: mergeGuestCart
+      parameters: [{ $ref: '#/components/parameters/GuestId' }]
+      responses:
+        '200': { description: Merged cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/carts/guest/{guestId}:
+    delete:
+      tags: [Cart]
+      operationId: clearGuestCart
+      parameters: [{ $ref: '#/components/parameters/GuestId' }]
+      responses: { '200': { description: Cleared cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+  /api/v1/carts/user/{userId}/items:
+    get:
+      tags: [Cart]
+      security: [{ bearerAuth: [] }]
+      operationId: getUserCart
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+    post:
+      tags: [Cart]
+      security: [{ bearerAuth: [] }]
+      operationId: addUserCartItem
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CartItemRequest' } } }
+      responses: { '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+  /api/v1/carts/user/{userId}:
+    delete:
+      tags: [Cart]
+      security: [{ bearerAuth: [] }]
+      operationId: clearUserCart
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Cleared cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } } }
+  /api/v1/checkout:
+    post:
+      tags: [Checkout]
+      security: [{ bearerAuth: [] }]
+      operationId: checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutRequest' }
+      responses:
+        '201': { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/payments/attempts:
+    post:
+      tags: [Payment]
+      security: [{ bearerAuth: [] }]
+      operationId: createPaymentAttempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentAttemptRequest' }
+      responses: { '201': { description: Payment attempt, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentAttempt' } } } } }
+  /api/v1/wardrobe/items:
+    get:
+      tags: [Wardrobe]
+      security: [{ bearerAuth: [] }]
+      operationId: listWardrobeItems
+      responses: { '200': { description: Wardrobe items, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WardrobeItem' } } } } } }
+    post:
+      tags: [Wardrobe]
+      security: [{ bearerAuth: [] }]
+      operationId: createWardrobeItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WardrobeItemRequest' }
+      responses: { '201': { description: Wardrobe item, content: { application/json: { schema: { $ref: '#/components/schemas/WardrobeItem' } } } } }
+  /api/v1/stylist/outfits:
+    post:
+      tags: [Stylist]
+      security: [{ bearerAuth: [] }]
+      operationId: recommendOutfit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StylistRequest' }
+      responses: { '200': { description: Validated outfit, content: { application/json: { schema: { $ref: '#/components/schemas/OutfitResult' } } } } }
+components:
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    Size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    ProductId: { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+    VariantId: { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+    CategoryId: { name: categoryId, in: path, required: true, schema: { type: string, format: uuid } }
+    BrandId: { name: brandId, in: path, required: true, schema: { type: string, format: uuid } }
+    GuestId: { name: guestId, in: path, required: true, schema: { type: string, minLength: 8 } }
+  responses:
+    BadRequest: { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Unauthorized: { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Forbidden: { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    NotFound: { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Conflict: { description: Business conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+        details: { type: object, additionalProperties: true }
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, format: password }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    AuthResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresInSeconds: { type: integer, format: int64 }
+    CategoryRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, maxLength: 120 }
+        slug: { type: string, maxLength: 140 }
+        active: { type: boolean }
+    Category:
+      allOf:
+        - $ref: '#/components/schemas/CategoryRequest'
+        - type: object
+          properties: { id: { type: string, format: uuid } }
+    BrandRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, maxLength: 120 }
+        slug: { type: string, maxLength: 140 }
+        active: { type: boolean }
+    Brand:
+      allOf:
+        - $ref: '#/components/schemas/BrandRequest'
+        - type: object
+          properties: { id: { type: string, format: uuid } }
+    ProductRequest:
+      type: object
+      required: [name, categoryId, brandId]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 4000 }
+        categoryId: { type: string, format: uuid }
+        brandId: { type: string, format: uuid }
+        status: { type: string, enum: [DRAFT, ACTIVE, INACTIVE] }
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductRequest'
+        - type: object
+          properties: { id: { type: string, format: uuid }, variants: { type: array, items: { $ref: '#/components/schemas/Variant' } } }
+    VariantRequest:
+      type: object
+      required: [sku, priceVnd]
+      properties:
+        sku: { type: string, minLength: 1, maxLength: 80 }
+        priceVnd: { type: integer, format: int64, minimum: 0 }
+        color: { type: string }
+        size: { type: string }
+        material: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        availableQuantity: { type: integer, minimum: 0 }
+    Variant:
+      allOf:
+        - $ref: '#/components/schemas/VariantRequest'
+        - type: object
+          properties: { id: { type: string, format: uuid }, productId: { type: string, format: uuid } }
+    InventoryRequest:
+      type: object
+      required: [availableQuantity]
+      properties: { availableQuantity: { type: integer, minimum: 0 } }
+    Availability:
+      type: object
+      properties:
+        variantId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        priceVnd: { type: integer, format: int64, minimum: 0 }
+        variantStatus: { type: string }
+        productStatus: { type: string }
+        availableQuantity: { type: integer, minimum: 0 }
+    PageProduct:
+      type: object
+      properties:
+        content: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+    CartItemRequest:
+      type: object
+      required: [variantId, quantity]
+      properties:
+        variantId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+    Cart:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ownerType: { type: string, enum: [GUEST, USER] }
+        ownerId: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
+        priceChangedVariantIds: { type: array, items: { type: string, format: uuid } }
+    CartItem:
+      type: object
+      properties:
+        variantId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        unitPriceVnd: { type: integer, format: int64, minimum: 0 }
+    CheckoutRequest:
+      type: object
+      required: [cartId, paymentMethod, recipientName, recipientPhone, recipientAddress]
+      properties:
+        cartId: { type: string, format: uuid }
+        paymentMethod: { type: string, enum: [COD, SEPAY_VIETQR] }
+        reconfirmPrice: { type: boolean, default: false }
+        recipientName: { type: string }
+        recipientPhone: { type: string }
+        recipientAddress: { type: string }
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string }
+        status: { type: string, enum: [PENDING, PAYMENT_PENDING, PAID, CONFIRMED, PROCESSING, SHIPPED, COMPLETED, CANCELLED, EXPIRED, FAILED] }
+        paymentMethod: { type: string, enum: [COD, SEPAY_VIETQR] }
+        totalVnd: { type: integer, format: int64 }
+        recipientName: { type: string }
+        recipientPhone: { type: string }
+        recipientAddress: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        variantId: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        color: { type: string }
+        size: { type: string }
+        material: { type: string }
+        quantity: { type: integer }
+        unitPriceVnd: { type: integer, format: int64 }
+        subtotalVnd: { type: integer, format: int64 }
+    PaymentAttemptRequest:
+      type: object
+      required: [orderId, method]
+      properties: { orderId: { type: string, format: uuid }, method: { type: string, enum: [COD, SEPAY_VIETQR] } }
+    PaymentAttempt:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        method: { type: string, enum: [COD, SEPAY_VIETQR] }
+        amountVnd: { type: integer, format: int64 }
+        reference: { type: string }
+        status: { type: string, enum: [PENDING, PAID, EXPIRED, FAILED, EXCEPTION] }
+        expiresAt: { type: string, format: date-time }
+        transferContent: { type: string }
+        qrPayload: { type: string }
+    WardrobeItemRequest:
+      type: object
+      required: [name]
+      properties: { name: { type: string }, category: { type: string }, color: { type: string }, imageUrl: { type: string, format: uri } }
+    WardrobeItem:
+      allOf:
+        - $ref: '#/components/schemas/WardrobeItemRequest'
+        - type: object
+          properties: { id: { type: string, format: uuid }, provenance: { type: string, enum: [OWNED] } }
+    StylistRequest:
+      type: object
+      required: [request]
+      properties: { request: { type: string }, hardConstraints: { type: array, items: { type: string } } }
+    OutfitResult:
+      type: object
+      properties: { items: { type: array, items: { type: object, additionalProperties: true } }, explanation: { type: string } }

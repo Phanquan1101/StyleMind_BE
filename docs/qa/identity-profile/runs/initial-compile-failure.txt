@@ -1,0 +1,4 @@
+Initial compile check — 2026-10-08
+Command: mvn -f identity-service/pom.xml -DskipTests compile
+Result: BUILD FAILURE before tests; one compiler error in the new ProfileRepository.lockOwnerAccount implementation.
+Classification: implementation compile defect. The expression lambda returning resultSet.next() matched both NamedParameterJdbcTemplate.query(ResultSetExtractor) and query(RowCallbackHandler). It was fixed by explicitly typing the callback as ResultSetExtractor<Boolean>. Subsequent test-compile succeeded.

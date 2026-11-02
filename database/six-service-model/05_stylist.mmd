@@ -1,0 +1,88 @@
+erDiagram
+    %% AI consultation sessions are separate from friend CHAT_SESSION.
+    %% Storage of requests and generated results is a PROPOSED logical implementation.
+    %% SHOP_VARIANT items must be grounded in Commerce; owned pieces remain non-purchasable.
+    STYLIST_SESSION {
+        uuid stylist_session_id PK
+        uuid customer_id "REF identity.ACCOUNT.account_id"
+        string title "NULL"
+        datetime opened_at
+        datetime closed_at "NULL"
+    }
+    STYLIST_MESSAGE {
+        uuid stylist_message_id PK
+        uuid stylist_session_id FK
+        string speaker_role "USER or ASSISTANT"
+        text content
+        datetime sent_at
+    }
+    STYLING_REQUEST {
+        uuid styling_request_id PK
+        uuid stylist_session_id FK
+        uuid source_message_id FK "NULL; must be from this session"
+        uuid wardrobe_id "REF wardrobe_community.WARDROBE.wardrobe_id; NULL"
+        uuid requirement_wardrobe_id "REF wardrobe_community.WARDROBE_REQUIREMENT.wardrobe_id; NULL"
+        string occasion "NULL when other context is sufficient"
+        string intended_use "NULL"
+        string style_context "NULL"
+        text general_weather_context "NULL; manually supplied"
+        bigint max_budget_vnd "NULL; hard limit when explicitly designated"
+        boolean budget_is_hard "False when no maximum budget is supplied"
+        string request_status "Lifecycle vocabulary TBD"
+        datetime requested_at
+    }
+    STYLING_CONSTRAINT {
+        uuid constraint_id PK
+        uuid styling_request_id FK
+        string constraint_kind "Category, color, product or variant exclusion"
+        uuid catalog_entity_id "NULL; typed logical Commerce reference"
+        string text_value "NULL; exclusive with catalog_entity_id"
+        boolean is_hard
+    }
+    REQUEST_WARDROBE_ITEM {
+        uuid styling_request_id PK, FK
+        uuid wardrobe_item_id PK "REF wardrobe_community.WARDROBE_ITEM.wardrobe_item_id"
+    }
+    WARDROBE_RECOMMENDATION {
+        uuid recommendation_id PK
+        uuid styling_request_id FK
+        text explanation
+        text styling_tips "NULL"
+        datetime generated_at
+    }
+    RECOMMENDATION_ITEM {
+        uuid recommendation_item_id PK
+        uuid recommendation_id FK
+        string source_type "OWNED_WARDROBE or SHOP_VARIANT"
+        uuid wardrobe_item_id "REF wardrobe_community.WARDROBE_ITEM.wardrobe_item_id; NULL"
+        uuid shop_variant_id "REF commerce.PRODUCT_VARIANT.variant_id; NULL"
+        string slot_name "Vocabulary TBD"
+        text selection_reason
+        int display_order
+    }
+    KNOWLEDGE_SOURCE {
+        uuid knowledge_source_id PK
+        string source_type "TEXT or URL"
+        text source_text "NULL; exactly one source content"
+        string source_url "NULL; exactly one source content"
+        uuid submitted_by_user_id "REF identity.ACCOUNT.account_id"
+        datetime submitted_at
+    }
+    KNOWLEDGE_ENTRY {
+        uuid knowledge_entry_id PK
+        uuid knowledge_source_id FK
+        text rule_text
+        string review_status "Draft before production approval"
+        uuid reviewed_by_user_id "REF identity.ACCOUNT.account_id; NULL"
+        datetime reviewed_at "NULL"
+        text review_note "NULL"
+    }
+
+    STYLIST_SESSION ||--o{ STYLIST_MESSAGE : stores_consultation_history
+    STYLIST_SESSION ||--o{ STYLING_REQUEST : receives_requests
+    STYLIST_MESSAGE o|--o{ STYLING_REQUEST : originates_request
+    STYLING_REQUEST ||--o{ STYLING_CONSTRAINT : obeys_constraints
+    STYLING_REQUEST ||--o{ REQUEST_WARDROBE_ITEM : uses_owned_context
+    STYLING_REQUEST ||--o{ WARDROBE_RECOMMENDATION : generates_results
+    WARDROBE_RECOMMENDATION ||--|{ RECOMMENDATION_ITEM : contains_grounded_items
+    KNOWLEDGE_SOURCE ||--o{ KNOWLEDGE_ENTRY : drafts_knowledge

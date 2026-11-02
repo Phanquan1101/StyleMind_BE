@@ -1,0 +1,97 @@
+erDiagram
+    %% Current Identity physical schema view: V1 (9 tables), V2 and V3 (1 table each).
+    %% Attributes are mapped from the versioned SQL migrations; no other business table is implied.
+    %% Customer and Admin are ACCOUNT roles, not duplicate account tables.
+    %% V2/V3 CHECK constraints remain in their migrations; this ERD does not expand them into attributes.
+    ACCOUNT {
+        uuid account_id PK
+        string email UK
+        string password_hash
+        string account_status
+        datetime email_verified_at "NULL"
+        datetime registered_at
+    }
+    ACCOUNT_ROLE {
+        uuid account_id PK, FK
+        string role_code PK "CUSTOMER or ADMIN"
+    }
+    USER_PROFILE {
+        uuid account_id PK, FK
+        string display_name
+    }
+    CUSTOMER_ADDRESS {
+        uuid address_id PK
+        uuid account_id FK
+        string label "NULL"
+        string recipient_name
+        string recipient_phone
+        string address_line
+        string ward_code "NULL; external Vietnam directory code"
+        boolean is_default
+    }
+    STYLE_PROFILE {
+        uuid account_id PK, FK
+        string fit_preference "NULL"
+        decimal height_cm "NULL"
+        string usual_top_size "NULL"
+        string usual_bottom_size "NULL"
+        string shoe_size "NULL"
+    }
+    PROFILE_STYLE {
+        uuid account_id PK, FK
+        string style_code PK "Vocabulary TBD"
+    }
+    PROFILE_COLOR {
+        uuid account_id PK, FK
+        string color_code PK "Vocabulary TBD"
+    }
+    PROFILE_BRAND {
+        uuid account_id PK, FK
+        uuid brand_id PK "REF commerce.BRAND.brand_id"
+    }
+    REFRESH_SESSION {
+        uuid session_id PK
+        uuid account_id FK
+        string token_hash UK
+        datetime issued_at
+        datetime expires_at
+        datetime revoked_at "NULL"
+    }
+    EMAIL_VERIFICATION_CHALLENGE {
+        uuid challenge_id PK
+        uuid account_id FK, UK
+        bytes code_digest "32 bytes"
+        datetime expires_at
+        smallint failed_attempts "DEFAULT 0; CHECK 0..5"
+        datetime consumed_at "NULL"
+        datetime last_send_attempt_at
+        datetime send_window_started_at
+        smallint send_count "CHECK 1..3"
+        datetime locked_until "NULL; CHECK with failed_attempts"
+    }
+    PASSWORD_RESET_CHALLENGE {
+        uuid challenge_id PK
+        uuid account_id FK, UK
+        bytes otp_digest "32 bytes"
+        datetime otp_expires_at
+        smallint failed_attempts "DEFAULT 0; CHECK 0..5"
+        datetime locked_until "NULL; CHECK with failed_attempts"
+        datetime last_send_attempt_at
+        datetime send_window_started_at
+        smallint send_count "CHECK 1..3"
+        datetime verified_at "NULL"
+        bytes reset_token_hash "NULL, UK, 32 bytes"
+        datetime reset_token_expires_at "NULL"
+        datetime consumed_at "NULL"
+    }
+
+    ACCOUNT ||--|{ ACCOUNT_ROLE : has_roles
+    ACCOUNT ||--o| USER_PROFILE : has_profile
+    ACCOUNT ||--o{ CUSTOMER_ADDRESS : keeps_addresses
+    ACCOUNT ||--o| STYLE_PROFILE : sets_preferences
+    STYLE_PROFILE ||--o{ PROFILE_STYLE : prefers_styles
+    STYLE_PROFILE ||--o{ PROFILE_COLOR : prefers_colors
+    STYLE_PROFILE ||--o{ PROFILE_BRAND : prefers_brands
+    ACCOUNT ||--o{ REFRESH_SESSION : opens_sessions
+    ACCOUNT ||--o| EMAIL_VERIFICATION_CHALLENGE : has_current_verification
+    ACCOUNT ||--o| PASSWORD_RESET_CHALLENGE : has_current_password_reset
