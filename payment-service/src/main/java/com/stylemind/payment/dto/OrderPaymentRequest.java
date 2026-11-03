@@ -18,7 +18,9 @@ public record OrderPaymentRequest(CommerceOrderPaymentSnapshot order, String req
                 throw new IllegalArgumentException();
             }
             for (String field : FIELDS) {
-                if (!body.hasNonNull(field) || (!field.equals("accepted_total_vnd") && !body.get(field).isTextual())) {
+                if (!body.has(field) || (!field.equals("customer_id") && !body.hasNonNull(field))
+                        || (!field.equals("accepted_total_vnd") && !body.get(field).isTextual()
+                            && !(field.equals("customer_id") && body.get(field).isNull()))) {
                     throw new IllegalArgumentException();
                 }
             }
@@ -27,7 +29,7 @@ public record OrderPaymentRequest(CommerceOrderPaymentSnapshot order, String req
                 throw new IllegalArgumentException();
             }
             UUID orderId = uuid(body.get("order_id").textValue());
-            UUID customerId = uuid(body.get("customer_id").textValue());
+            UUID customerId = body.get("customer_id").isNull() ? null : uuid(body.get("customer_id").textValue());
             PaymentMethod method = PaymentMethod.valueOf(body.get("payment_method").textValue());
             String status = body.get("order_status").textValue();
             String key = body.get("request_key").textValue();

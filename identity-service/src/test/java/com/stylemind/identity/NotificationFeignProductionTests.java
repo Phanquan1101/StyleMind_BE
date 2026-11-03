@@ -9,7 +9,7 @@ import com.stylemind.identity.client.notification.NotificationEmailClient;
 import com.stylemind.identity.client.notification.NotificationFeignClient;
 import com.stylemind.identity.client.notification.payload.EmailDispatch;
 import com.stylemind.identity.client.notification.payload.PasswordResetEmailDispatch;
-import com.stylemind.identity.errors.EmailDeliveryException;
+import com.stylemind.identity.errors.ApiOperationException;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -164,7 +164,7 @@ class NotificationFeignProductionTests {
 
     private void assertUnknownDelivery(Runnable delivery) {
         assertThatThrownBy(delivery::run)
-                .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                     assertThat(failure.status().value()).isEqualTo(504);
                     assertThat(failure.code()).isEqualTo("EMAIL_DELIVERY_UNKNOWN");
                 });
@@ -172,7 +172,7 @@ class NotificationFeignProductionTests {
 
     private void assertDeliveryFailure(Runnable delivery, int status, String code) {
         assertThatThrownBy(delivery::run)
-                .isInstanceOfSatisfying(EmailDeliveryException.class, failure -> {
+                .isInstanceOfSatisfying(ApiOperationException.class, failure -> {
                     assertThat(failure.status().value()).isEqualTo(status);
                     assertThat(failure.code()).isEqualTo(code);
                 });

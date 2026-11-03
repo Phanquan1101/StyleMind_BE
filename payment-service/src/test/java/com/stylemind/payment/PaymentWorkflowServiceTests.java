@@ -15,16 +15,20 @@ import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.dto.ConfirmCodCollectionRequest;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.errors.PaymentApiException;
+import com.stylemind.payment.mapper.PaymentMapper;
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import com.stylemind.payment.repository.PaymentReconciliationRepository;
 import com.stylemind.payment.service.PaymentAttemptService;
+import com.stylemind.payment.service.impl.PaymentAttemptServiceImpl;
 import com.stylemind.payment.service.PaymentOutboxService;
 import com.stylemind.payment.service.SepayQrPayloadBuilder;
 import com.stylemind.payment.service.SepayWebhookAuthenticationService;
+import com.stylemind.payment.service.impl.SepayWebhookAuthenticationServiceImpl;
 import com.stylemind.payment.service.SepayWebhookService;
+import com.stylemind.payment.service.impl.SepayWebhookServiceImpl;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -161,19 +165,19 @@ class PaymentWorkflowServiceTests {
             PaymentOutboxService outbox,
             CommerceOrderClient commerce) {
         SepayPaymentProperties properties = properties("none");
-        return new PaymentAttemptService(
+        return new PaymentAttemptServiceImpl(
                 repository,
                 outbox,
                 new SepayQrPayloadBuilder(properties),
                 properties,
-                commerce);
+                commerce, new PaymentMapper(new com.fasterxml.jackson.databind.ObjectMapper()));
     }
 
     private SepayWebhookService webhookService(PaymentReconciliationRepository repository, PaymentOutboxService outbox) {
-        return new SepayWebhookService(
+        return new SepayWebhookServiceImpl(
                 new ObjectMapper(),
                 properties("none"),
-                new SepayWebhookAuthenticationService(properties("none")),
+                new SepayWebhookAuthenticationServiceImpl(properties("none")),
                 repository,
                 outbox);
     }

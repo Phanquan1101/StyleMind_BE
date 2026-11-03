@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.dto.profile.PatchMyProfileRequest;
 import com.stylemind.identity.dto.profile.ReplaceStyleProfileRequest;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.profile.StyleProfileCommand;
+import com.stylemind.identity.dto.profile.StyleProfileUpdateRequest;
 import com.stylemind.identity.validation.profile.ProfileRequestValidator;
 import java.math.BigDecimal;
 import java.util.List;
@@ -47,7 +47,7 @@ class ProfileRequestValidationTests {
     @Test
     void styleReplacementRequiresAllEightPropertiesAndAllowsNullableScalars() throws Exception {
         String empty = replacement(null, null, null, null, null, "[]", "[]", "[]");
-        StyleProfileCommand emptyCommand = validator.validateReplacement(replace(empty));
+        StyleProfileUpdateRequest emptyCommand = validator.validateReplacement(replace(empty));
         assertThat(emptyCommand.fitPreference()).isNull();
         assertThat(emptyCommand.heightCm()).isNull();
         assertThat(emptyCommand.weightKg()).isNull();
@@ -86,7 +86,7 @@ class ProfileRequestValidationTests {
     void codesCanonicalizeAndRejectMalformedOrCanonicalDuplicates() throws Exception {
         String valid = replacement("\" casual \"", "null", "null", "null", "null",
                 "[\" street \",\"classic-2\"]", "[\"Navy\"]", "[]");
-        StyleProfileCommand command = validator.validateReplacement(replace(valid));
+        StyleProfileUpdateRequest command = validator.validateReplacement(replace(valid));
         assertThat(command.fitPreference()).isEqualTo("CASUAL");
         assertThat(command.styleCodes()).containsExactly("STREET", "CLASSIC-2");
         assertThat(command.colorCodes()).containsExactly("NAVY");
@@ -167,7 +167,7 @@ class ProfileRequestValidationTests {
 
         String uuid = "f0000000-0000-4000-8000-000000000001";
         UUID logicalBrand = UUID.fromString(uuid);
-        StyleProfileCommand brand = validator.validateReplacement(replace(replacement("null", "null", "null", "null",
+        StyleProfileUpdateRequest brand = validator.validateReplacement(replace(replacement("null", "null", "null", "null",
                 "null", "[]", "[]", "[\"" + uuid.toUpperCase() + "\"]")));
         assertThat(brand.brandIds()).containsExactly(logicalBrand);
         assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", "null", "null", "null",

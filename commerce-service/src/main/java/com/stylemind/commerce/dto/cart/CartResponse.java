@@ -11,4 +11,10 @@ public record CartResponse(
         @JsonProperty("cart_status") String cartStatus,
         List<CartItemResponse> items,
         @JsonProperty("total_vnd") long totalVnd) {
+    @Override
+    public String toString() {
+        return "CartResponse[cartId=" + cartId + ", customerId=" + customerId
+                + ", guestSessionKey=[REDACTED], cartStatus=" + cartStatus
+                + ", itemCount=" + items.size() + ", totalVnd=" + totalVnd + "]";
+    }
 }

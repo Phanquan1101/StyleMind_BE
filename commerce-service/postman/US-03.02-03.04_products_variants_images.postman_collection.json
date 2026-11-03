@@ -53,7 +53,7 @@
           }
         },
         {
-          "name": "Delete Product",
+          "name": "Soft-delete Product (sets product_status=INACTIVE)",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"}
         }
       ]
@@ -98,7 +98,7 @@
           }
         },
         {
-          "name": "Delete Variant",
+          "name": "Soft-delete Variant (sets variant_status=INACTIVE)",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}"}
         }
       ]
@@ -111,18 +111,35 @@
           "request": {
             "method": "GET",
             "header": [],
+            "auth": {"type": "noauth"},
             "url": "{{baseUrl}}/api/v1/products?keyword=linen&category_id={{categoryId}}&min_price_vnd=100000&max_price_vnd=300000&demographic_segment=WOMEN&page=0&size=20"
-          }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Variants expose global availability', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const variants = pm.response.json().items.flatMap(item => item.variants);",
+                "  pm.expect(variants.length).to.be.above(0);",
+                "  pm.expect(variants[0]).to.have.property('available_quantity');",
+                "  pm.expect(variants[0].available_quantity).to.be.at.least(0);",
+                "});"
+              ]
+            }
+          }]
         },
         {
           "name": "Product Detail",
-          "request": {"method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/products/{{productId}}"}
+          "request": {"method": "GET", "header": [], "auth": {"type": "noauth"}, "url": "{{baseUrl}}/api/v1/products/{{productId}}"}
         },
         {
           "name": "Batch Variant Lookup",
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
+            "auth": {"type": "noauth"},
             "body": {"mode": "raw", "raw": "{\n  \"variant_ids\": [\"{{variantId}}\"]\n}"},
             "url": "{{baseUrl}}/api/v1/variants/batch-lookup"
           }
@@ -145,7 +162,24 @@
               ]
             },
             "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}/images"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cloudinary image was created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.image_url).to.match(/^https:\\/\\//);",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql(body.image_url);",
+                  "  pm.collectionVariables.set('imageId', body.image_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Reorder Images",
@@ -160,7 +194,7 @@
           }
         },
         {
-          "name": "Delete Image",
+          "name": "Permanently Delete Image Metadata and Cloudinary Asset",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/variant-images/{{imageId}}"}
         }
       ]

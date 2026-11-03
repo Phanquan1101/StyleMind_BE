@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.identity.dto.profile.PatchMyProfileRequest;
 import com.stylemind.identity.dto.profile.ReplaceStyleProfileRequest;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.profile.StyleProfileCommand;
+import com.stylemind.identity.dto.profile.StyleProfileUpdateRequest;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.http.HttpStatus;
+import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -35,7 +35,7 @@ public final class ProfileRequestValidator {
         return displayName(request.getDisplayName());
     }
 
-    public StyleProfileCommand validateReplacement(ReplaceStyleProfileRequest request) {
+    public StyleProfileUpdateRequest validateReplacement(ReplaceStyleProfileRequest request) {
         if (request == null || !request.getUnknownProperties().isEmpty()
                 || !request.isFitPreferencePresent() || !request.isHeightCmPresent()
                 || !request.isUsualTopSizePresent() || !request.isUsualBottomSizePresent()
@@ -44,7 +44,7 @@ public final class ProfileRequestValidator {
             throw invalidRequest();
         }
 
-        return new StyleProfileCommand(
+        return new StyleProfileUpdateRequest(
                 optionalCode(request.getFitPreference()),
                 height(request.getHeightCm()),
                 weight(request.getWeightKg()),
@@ -214,7 +214,6 @@ public final class ProfileRequestValidator {
     }
 
     private ApiOperationException invalidRequest() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
-                "Request is missing or malformed", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is missing or malformed");
     }
 }

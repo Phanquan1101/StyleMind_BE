@@ -26,7 +26,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "management.health.db.enabled=false")
+@SpringBootTest(properties = {"management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 class InternalVariantLookupPostgresIntegrationTests {
@@ -36,7 +37,7 @@ class InternalVariantLookupPostgresIntegrationTests {
     private static final String SERVICE_TOKEN = "test-only-internal-service-token-0123456789";
 
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_commerce_internal_test")
             .withUsername("commerce_internal_test")
             .withPassword("test-only-not-a-secret");
@@ -61,6 +62,8 @@ class InternalVariantLookupPostgresIntegrationTests {
     @BeforeEach
     void seed() {
         jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.image_asset");
+        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
@@ -88,11 +91,18 @@ class InternalVariantLookupPostgresIntegrationTests {
         insertVariant(inactiveVariantId, activeProductId, "SKU-INACTIVE", "INACTIVE");
         insertVariant(inactiveProductVariantId, inactiveProductId, "SKU-RETIRED", "ACTIVE");
         insertVariant(inactiveBrandVariantId, inactiveBrandProductId, "SKU-OLDBRAND", "ACTIVE");
+        UUID secondAssetId = UUID.randomUUID();
+        UUID primaryAssetId = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO public.variant_image(image_id, variant_id, image_url, display_order, is_primary)
-                VALUES (?, ?, '/api/v1/variant-images/second/content', 1, false),
-                       (?, ?, '/api/v1/variant-images/primary/content', 0, true)
-                """, UUID.randomUUID(), activeVariantId, UUID.randomUUID(), activeVariantId);
+                INSERT INTO public.image_asset(image_asset_id, image_url, created_at)
+                VALUES (?, '/api/v1/variant-images/second/content', now()),
+                       (?, '/api/v1/variant-images/primary/content', now())
+                """, secondAssetId, primaryAssetId);
+        jdbc.update("""
+                INSERT INTO public.variant_image(image_id, variant_id, image_asset_id, display_order, is_primary)
+                VALUES (?, ?, ?, 1, false), (?, ?, ?, 0, true)
+                """, UUID.randomUUID(), activeVariantId, secondAssetId,
+                UUID.randomUUID(), activeVariantId, primaryAssetId);
     }
 
     @Test

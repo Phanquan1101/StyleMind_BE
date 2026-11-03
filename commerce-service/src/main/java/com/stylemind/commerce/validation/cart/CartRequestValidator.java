@@ -31,7 +31,13 @@ public class CartRequestValidator {
         if (!request.getParameterMap().keySet().stream().allMatch("guest_session_key"::equals)) {
             throw invalidRequest();
         }
-        return owner(customerId, request.getParameter("guest_session_key"));
+        // Keep legacy query clients working; the FE uses the header so keys stay out of URLs.
+        String headerKey = request.getHeader("X-Guest-Session-Key");
+        String queryKey = request.getParameter("guest_session_key");
+        if (customerId == null && headerKey != null && queryKey != null && !headerKey.equals(queryKey)) {
+            throw invalidRequest();
+        }
+        return owner(customerId, headerKey != null ? headerKey : queryKey);
     }
 
     public CartItemCommand itemCommand(JsonNode body) {

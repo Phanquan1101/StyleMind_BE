@@ -9,10 +9,12 @@ import com.stylemind.payment.client.CommerceOrderPaymentSnapshot;
 import com.stylemind.payment.config.SepayPaymentProperties;
 import com.stylemind.payment.dto.OrderPaymentRequest;
 import com.stylemind.payment.errors.PaymentApiException;
+import com.stylemind.payment.mapper.PaymentMapper;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentMethod;
 import com.stylemind.payment.repository.PaymentAttemptRepository;
 import com.stylemind.payment.service.PaymentAttemptService;
+import com.stylemind.payment.service.impl.PaymentAttemptServiceImpl;
 import com.stylemind.payment.service.SepayQrPayloadBuilder;
 import java.time.Instant;
 import java.util.Optional;
@@ -23,8 +25,8 @@ class PaymentOrderAttemptServiceTests {
     final PaymentAttemptRepository repository = mock(PaymentAttemptRepository.class);
     final CommerceOrderClient commerce = mock(CommerceOrderClient.class);
     final SepayPaymentProperties properties = new SepayPaymentProperties("hmac", "test-only-secret", "", null, "SEPAY", "TESTBANK", "000-test-only", null, "SM");
-    final PaymentAttemptService service = new PaymentAttemptService(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
-            new SepayQrPayloadBuilder(properties), properties, commerce);
+    final PaymentAttemptService service = new PaymentAttemptServiceImpl(repository, mock(com.stylemind.payment.service.PaymentOutboxService.class),
+            new SepayQrPayloadBuilder(properties), properties, commerce, new PaymentMapper(new com.fasterxml.jackson.databind.ObjectMapper()));
     final UUID order = UUID.randomUUID();
     final UUID owner = UUID.randomUUID();
     final Instant now = Instant.parse("2026-10-21T00:00:00Z");
@@ -72,6 +74,21 @@ class PaymentOrderAttemptServiceTests {
                             e -> assertThat(e.code()).isEqualTo("DUPLICATE_PAYMENT_REQUEST_MISMATCH"));
         }
         verify(repository, never()).insert(any());
+    }
+
+    @Test
+    void createsAndReplaysGuestSnapshotButRejectsCustomerOwnerMismatch() {
+        var anonymous = new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(order, null, PaymentMethod.COD,
+                125000, "PENDING_PAYMENT"), "initial-" + order);
+        when(repository.insert(any())).thenReturn(true);
+        assertThat(service.createOrderAttempt(anonymous, now).amountVnd()).isEqualTo(125000);
+        var existing = snapshot(null, 125000, "COD");
+        when(repository.findByOrderAndRequestKey(order, "initial-" + order)).thenReturn(Optional.of(existing));
+        assertThat(service.createOrderAttempt(anonymous, now).id()).isEqualTo(existing.paymentAttemptId());
+        assertThatThrownBy(() -> service.createOrderAttempt(request(PaymentMethod.COD, 125000), now))
+                .isInstanceOfSatisfying(PaymentApiException.class,
+                        failure -> assertThat(failure.code()).isEqualTo("DUPLICATE_PAYMENT_REQUEST_MISMATCH"));
+        verifyNoInteractions(commerce);
     }
 
     private OrderPaymentRequest request(PaymentMethod method, long amount) {

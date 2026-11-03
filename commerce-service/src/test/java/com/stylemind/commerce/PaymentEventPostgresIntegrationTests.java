@@ -20,10 +20,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "stylemind.payment.ingress-token=event-test-only-key")
+        properties = {"stylemind.payment.ingress-token=event-test-only-key",
+                "stylemind.commerce.inventory.expiry-enabled=false"})
 @Testcontainers
 class PaymentEventPostgresIntegrationTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("commerce_event_test").withUsername("event_test").withPassword("test-only");
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", DB::getJdbcUrl);
@@ -219,6 +220,28 @@ class PaymentEventPostgresIntegrationTests {
                 id, "EV-" + id, owner, id.toString(), status, method, java.sql.Timestamp.from(Instant.now()));
         return id;
     }
+    @Test void guestSettlementReplaysWithNullOwnerAndRejectsCustomerGuestMismatch() {
+        UUID guestOrder = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO public.customer_order(order_id,order_number,customer_id,guest_session_hash,checkout_key,
+                    order_status,payment_method,accepted_total_vnd,placed_at)
+                VALUES (?,?,NULL,repeat('a',64),'guest-event-key','PENDING_PAYMENT','SEPAY_VIETQR',125000,now())
+                """, guestOrder, "GUEST-" + guestOrder);
+        var payment = event(guestOrder, UUID.randomUUID());
+        assertThat(send(payment).getBody().path("reason").asText()).isEqualTo("OWNER_MISMATCH");
+        payment.put("event_id", UUID.randomUUID()); payment.put("customer_id", null);
+        assertThat(send(payment).getBody().path("outcome").asText()).isEqualTo("APPLIED");
+        assertThat(send(payment).getBody().path("outcome").asText()).isEqualTo("APPLIED");
+        payment.put("event_id", UUID.randomUUID());
+        assertThat(send(payment).getBody().path("outcome").asText()).isEqualTo("DUPLICATE");
+        assertThat(state(guestOrder)).isEqualTo("PAID");
+        assertThat(count("order_status_history")).isEqualTo(1);
+        UUID registered = order(UUID.randomUUID(), "PENDING_PAYMENT", "SEPAY_VIETQR");
+        payment.put("event_id", UUID.randomUUID()); payment.put("order_id", registered);
+        assertThat(send(payment).getBody().path("reason").asText()).isEqualTo("OWNER_MISMATCH");
+        assertThat(state(registered)).isEqualTo("PENDING_PAYMENT");
+    }
+
     private Map<String, Object> event(UUID order, UUID owner) {
         return new HashMap<>(Map.of("event_id", UUID.randomUUID(), "event_type", "PaymentConfirmed",
                 "payment_attempt_id", UUID.randomUUID(), "order_id", order, "customer_id", owner,

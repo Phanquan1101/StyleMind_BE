@@ -44,7 +44,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @Import(PaymentCreationHttpPostgresTests.JwtConfig.class)
 class PaymentCreationHttpPostgresTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("payment_runtime_test").withUsername("payment_test").withPassword("test-only");
     static final RSAKey SIGNING_KEY = signingKey();
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {

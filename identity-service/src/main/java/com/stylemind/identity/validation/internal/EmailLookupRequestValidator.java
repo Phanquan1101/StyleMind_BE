@@ -3,10 +3,10 @@ package com.stylemind.identity.validation.internal;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stylemind.identity.errors.ApiOperationException;
+import com.stylemind.identity.errors.ErrorCode;
 import jakarta.validation.Validator;
 import java.io.IOException;
 import java.util.Locale;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -28,6 +28,6 @@ public class EmailLookupRequestValidator {
         } catch (IOException | IllegalArgumentException failure) { throw invalid(); }
     }
     private ApiOperationException invalid() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request is missing or malformed", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is missing or malformed");
     }
 }

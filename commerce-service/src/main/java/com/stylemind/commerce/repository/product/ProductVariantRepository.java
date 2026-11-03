@@ -11,12 +11,15 @@ import org.springframework.data.repository.query.Param;
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, UUID> {
     List<ProductVariant> findByProductIdInOrderByProductIdAscSkuAscVariantIdAsc(Collection<UUID> productIds);
     List<ProductVariant> findByVariantIdInOrderByVariantIdAsc(Collection<UUID> variantIds);
+    boolean existsByProductIdAndVariantStatus(UUID productId, String variantStatus);
 
     /** Rows for the internal batch lookup; purchasable mirrors the cart rule (variant, product, category, brand active). */
     @Query(value = """
             select v.variant_id, v.product_id, p.name, p.product_status, v.variant_status, v.color, v.size,
                    v.unit_price_vnd,
-                   (select i.image_url from public.variant_image i where i.variant_id = v.variant_id
+                   (select a.image_url from public.variant_image i
+                    join public.image_asset a on a.image_asset_id = i.image_asset_id
+                    where i.variant_id = v.variant_id
                     order by i.is_primary desc, i.display_order asc, i.image_id asc limit 1),
                    (v.variant_status = 'ACTIVE' and p.product_status = 'ACTIVE' and c.is_active and b.is_active)
             from public.product_variant v

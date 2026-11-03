@@ -44,7 +44,7 @@ public class RestCommerceOrderClient implements CommerceOrderClient {
                                 "Commerce order payment snapshot lookup failed");
                     })
                     .body(CommerceOrderPaymentSnapshot.class);
-            if (snapshot == null || snapshot.customerId() == null
+            if (snapshot == null
                     || snapshot.paymentMethod() == null || snapshot.acceptedTotalVnd() <= 0) {
                 throw new PaymentApiException(HttpStatus.BAD_GATEWAY, "COMMERCE_ORDER_SNAPSHOT_INVALID",
                         "Commerce order payment snapshot is invalid");

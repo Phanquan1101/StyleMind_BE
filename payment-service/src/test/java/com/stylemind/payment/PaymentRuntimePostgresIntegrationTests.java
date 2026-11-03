@@ -47,7 +47,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @Import(PaymentRuntimePostgresIntegrationTests.JwtConfig.class)
 class PaymentRuntimePostgresIntegrationTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("payment_runtime_test").withUsername("payment_test").withPassword("test-only");
     static final AtomicLong EVENTS = new AtomicLong(100000);
     static final RSAKey SIGNING_KEY = signingKey();
@@ -346,6 +346,81 @@ class PaymentRuntimePostgresIntegrationTests {
         } finally { jdbc.execute("DROP TRIGGER fail_outbox_test ON public.payment_outbox"); }
         assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", admin).getStatusCode().value()).isEqualTo(200);
         assertThat(count("financial_transaction")).isEqualTo(1); assertThat(count("payment_outbox")).isEqualTo(1);
+    }
+
+    @Test
+    void guestPaymentCreationReplaysAndSettlesBothMethodsWithoutPublicCustomerAccess() throws Exception {
+        for (String method : List.of("COD", "SEPAY_VIETQR")) {
+            UUID order = UUID.randomUUID();
+            var body = new java.util.HashMap<String, Object>(Map.of("order_id", order, "accepted_total_vnd", 125000,
+                    "payment_method", method, "order_status", "PENDING_PAYMENT", "request_key", "initial-" + order));
+            body.put("customer_id", null);
+            var created = post("/internal/v1/payments/order-attempts", body,
+                    "X-StyleMind-Service-Token", "runtime-test-only-handoff");
+            assertThat(created.getStatusCode().value()).isEqualTo(201);
+            var replay = post("/internal/v1/payments/order-attempts", body,
+                    "X-StyleMind-Service-Token", "runtime-test-only-handoff");
+            assertThat(replay.getBody().path("id")).isEqualTo(created.getBody().path("id"));
+            body.put("customer_id", UUID.randomUUID());
+            assertThat(post("/internal/v1/payments/order-attempts", body,
+                    "X-StyleMind-Service-Token", "runtime-test-only-handoff").getStatusCode().value()).isEqualTo(409);
+            var attempt = created.getBody();
+            if (method.equals("COD")) {
+                var collection = Map.of("payment_attempt_id", attempt.path("id").asText(), "collected_amount_vnd", 125000);
+                assertThat(post("/api/v1/admin/cod-collections", collection, "Authorization", "Bearer " + token(UUID.randomUUID(), "CUSTOMER"))
+                        .getStatusCode().value()).isEqualTo(403);
+                assertThat(post("/api/v1/admin/cod-collections", collection, "Authorization", "Bearer " + token(UUID.randomUUID(), "ADMIN"))
+                        .getStatusCode().value()).isEqualTo(200);
+            } else {
+                assertThat(attempt.path("qrPayload").asText()).contains("amount=125000");
+                var payload = webhook(attempt.path("reference").asText(), 125000);
+                for (int i=0;i<2;i++) assertThat(post(WEBHOOK, payload, "Authorization", "Apikey runtime-test-only-sepay")
+                        .getStatusCode().value()).isEqualTo(200);
+            }
+        }
+        assertThat(count("payment_attempt")).isEqualTo(2);
+        assertThat(count("financial_transaction")).isEqualTo(2);
+        assertThat(count("payment_outbox")).isEqualTo(2);
+    }
+
+    @Test
+    void previouslyPersistedAnonymousOnlineAttemptCanStillSettleOnce() throws Exception {
+        var attempt = legacyAttempt("SEPAY_VIETQR");
+        var payload = webhook(attempt.path("reference").asText(), 125000);
+        for (int i = 0; i < 2; i++) assertThat(post(WEBHOOK, payload, "Authorization", "Apikey runtime-test-only-sepay")
+                .getStatusCode().value()).isEqualTo(200);
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+        assertThat(attemptStatus()).isEqualTo("SETTLED");
+        var event = new com.fasterxml.jackson.databind.ObjectMapper().readTree(jdbc.queryForObject(
+                "SELECT event_payload FROM public.payment_outbox", String.class));
+        assertThat(event.get("customer_id").isNull()).isTrue();
+    }
+
+    @Test
+    void previouslyPersistedAnonymousCodStillRequiresAdminCollection() {
+        var attempt = legacyAttempt("COD");
+        var body = Map.of("payment_attempt_id", attempt.path("id").asText(), "collected_amount_vnd", 125000);
+        assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", "Bearer " + token(UUID.randomUUID(), "CUSTOMER"))
+                .getStatusCode().value()).isEqualTo(403);
+        String admin = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", admin).getStatusCode().value()).isEqualTo(200);
+        assertThat(post("/api/v1/admin/cod-collections", body, "Authorization", admin).getStatusCode().value()).isEqualTo(409);
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+    }
+
+    private JsonNode legacyAttempt(String method) {
+        UUID id = UUID.randomUUID();
+        String reference = "LEGACY-" + id;
+        Instant now = Instant.now();
+        jdbc.update("""
+                INSERT INTO public.payment_attempt(payment_attempt_id,order_id,customer_id,payment_reference,request_key,
+                    payment_method,expected_amount_vnd,attempt_status,generated_at,expires_at)
+                VALUES (?,?,NULL,?,?,?,125000,'PENDING',?,?)
+                """, id, UUID.randomUUID(), reference, "initial-" + id, method, java.sql.Timestamp.from(now),
+                method.equals("COD") ? null : java.sql.Timestamp.from(now.plusSeconds(900)));
+        return new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("id", id.toString()).put("reference", reference);
     }
 
     private JsonNode push(UUID order, UUID customer, String method) {
