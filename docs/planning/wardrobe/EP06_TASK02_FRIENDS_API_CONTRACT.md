@@ -1,5 +1,7 @@
 # EP06 Task 02 — Manage Friends API contract
 
+**Cập nhật theo yêu cầu Owner:** Danh sách bạn bè trả thêm `email` của từng bạn trong trang để FE hiển thị `email (tên hiển thị)`, hoặc email khi chưa có tên. Chỉ trả thông tin của bạn bè đang có quan hệ với actor; không thêm quyền tra cứu email tùy ý. Không lưu bản sao email trong Wardrobe. Khi Identity không trả thông tin một tài khoản, `email` và `display_name` có thể null.
+
 **2026-10-28 — v4.10. Task 02/03 DONE_LOCAL trong phạm vi backend.** Focused 56/56; Wardrobe regression 294/294 và Notification 40/40 pass, không skipped. Identity 161 tests còn 15 lỗi baseline, tên lỗi trùng chính xác probe cũ; không coi full Identity gate pass. Bốn JAR thật + Mailpit/DB disposable đã chạy invitation → Register/verify/login → accept → Chat → unfriend/refriend. Năm collection Newman 123 requests/325 assertions/0 failures; chưa live cloud hoặc browser. [Báo cáo verification](../../qa/wardrobe/EP06_TASK02_03_VERIFICATION_REPORT_2026-10-28.md). Các khối v4.8/v4.9 bên dưới là checkpoint trước verification, không là trạng thái hiện tại.
 
 
@@ -47,6 +49,7 @@ Chỉ lấy Friendship có actor ở một trong hai đầu và `unfriended_at I
     {
       "friendship_id": "10000000-0000-0000-0000-000000000001",
       "friend_account_id": "20000000-0000-0000-0000-000000000002",
+      "email": "friend@example.test",
       "display_name": "Minh",
       "established_at": "2026-10-24T09:00:00Z"
     }
@@ -58,7 +61,7 @@ Chỉ lấy Friendship có actor ở một trong hai đầu và `unfriended_at I
 }
 ```
 
-Không trả email, status tài khoản, invitation credential hoặc token/hash của peer. Tên hiển thị lấy từ Identity hiện tại; thiếu profile/account trong kết quả directory thì `display_name: null`, không tự xóa Friendship hoặc suy ra trạng thái tài khoản. Identity unavailable trả `503 IDENTITY_UNAVAILABLE` theo client hiện có. Page rỗng không gọi Identity. Kết quả quan hệ phản ánh snapshot DB; không tuyên bố snapshot tên hiển thị phân tán cùng transaction với Identity.
+Không trả status tài khoản, invitation credential hoặc token/hash của peer. Email và tên hiển thị lấy từ Identity hiện tại; thiếu profile thì tra email bằng API email-verification nội bộ theo batch, `display_name: null`. Nếu không tìm thấy account thì các trường đó có thể null; không tự xóa Friendship hoặc suy ra trạng thái tài khoản. Identity unavailable trả `503 IDENTITY_UNAVAILABLE`. Page rỗng không gọi Identity. Kết quả quan hệ phản ánh snapshot DB; không tuyên bố snapshot Identity phân tán cùng transaction với Identity.
 
 ### Lời mời đã gửi
 

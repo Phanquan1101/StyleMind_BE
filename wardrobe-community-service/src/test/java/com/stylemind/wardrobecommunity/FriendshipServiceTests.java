@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.stylemind.wardrobecommunity.client.identity.IdentityDirectoryClient;
+import com.stylemind.wardrobecommunity.client.identity.IdentityEmailVerificationClient;
+import com.stylemind.wardrobecommunity.client.identity.payload.AccountEmailVerificationItem;
 import com.stylemind.wardrobecommunity.client.identity.payload.AccountLookupItem;
 import com.stylemind.wardrobecommunity.dto.friendship.FriendPageCriteria;
 import com.stylemind.wardrobecommunity.entity.FriendInvitation;
@@ -43,13 +45,14 @@ class FriendshipServiceTests {
     private final FriendshipRepository friendships = mock(FriendshipRepository.class);
     private final FriendInvitationRepository invitations = mock(FriendInvitationRepository.class);
     private final IdentityDirectoryClient identity = mock(IdentityDirectoryClient.class);
+    private final IdentityEmailVerificationClient verification = mock(IdentityEmailVerificationClient.class);
     private FriendshipService service;
 
     @BeforeEach
     void setUp() {
         service = new FriendshipServiceImpl(new FriendshipPersistenceService(friendships, invitations,
                 Clock.fixed(NOW.toInstant(), ZoneOffset.UTC),
-                mock(com.stylemind.wardrobecommunity.service.friendship.internal.FriendshipMutationLock.class)), identity);
+                mock(com.stylemind.wardrobecommunity.service.friendship.internal.FriendshipMutationLock.class)), identity, verification);
     }
 
     @Test
@@ -65,9 +68,24 @@ class FriendshipServiceTests {
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().getFirst().friendAccountId()).isEqualTo(A);
         assertThat(result.items().getFirst().displayName()).isEqualTo("Linh");
+        assertThat(result.items().getFirst().email()).isEqualTo("private@example.test");
         assertThat(result.totalElements()).isEqualTo(1);
         assertThat(result.totalPages()).isEqualTo(1);
         verify(identity).lookup(List.of(A));
+    }
+
+    @Test
+    void friendWithoutProfileStillReturnsTheEmail() {
+        when(friendships.countActiveForAccount(A)).thenReturn(1L);
+        when(friendships.findActiveForAccount(eq(A), any())).thenReturn(List.of(friendship(A, B)));
+        when(identity.lookup(List.of(B))).thenReturn(Map.of());
+        when(verification.lookupMany(List.of(B))).thenReturn(Map.of(B,
+                new AccountEmailVerificationItem(B, "friend@example.test", "ACTIVE", NOW)));
+
+        var friend = service.list(A, new FriendPageCriteria(0, 20)).items().getFirst();
+        assertThat(friend.email()).isEqualTo("friend@example.test");
+        assertThat(friend.displayName()).isNull();
+        assertThat(friend.toString()).doesNotContain("friend@example.test");
     }
 
     @Test
