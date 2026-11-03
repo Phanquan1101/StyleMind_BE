@@ -7,6 +7,7 @@ import com.stylemind.wardrobecommunity.client.identity.payload.*;
 import com.stylemind.wardrobecommunity.errors.ApiOperationException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +30,17 @@ class IdentityEmailVerificationClientTests {
     @Test void unknownAccountIsAbsentAndDoesNotInventVerification() {
         when(feign.emailVerificationLookup(any(), any())).thenReturn(new AccountEmailVerificationLookupResponse(List.of()));
         assertThat(client.lookup(actor)).isEmpty();
+    }
+
+    @Test void batchLookupReturnsOnlyRequestedAccountsAndRejectsDuplicates() {
+        UUID peer = UUID.randomUUID();
+        var peerFact = new AccountEmailVerificationItem(peer, "peer@example.test", "ACTIVE", null);
+        when(feign.emailVerificationLookup(any(), any())).thenReturn(new AccountEmailVerificationLookupResponse(List.of(facts("ACTIVE", null), peerFact)));
+        assertThat(client.lookupMany(List.of(actor, peer))).containsOnlyKeys(actor, peer);
+        when(feign.emailVerificationLookup(any(), any())).thenReturn(new AccountEmailVerificationLookupResponse(List.of(peerFact, peerFact)));
+        assertThatThrownBy(() -> client.lookupMany(List.of(actor, peer))).isInstanceOf(ApiOperationException.class);
+        when(feign.emailVerificationLookup(any(), any())).thenReturn(new AccountEmailVerificationLookupResponse(List.of(new AccountEmailVerificationItem(UUID.randomUUID(), "other@example.test", "ACTIVE", null))));
+        assertThatThrownBy(() -> client.lookupMany(List.of(actor, peer))).isInstanceOf(ApiOperationException.class);
     }
 
     @Test void missingConfigFailsClosedWithoutCallingIdentity() {

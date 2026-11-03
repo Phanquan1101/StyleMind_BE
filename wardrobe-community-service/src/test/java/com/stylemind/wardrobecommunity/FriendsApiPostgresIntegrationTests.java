@@ -19,6 +19,8 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.stylemind.wardrobecommunity.client.identity.IdentityDirectoryClient;
+import com.stylemind.wardrobecommunity.client.identity.IdentityEmailVerificationClient;
+import com.stylemind.wardrobecommunity.client.identity.payload.AccountEmailVerificationItem;
 import com.stylemind.wardrobecommunity.client.identity.payload.AccountLookupItem;
 import com.stylemind.wardrobecommunity.errors.ApiOperationException;
 import com.stylemind.wardrobecommunity.model.friendship.FriendshipPair;
@@ -112,6 +114,7 @@ class FriendsApiPostgresIntegrationTests {
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean private IdentityDirectoryClient identity;
+    @MockitoBean private IdentityEmailVerificationClient verification;
     @MockitoBean(name = "friendshipClock") private Clock clock;
     private final Map<UUID, AccountLookupItem> accounts = new HashMap<>();
 
@@ -173,7 +176,7 @@ class FriendsApiPostgresIntegrationTests {
     }
 
     @Test
-    void activeFriendsAreActorScopedAndDoNotExposePeerEmail() throws Exception {
+    void activeFriendsAreActorScopedAndIncludePeerEmail() throws Exception {
         friendship(A, B, ESTABLISHED);
         UUID inactive = friendship(A, C, ESTABLISHED);
         jdbc.update("UPDATE public.friendship SET unfriended_at = ?, updated_at = ? WHERE friendship_id = ?", DB_NOW, DB_NOW, inactive);
@@ -185,8 +188,9 @@ class FriendsApiPostgresIntegrationTests {
         assertThat(forA.path("items")).hasSize(1);
         assertThat(forA.at("/items/0/friend_account_id").asText()).isEqualTo(B.toString());
         assertThat(forA.at("/items/0/display_name").asText()).isEqualTo("Minh");
+        assertThat(forA.at("/items/0/email").asText()).isEqualTo("private-b@example.test");
         assertThat(forB.at("/items/0/friend_account_id").asText()).isEqualTo(A.toString());
-        assertThat(fields(forA.at("/items/0"))).containsExactlyInAnyOrder("friendship_id", "friend_account_id", "display_name", "established_at");
+        assertThat(fields(forA.at("/items/0"))).containsExactlyInAnyOrder("friendship_id", "friend_account_id", "email", "display_name", "established_at");
     }
 
     @Test
@@ -207,11 +211,14 @@ class FriendsApiPostgresIntegrationTests {
     @Test
     void unknownIdentityProfileKeepsTheFriendWithNullDisplayName() throws Exception {
         friendship(A, D, ESTABLISHED);
+        when(verification.lookupMany(List.of(D))).thenReturn(Map.of(D,
+                new AccountEmailVerificationItem(D, "no-profile@example.test", "ACTIVE", ESTABLISHED)));
 
         JsonNode result = body(send(get(FRIENDS), A).andExpect(status().isOk()));
 
         assertThat(result.at("/items/0/friend_account_id").asText()).isEqualTo(D.toString());
         assertThat(result.at("/items/0/display_name").isNull()).isTrue();
+        assertThat(result.at("/items/0/email").asText()).isEqualTo("no-profile@example.test");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.friendship", Integer.class)).isEqualTo(1);
     }
 
@@ -355,7 +362,7 @@ class FriendsApiPostgresIntegrationTests {
         assertThat(fields(document.at("/components/schemas/FriendInvitationSummaryResponse/properties")))
                 .containsExactlyInAnyOrder("friend_invitation_id", "recipient_email", "status", "created_at", "expires_at", "accepted_at");
         assertThat(fields(document.at("/components/schemas/FriendSummaryResponse/properties")))
-                .doesNotContain("email", "token", "token_hash");
+                .contains("email").doesNotContain("token", "token_hash");
     }
 
     @Test

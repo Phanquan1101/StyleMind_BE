@@ -6,6 +6,10 @@ import com.stylemind.wardrobecommunity.errors.ApiOperationException;
 import feign.FeignException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +41,23 @@ public class IdentityEmailVerificationClient {
         } catch (FeignException failed) {
             throw unavailable();
         }
+    }
+
+    public Map<UUID, AccountEmailVerificationItem> lookupMany(Collection<UUID> accountIds) {
+        if (accountIds.isEmpty()) return Map.of();
+        if (serviceToken == null || accountIds.size() > 100) throw unavailable();
+        var requested = Set.copyOf(accountIds);
+        try {
+            var response = identity.emailVerificationLookup(serviceToken, new AccountLookupRequest(List.copyOf(requested)));
+            if (response == null || response.items() == null || response.items().size() > requested.size()) throw unavailable();
+            var result = new LinkedHashMap<UUID, AccountEmailVerificationItem>();
+            for (var item : response.items()) {
+                if (item == null || item.accountId() == null || !requested.contains(item.accountId())
+                        || item.email() == null || item.email().isBlank() || item.accountStatus() == null
+                        || item.accountStatus().isBlank() || result.putIfAbsent(item.accountId(), item) != null) throw unavailable();
+            }
+            return Map.copyOf(result);
+        } catch (FeignException failed) { throw unavailable(); }
     }
 
     public Optional<AccountEmailVerificationItem> lookupByEmail(String email) {

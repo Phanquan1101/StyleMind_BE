@@ -1,5 +1,7 @@
 # EP06 Manage Friends — Postman run guide
 
+**Cập nhật 2026-11-03:** `GET /me/friends` trả thêm `email` của bạn bè đang có quan hệ, cùng `display_name` có thể null. Collection đã cập nhật cấu trúc phản hồi; cần chạy lại với hai tài khoản test sau khi build BE mới. Kết quả các lần chạy cũ bên dưới chưa xác minh trường mới.
+
 **Verification hiện hành 2026-10-28:** Friends 28 requests/89 assertions pass; companion [invitation](EP06_FRIEND_INVITATIONS_RUN_GUIDE.md) 10/20 pass. Tổng 5 collections 123/325, Wardrobe regression 294 pass. [Báo cáo](../docs/qa/wardrobe/EP06_TASK02_03_VERIFICATION_REPORT_2026-10-28.md). Các thông báo PARTIAL/chưa có API ở checkpoint cũ phía dưới đã được thay thế trong phạm vi backend.
 
 
