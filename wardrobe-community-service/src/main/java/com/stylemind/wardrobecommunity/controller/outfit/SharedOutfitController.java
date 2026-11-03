@@ -6,11 +6,14 @@ import com.stylemind.wardrobecommunity.errors.ApiOperationException;
 import com.stylemind.wardrobecommunity.security.CurrentUser;
 import com.stylemind.wardrobecommunity.service.outfit.SharedOutfitService;
 import com.stylemind.wardrobecommunity.validation.outfit.OutfitRequestValidator;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,6 +23,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/me/shared-outfits")
@@ -31,15 +36,25 @@ public class SharedOutfitController {
     private final OutfitRequestValidator validator;
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "List outfits shared with the caller, newest share first")
-    public ResponseEntity<SharedOutfitListResponse> list(Authentication authentication, HttpServletRequest request) {
+    @Operation(
+            summary = "Retired: email-share feed returns 410; use a friend's outfits",
+            deprecated = true)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "410",
+            description = "OUTFIT_EMAIL_SHARING_RETIRED")
+    public ResponseEntity<SharedOutfitListResponse> list(
+            Authentication authentication, HttpServletRequest request) {
         var criteria = validator.list(request);
         return noStore(service.list(caller(authentication), criteria));
     }
 
     @GetMapping(path = "/{outfitId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Get an outfit that is actively shared with the caller")
-    public ResponseEntity<SharedOutfitViewResponse> get(Authentication authentication, @PathVariable String outfitId) {
+    @Operation(summary = "Retired: email-share reader returns 410", deprecated = true)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "410",
+            description = "OUTFIT_EMAIL_SHARING_RETIRED")
+    public ResponseEntity<SharedOutfitViewResponse> get(
+            Authentication authentication, @PathVariable String outfitId) {
         UUID id = validator.pathId(outfitId);
         return noStore(service.view(caller(authentication), id));
     }
@@ -51,7 +66,8 @@ public class SharedOutfitController {
     private UUID caller(Authentication authentication) {
         UUID callerId = CurrentUser.subject(authentication);
         if (callerId == null) {
-            throw new ApiOperationException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication is required");
+            throw new ApiOperationException(
+                    HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication is required");
         }
         return callerId;
     }

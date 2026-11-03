@@ -16,11 +16,35 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler(FriendInvitationFailure.class)
+    public ResponseEntity<ProblemDetail> invitationFailure(FriendInvitationFailure exception, HttpServletRequest request) {
+        ProblemDetail detail = ApiProblemDetails.create(exception.status(), exception.status().getReasonPhrase(),
+                "Friend invitation action could not be completed", exception.getMessage(), request);
+        if (exception.invitationId() != null) detail.setProperty("friend_invitation_id", exception.invitationId());
+        detail.setProperty("retry_after_seconds", exception.retryAfter());
+        var response = ResponseEntity.status(exception.status()).cacheControl(org.springframework.http.CacheControl.noStore());
+        if (exception.retryAfter() > 0) response.header("Retry-After", Long.toString(exception.retryAfter()));
+        return response.body(detail);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ProblemDetail> uploadTooLarge(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large", "Image upload exceeds the configured multipart limit",
+                "CHAT_IMAGE_TOO_LARGE", request);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ProblemDetail> malformedUpload(MultipartException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Bad Request", "Image request is missing or malformed", "INVALID_REQUEST", request);
+    }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
             MissingServletRequestParameterException.class})
