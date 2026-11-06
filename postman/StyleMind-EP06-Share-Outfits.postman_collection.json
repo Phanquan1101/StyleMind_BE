@@ -1,0 +1,1084 @@
+{
+  "info": {
+    "name": "StyleMind EP06 Share Outfits",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Owner-approved PRIVATE/FRIENDS/PUBLIC cutover. Creates and deletes one temporary Outfit. Requires real current friends A/B, outsider C and one purchasable Commerce variant. Explicit opt-in required. Tokens and public link are kept only in the local environment."
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if(pm.environment.get('allowOutfitSharingTest')!=='true'){pm.execution.skipRequest();throw new Error('Read the run guide and explicitly enable allowOutfitSharingTest for disposable test data');}",
+          "['baseUrl','accessTokenA','accessTokenB','accessTokenC','friendAccountA','friendAccountB','variantId'].forEach(k=>{if(!pm.environment.get(k))throw new Error('Missing required environment variable: '+k);});"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Create owned PRIVATE outfit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"EP06 temporary sharing check\",\n  \"creation_source\": \"MANUAL\",\n  \"items\": [\n    {\n      \"variant_id\": \"{{variantId}}\"\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+              "pm.environment.set('outfitId',pm.response.json().outfit_id);pm.test('Default PRIVATE',()=>pm.expect(pm.response.json().visibility).to.eql('PRIVATE'));pm.environment.set('ownedItemId',pm.response.json().items[0].outfit_item_id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Owner reads settings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('Private link inactive',()=>{const b=pm.response.json();pm.expect(b.visibility).to.eql('PRIVATE');pm.expect(b.public_enabled).to.eql(false);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Friend cannot see PRIVATE",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits/{{outfitId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Other account cannot change settings",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenC}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PUBLIC\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Reject unknown body fields",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PUBLIC\",\n  \"public_token\": \"client-chosen\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400',()=>pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Owner selects FRIENDS",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"FRIENDS\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('FRIENDS active',()=>pm.expect(pm.response.json().visibility).to.eql('FRIENDS'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Current friend lists visible outfits",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits?page=0&size=100"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('Visible outfit in page',()=>pm.expect(pm.response.json().items.map(i=>i.outfit_id)).to.include(pm.environment.get('outfitId')));",
+              "pm.test('Only visible modes',()=>pm.response.json().items.forEach(i=>pm.expect(['FRIENDS','PUBLIC']).to.include(i.visibility)));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Current friend views detail",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits/{{outfitId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('Viewer fields exclude owner secrets',()=>{const b=pm.response.json();pm.expect(b).not.to.have.property('public_token');pm.expect(b).not.to.have.property('owner_account_id');pm.expect(b).not.to.have.property('email');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Non-friend cannot list",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenC}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Wrong parent cannot disclose outfit",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountB}}/outfits/{{outfitId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Reject out-of-range page size",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits?size=101"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400',()=>pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Friend cannot rename owned outfit",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Forbidden change\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Owner selects PUBLIC",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PUBLIC\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('Public enabled',()=>pm.expect(pm.response.json().public_enabled).to.eql(true));pm.environment.set('publicToken',pm.response.json().public_token);pm.environment.set('publicEnabledAt',pm.response.json().public_enabled_at);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Guest uses public link",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/public/outfits/{{publicToken}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+              "pm.test('Viewer fields exclude owner secrets',()=>{const b=pm.response.json();pm.expect(b).not.to.have.property('public_token');pm.expect(b).not.to.have.property('owner_account_id');pm.expect(b).not.to.have.property('email');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Repeated PUBLIC is no-op",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PUBLIC\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('Same link and activation time',()=>{const b=pm.response.json();pm.expect(b.public_token===pm.environment.get('publicToken')).to.eql(true);pm.expect(b.public_enabled_at).to.eql(pm.environment.get('publicEnabledAt'));});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Owner returns to PRIVATE",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PRIVATE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('Link retained and inactive',()=>{const b=pm.response.json();pm.expect(b.public_token===pm.environment.get('publicToken')).to.eql(true);pm.expect(b.public_enabled).to.eql(false);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Private is absent from friend page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits?size=100"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('PRIVATE absent',()=>pm.expect(pm.response.json().items.map(i=>i.outfit_id)).not.to.include(pm.environment.get('outfitId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Old link blocked immediately",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/public/outfits/{{publicToken}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));",
+              "pm.test('Error omits token',()=>pm.expect(pm.response.json().instance).to.eql('/api/v1/public/outfits'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Public-link alias reuses link",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/public-link"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('Same reusable token',()=>pm.expect(pm.response.json().public_token===pm.environment.get('publicToken')).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 Guest can use restored link",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/public/outfits/{{publicToken}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('Viewer fields exclude owner secrets',()=>{const b=pm.response.json();pm.expect(b).not.to.have.property('public_token');pm.expect(b).not.to.have.property('owner_account_id');pm.expect(b).not.to.have.property('email');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 Legacy email grant is retired",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/shares",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"ep06-unused@example.test\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 410',()=>pm.response.to.have.status(410));",
+              "pm.test('Explicit retired code',()=>pm.expect(pm.response.json().code).to.eql('OUTFIT_EMAIL_SHARING_RETIRED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 Legacy grant listing is retired",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/shares"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 410',()=>pm.response.to.have.status(410));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 Legacy shared feed is retired",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/shared-outfits"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 410',()=>pm.response.to.have.status(410));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24 Owner disables public link",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/public-link"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204',()=>pm.response.to.have.status(204));",
+              "pm.test('No-store',()=>pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25 Guest loses link access",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/public/outfits/{{publicToken}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26 Restore FRIENDS for alias check",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"FRIENDS\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 DELETE inactive link leaves FRIENDS",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/public-link"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28 Check FRIENDS preserved",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+              "pm.test('FRIENDS unchanged',()=>pm.expect(pm.response.json().visibility).to.eql('FRIENDS'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29 No JWT cannot change mode",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}/sharing",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visibility\": \"PUBLIC\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401',()=>pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30 Owner deletes fixture outfit",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenA}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/outfits/{{outfitId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "31 Deleted outfit unavailable to friend",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessTokenB}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friends/{{friendAccountA}}/outfits/{{outfitId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "32 Deleted outfit unavailable to guest",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/wardrobe-community/api/v1/public/outfits/{{publicToken}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

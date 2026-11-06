@@ -4,37 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.errors.handler.ApiExceptionHandler;
+import com.stylemind.identity.logging.CorrelationIdFilter;
+import com.stylemind.identity.repository.RefreshSessionRepository;
+import com.stylemind.identity.security.jwt.JwtTokenService;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stylemind.identity.errors.ApiExceptionHandler;
-import com.stylemind.identity.logging.CorrelationIdFilter;
-import com.stylemind.identity.repository.session.RefreshSessionRepository;
-import com.stylemind.identity.entity.RefreshSessionRow;
-import com.stylemind.identity.security.JwtTokenService;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -53,17 +35,38 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "management.health.db.enabled=false")
 @Testcontainers
-@Import(RefreshPostgresIntegrationTests.TestClockConfiguration.class)
+@Import({RefreshPostgresIntegrationTests.TestClockConfiguration.class,
+        RepositoryCallHooks.ConfigurationForTests.class})
 class RefreshPostgresIntegrationTests {
 
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
@@ -94,13 +97,13 @@ class RefreshPostgresIntegrationTests {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtDecoder jwtDecoder;
     @LocalServerPort private int serverPort;
-    @MockitoSpyBean private RefreshSessionRepository refreshSessionRepository;
     @MockitoSpyBean private JwtTokenService jwtTokenService;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @BeforeEach
     void clearDisposableDatabaseAndSetClock() {
+        RepositoryCallHooks.clearCalls();
         jdbcTemplate.update("DELETE FROM public.email_verification_challenge");
         jdbcTemplate.update("DELETE FROM public.refresh_session");
         jdbcTemplate.update("DELETE FROM public.account_role");
@@ -306,11 +309,16 @@ class RefreshPostgresIntegrationTests {
         assertThat(countSessions(account.accountId())).isEqualTo(1);
 
         org.mockito.Mockito.reset(jwtTokenService);
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only refresh-session insert failure");
-        }).when(refreshSessionRepository).saveAndFlush(any(RefreshSessionRow.class));
-        HttpResponse<String> insertFailure = post("/api/v1/auth/refresh", Map.of("refresh_token", token));
+        HttpResponse<String> insertFailure;
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("refreshSessionRepository".equals(bean) && "save".equals(method.getName())) {
+                throw new IllegalStateException("test-only refresh-session insert failure");
+            }
+            return result;
+        })) {
+            insertFailure = post("/api/v1/auth/refresh", Map.of("refresh_token", token));
+        }
         assertThat(insertFailure.statusCode()).isEqualTo(500);
         assertThat(insertFailure.body()).doesNotContain("access_token", "refresh_token", token);
         assertThat(revokedAt(hash)).isNull();
@@ -375,10 +383,15 @@ class RefreshPostgresIntegrationTests {
         AccountFixture account = createAccount("ACTIVE", true, "CUSTOMER");
         String token = login(account.email()).path("refresh_token").asText();
         String hash = hash(token);
-        doThrow(new IllegalStateException("test-only revoke failure"))
-                .when(refreshSessionRepository).flush();
-
-        HttpResponse<String> response = post("/api/v1/auth/logout", Map.of("refresh_token", token));
+        HttpResponse<String> response;
+        jdbcTemplate.execute("ALTER TABLE public.refresh_session DROP CONSTRAINT IF EXISTS test_reject_session_revocation");
+        jdbcTemplate.execute("ALTER TABLE public.refresh_session ADD CONSTRAINT test_reject_session_revocation "
+                + "CHECK (revoked_at IS NULL)");
+        try {
+            response = post("/api/v1/auth/logout", Map.of("refresh_token", token));
+        } finally {
+            jdbcTemplate.execute("ALTER TABLE public.refresh_session DROP CONSTRAINT IF EXISTS test_reject_session_revocation");
+        }
         assertThat(response.statusCode()).isEqualTo(500);
         assertThat(response.headers().firstValue(HttpHeaders.CACHE_CONTROL)).contains("no-store");
         assertThat(revokedAt(hash)).isNull();
@@ -390,16 +403,9 @@ class RefreshPostgresIntegrationTests {
         String token = login(account.email()).path("refresh_token").asText();
         String tokenHash = hash(token);
         CyclicBarrier barrier = new CyclicBarrier(2);
-        doAnswer(invocation -> {
-            Object result = invocation.callRealMethod();
-            if (tokenHash.equals(invocation.getArgument(0))) {
-                barrier.await(15, TimeUnit.SECONDS);
-            }
-            return result;
-        }).when(refreshSessionRepository).findByTokenHash(tokenHash);
-
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
+        try (AutoCloseable hook = barrierOnSessionLookup(tokenHash, barrier)) {
+          try {
             Future<HttpResponse<String>> first = executor.submit(() -> post("/api/v1/auth/refresh",
                     Map.of("refresh_token", token)));
             Future<HttpResponse<String>> second = executor.submit(() -> post("/api/v1/auth/refresh",
@@ -407,8 +413,9 @@ class RefreshPostgresIntegrationTests {
             List<Integer> statuses = List.of(first.get(30, TimeUnit.SECONDS).statusCode(),
                     second.get(30, TimeUnit.SECONDS).statusCode());
             assertThat(statuses).containsExactlyInAnyOrder(200, 401);
-        } finally {
+          } finally {
             executor.shutdownNow();
+          }
         }
         assertThat(countSessions(account.accountId())).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session "
@@ -424,24 +431,18 @@ class RefreshPostgresIntegrationTests {
         String tokenHash = hash(token);
         String otherHash = hash(second.path("refresh_token").asText());
         CyclicBarrier barrier = new CyclicBarrier(2);
-        doAnswer(invocation -> {
-            Object result = invocation.callRealMethod();
-            if (tokenHash.equals(invocation.getArgument(0))) {
-                barrier.await(15, TimeUnit.SECONDS);
-            }
-            return result;
-        }).when(refreshSessionRepository).findByTokenHash(tokenHash);
-
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
+        try (AutoCloseable hook = barrierOnSessionLookup(tokenHash, barrier)) {
+          try {
             Future<HttpResponse<String>> firstLogout = executor.submit(() -> post("/api/v1/auth/logout",
                     Map.of("refresh_token", token)));
             Future<HttpResponse<String>> secondLogout = executor.submit(() -> post("/api/v1/auth/logout",
                     Map.of("refresh_token", token)));
             assertThat(List.of(firstLogout.get(30, TimeUnit.SECONDS).statusCode(),
                     secondLogout.get(30, TimeUnit.SECONDS).statusCode())).containsExactly(204, 204);
-        } finally {
+          } finally {
             executor.shutdownNow();
+          }
         }
         assertThat(revokedAt(tokenHash)).isNotNull();
         assertThat(revokedAt(otherHash)).isNull();
@@ -453,26 +454,20 @@ class RefreshPostgresIntegrationTests {
         String oldToken = login(account.email()).path("refresh_token").asText();
         String oldHash = hash(oldToken);
         CyclicBarrier barrier = new CyclicBarrier(2);
-        doAnswer(invocation -> {
-            Object result = invocation.callRealMethod();
-            if (oldHash.equals(invocation.getArgument(0))) {
-                barrier.await(15, TimeUnit.SECONDS);
-            }
-            return result;
-        }).when(refreshSessionRepository).findByTokenHash(oldHash);
-
         ExecutorService executor = Executors.newFixedThreadPool(2);
         HttpResponse<String> refresh;
         HttpResponse<String> logout;
-        try {
+        try (AutoCloseable hook = barrierOnSessionLookup(oldHash, barrier)) {
+          try {
             Future<HttpResponse<String>> refreshFuture = executor.submit(() -> post("/api/v1/auth/refresh",
                     Map.of("refresh_token", oldToken)));
             Future<HttpResponse<String>> logoutFuture = executor.submit(() -> post("/api/v1/auth/logout",
                     Map.of("refresh_token", oldToken)));
             refresh = refreshFuture.get(30, TimeUnit.SECONDS);
             logout = logoutFuture.get(30, TimeUnit.SECONDS);
-        } finally {
+          } finally {
             executor.shutdownNow();
+          }
         }
         assertThat(logout.statusCode()).isEqualTo(204);
         assertThat(refresh.statusCode()).isIn(200, 401);
@@ -607,6 +602,17 @@ class RefreshPostgresIntegrationTests {
     private int countSessions(UUID accountId) {
         return jdbcTemplate.queryForObject("SELECT count(*) FROM public.refresh_session WHERE account_id = ?",
                 Integer.class, accountId);
+    }
+
+    private AutoCloseable barrierOnSessionLookup(String tokenHash, CyclicBarrier barrier) {
+        return RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("refreshSessionRepository".equals(bean) && "findAccountIdByTokenHash".equals(method.getName())
+                    && arguments.length > 0 && tokenHash.equals(arguments[0])) {
+                barrier.await(15, TimeUnit.SECONDS);
+            }
+            return result;
+        });
     }
 
     private static String randomRefreshToken() {

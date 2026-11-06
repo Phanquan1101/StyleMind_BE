@@ -1,57 +1,56 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.reset;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.repository.AccountRepository;
+import com.stylemind.identity.repository.ProfileColorRepository;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.stylemind.identity.entity.Account;
-import com.stylemind.identity.entity.ProfileColor;
-import com.stylemind.identity.repository.account.AccountRepository;
-import com.stylemind.identity.repository.profile.ProfileColorRepository;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "management.health.db.enabled=false")
 @AutoConfigureMockMvc
 @Testcontainers
+@Import(RepositoryCallHooks.ConfigurationForTests.class)
 class ManageProfilePostgresIntegrationTests {
 
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
@@ -80,12 +79,9 @@ class ManageProfilePostgresIntegrationTests {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;
     @LocalServerPort private int port;
-    @MockitoSpyBean private AccountRepository accountRepository;
-    @MockitoSpyBean private ProfileColorRepository profileColorRepository;
-
     @BeforeEach
     void clearDisposableProfileDatabase() {
-        reset(accountRepository, profileColorRepository);
+        RepositoryCallHooks.clearCalls();
         jdbc.update("DELETE FROM public.profile_style");
         jdbc.update("DELETE FROM public.profile_color");
         jdbc.update("DELETE FROM public.profile_brand");
@@ -355,18 +351,17 @@ class ManageProfilePostgresIntegrationTests {
                 styleBody("\"SLIM\"", "160", "\"S\"", "null", "null",
                         "[\"OLD\"]", "[\"RED\"]", "[]")).getResponse().getStatus()).isEqualTo(200);
 
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only profile write failure");
-        }).when(profileColorRepository).saveAll(any(Iterable.class));
-
         MvcResult failure;
-        try {
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("profileColorRepository".equals(bean) && "saveAll".equals(method.getName())) {
+                throw new IllegalStateException("test-only profile write failure");
+            }
+            return result;
+        })) {
             failure = perform("PUT", STYLE, customer,
                     styleBody("\"LOOSE\"", "180", "\"L\"", "\"32\"", "\"EU 42\"",
                             "[\"NEW\"]", "[\"BLUE\"]", "[]"));
-        } finally {
-            reset(accountRepository, profileColorRepository);
         }
         assertProblem(failure, 500, "INTERNAL_ERROR");
         JsonNode profile = json(perform("GET", STYLE, customer, null)).path("style_profile");
@@ -400,39 +395,40 @@ class ManageProfilePostgresIntegrationTests {
 
     private void assertSerializedWrites(UUID owner, String bearer, String method, String path,
             String firstBody, String secondBody) throws Exception {
-        reset(accountRepository, profileColorRepository);
         CountDownLatch firstOwnsLock = new CountDownLatch(1);
         CountDownLatch secondReachedLock = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         AtomicInteger order = new AtomicInteger();
-        doAnswer(invocation -> {
-            int position = order.incrementAndGet();
-            if (position == 1) {
-                boolean locked = (boolean) invocation.callRealMethod();
-                firstOwnsLock.countDown();
-                if (!releaseFirst.await(10, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("test synchronization timed out");
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, methodCall, arguments, invocation) -> {
+            if ("accountRepository".equals(bean) && "findLockedByAccountId".equals(methodCall.getName())) {
+                int position = order.incrementAndGet();
+                if (position == 1) {
+                    Object locked = invocation.proceed();
+                    firstOwnsLock.countDown();
+                    if (!releaseFirst.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("test synchronization timed out");
+                    }
+                    return locked;
                 }
-                return locked;
+                if (position == 2) secondReachedLock.countDown();
             }
-            if (position == 2) {
-                secondReachedLock.countDown();
+            return invocation.proceed();
+        })) {
+            CompletableFuture<HttpResponse<String>> first = sendAsync(method, path, bearer, firstBody);
+            assertThat(firstOwnsLock.await(10, TimeUnit.SECONDS))
+                    .as("first profile request should invoke findLockedByAccountId; calls=%s",
+                            RepositoryCallHooks.calls("accountRepository", "findLockedByAccountId"))
+                    .isTrue();
+            CompletableFuture<HttpResponse<String>> second = sendAsync(method, path, bearer, secondBody);
+            try {
+                assertThat(secondReachedLock.await(10, TimeUnit.SECONDS)).isTrue();
+                awaitPostgresRowLockWait();
+            } finally {
+                releaseFirst.countDown();
             }
-            return invocation.callRealMethod();
-        }).when(accountRepository).findLockedByAccountId(eq(owner));
-
-        CompletableFuture<HttpResponse<String>> first = sendAsync(method, path, bearer, firstBody);
-        assertThat(firstOwnsLock.await(10, TimeUnit.SECONDS)).isTrue();
-        CompletableFuture<HttpResponse<String>> second = sendAsync(method, path, bearer, secondBody);
-        try {
-            assertThat(secondReachedLock.await(10, TimeUnit.SECONDS)).isTrue();
-            awaitPostgresRowLockWait();
-        } finally {
-            releaseFirst.countDown();
+            assertThat(first.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
+            assertThat(second.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
         }
-        assertThat(first.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
-        assertThat(second.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
-            reset(accountRepository, profileColorRepository);
     }
 
     private void awaitPostgresRowLockWait() throws Exception {
@@ -440,7 +436,8 @@ class ManageProfilePostgresIntegrationTests {
         while (System.nanoTime() < deadline) {
             Integer waiting = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity "
                     + "WHERE datname = current_database() AND state = 'active' "
-                    + "AND wait_event_type = 'Lock' AND query ILIKE '%FOR UPDATE%'", Integer.class);
+                    + "AND wait_event_type = 'Lock' AND query ILIKE '%account%' "
+                    + "AND cardinality(pg_blocking_pids(pid)) > 0", Integer.class);
             if (waiting != null && waiting > 0) {
                 return;
             }

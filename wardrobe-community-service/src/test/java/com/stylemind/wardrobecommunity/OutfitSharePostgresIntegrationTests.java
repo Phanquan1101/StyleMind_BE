@@ -1,14 +1,15 @@
 package com.stylemind.wardrobecommunity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -27,19 +28,10 @@ import com.stylemind.wardrobecommunity.client.identity.IdentityDirectoryClient;
 import com.stylemind.wardrobecommunity.client.identity.payload.AccountLookupItem;
 import com.stylemind.wardrobecommunity.client.notification.ShareInvitationMailClient;
 import com.stylemind.wardrobecommunity.errors.ApiOperationException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.stylemind.wardrobecommunity.repository.outfit.OutfitRepository;
+import com.stylemind.wardrobecommunity.service.friendship.FriendshipService;
+import com.stylemind.wardrobecommunity.service.outfit.OutfitShareService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,9 +58,26 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.*;
 
 @SpringBootTest(properties = "management.health.db.enabled=false")
 @AutoConfigureMockMvc
@@ -82,10 +91,11 @@ class OutfitSharePostgresIntegrationTests {
     private static final RSAKey SIGNING_KEY = generateRsaKey();
 
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
-            .withDatabaseName("stylemind_wardrobe_community_share_test")
-            .withUsername("wardrobe_community_share_test")
-            .withPassword("test-only-not-a-secret");
+    private static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>("postgres:18.6")
+                    .withDatabaseName("stylemind_wardrobe_community_share_test")
+                    .withUsername("wardrobe_community_share_test")
+                    .withPassword("test-only-not-a-secret");
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -97,6 +107,10 @@ class OutfitSharePostgresIntegrationTests {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private FriendshipService friendshipService;
+    @Autowired private OutfitShareService sharing;
+    @Autowired private OutfitRepository outfits;
+    @Autowired private TransactionTemplate transaction;
     @MockitoBean private CommerceCatalogClient catalog;
     @MockitoBean private IdentityDirectoryClient identity;
     @MockitoBean private ShareInvitationMailClient mail;
@@ -113,391 +127,623 @@ class OutfitSharePostgresIntegrationTests {
         jdbc.update("DELETE FROM public.outfit_share");
         jdbc.update("DELETE FROM public.outfit_item");
         jdbc.update("DELETE FROM public.outfit");
+        jdbc.update("DELETE FROM public.friendship");
         commerce.clear();
         accounts.clear();
         owner = account("Owner@Example.Test", "Linh Tran");
         viewer = account("viewer@example.test", "Minh Le");
         stranger = account("stranger@example.test", "Sam Pham");
         variant = variant();
-        when(catalog.lookup(any())).thenAnswer(invocation -> {
-            Collection<UUID> ids = invocation.getArgument(0);
-            Map<UUID, VariantLookupItem> found = new LinkedHashMap<>();
-            ids.forEach(id -> {
-                if (commerce.containsKey(id)) {
-                    found.put(id, commerce.get(id));
-                }
-            });
-            return found;
-        });
-        when(identity.lookup(any())).thenAnswer(invocation -> {
-            Collection<UUID> ids = invocation.getArgument(0);
-            Map<UUID, AccountLookupItem> found = new LinkedHashMap<>();
-            ids.forEach(id -> {
-                if (accounts.containsKey(id)) {
-                    found.put(id, accounts.get(id));
-                }
-            });
-            return found;
-        });
+        when(catalog.lookup(any()))
+                .thenAnswer(
+                        invocation -> {
+                            Collection<UUID> ids = invocation.getArgument(0);
+                            Map<UUID, VariantLookupItem> found = new LinkedHashMap<>();
+                            ids.forEach(
+                                    id -> {
+                                        if (commerce.containsKey(id)) {
+                                            found.put(id, commerce.get(id));
+                                        }
+                                    });
+                            return found;
+                        });
+        when(identity.lookup(any()))
+                .thenAnswer(
+                        invocation -> {
+                            Collection<UUID> ids = invocation.getArgument(0);
+                            Map<UUID, AccountLookupItem> found = new LinkedHashMap<>();
+                            ids.forEach(
+                                    id -> {
+                                        if (accounts.containsKey(id)) {
+                                            found.put(id, accounts.get(id));
+                                        }
+                                    });
+                            return found;
+                        });
     }
 
-    // ---------------------------------------------------------------- authentication and authorization
+    // The approved cutover replaces the old email-grant success scenarios with 410
+    // assertions and current-friend visibility. Original baseline is snapshotted in evidence.
+    @Test
+    void authAndRolesProtectAllOwnerAndFriendRoutes() throws Exception {
+        UUID id = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
+        for (String jwt : new String[] {null, token(stranger, "ADMIN")}) {
+            int expected = jwt == null ? 401 : 403;
+            for (var route :
+                    List.of(
+                            get(settings(id)),
+                            patch(settings(id)),
+                            get(friendList(owner)),
+                            get(friendDetail(owner, id)),
+                            post(OUTFITS + "/" + id + "/shares"),
+                            get(OUTFITS + "/" + id + "/shares"),
+                            delete(OUTFITS + "/" + id + "/shares/" + UUID.randomUUID()),
+                            get(SHARED),
+                            get(SHARED + "/" + id),
+                            put(OUTFITS + "/" + id + "/public-link"),
+                            delete(OUTFITS + "/" + id + "/public-link")))
+                send(route, jwt, "{\"visibility\":\"FRIENDS\",\"email\":\"viewer@example.test\"}")
+                        .andExpect(status().is(expected));
+        }
+        send(get(PUBLIC + "/unknown-fixture"), null, null).andExpect(status().isNotFound());
+        send(post(PUBLIC + "/unknown-fixture"), null, null).andExpect(status().isUnauthorized());
+    }
 
     @Test
-    void sharingAndViewerRoutesNeedACustomerAndPublicRouteNeedsNothing() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        String body = "{\"email\":\"viewer@example.test\"}";
-        List<MockHttpServletRequestBuilder> routes = List.of(
-                post(OUTFITS + "/" + outfitId + "/shares"), get(OUTFITS + "/" + outfitId + "/shares"),
-                delete(OUTFITS + "/" + outfitId + "/shares/" + UUID.randomUUID()),
-                put(OUTFITS + "/" + outfitId + "/public-link"), delete(OUTFITS + "/" + outfitId + "/public-link"),
-                get(SHARED), get(SHARED + "/" + outfitId));
-        for (MockHttpServletRequestBuilder route : routes) {
-            send(route, null, body).andExpect(status().isUnauthorized());
+    void defaultPrivateAndSettingsAreOwnerOnlyWithStrictBody() throws Exception {
+        UUID id = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
+        var initial =
+                json(
+                        send(get(settings(id)), token(owner, "CUSTOMER"), null)
+                                .andExpect(status().isOk())
+                                .andExpect(header().string("Cache-Control", "no-store")));
+        assertThat(initial.path("visibility").asText()).isEqualTo("PRIVATE");
+        assertThat(initial.path("public_enabled").asBoolean()).isFalse();
+        for (String body :
+                List.of(
+                        "{}",
+                        "null",
+                        "[]",
+                        "{\"visibility\":null}",
+                        "{\"visibility\":\"friends\"}",
+                        "{\"visibility\":\"PUBLIC\",\"owner_account_id\":\"other\"}",
+                        "{\"visibility\":\"PRIVATE\",\"visibility\":\"PUBLIC\"}",
+                        "{\"visibility\":\"PUBLIC\"} {}"))
+            assertProblem(
+                    send(patch(settings(id)), token(owner, "CUSTOMER"), body),
+                    400,
+                    "INVALID_REQUEST");
+        send(
+                        patch(settings(id)).contentType(MediaType.APPLICATION_JSON),
+                        token(owner, "CUSTOMER"),
+                        null)
+                .andExpect(status().isBadRequest());
+        for (UUID actor : List.of(viewer, stranger)) {
+            assertProblem(
+                    send(get(settings(id)), token(actor, "CUSTOMER"), null),
+                    404,
+                    "RESOURCE_NOT_FOUND");
+            assertProblem(
+                    send(
+                            patch(settings(id)),
+                            token(actor, "CUSTOMER"),
+                            "{\"visibility\":\"PUBLIC\"}"),
+                    404,
+                    "RESOURCE_NOT_FOUND");
         }
-        String admin = token(UUID.randomUUID(), "ADMIN");
-        for (MockHttpServletRequestBuilder route : routes) {
-            send(route, admin, body).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        assertProblem(
+                send(get(OUTFITS + "/bad-uuid/sharing"), token(owner, "CUSTOMER"), null),
+                400,
+                "INVALID_REQUEST");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT visibility FROM outfit WHERE outfit_id=?",
+                                String.class,
+                                id))
+                .isEqualTo("PRIVATE");
+    }
+
+    @Test
+    void legacyEmailGrantsAndFeedAreRetiredWithoutMailOrMutations() throws Exception {
+        UUID id = seedOutfit(owner, "Private", OffsetDateTime.now(), variant);
+        UUID grant = seedShare(id, "viewer@example.test", OffsetDateTime.now(), null);
+        for (var route :
+                List.of(
+                        get(OUTFITS + "/" + id + "/shares"),
+                        post(OUTFITS + "/" + id + "/shares"),
+                        delete(OUTFITS + "/" + id + "/shares/" + grant))) {
+            assertProblem(
+                    send(route, token(owner, "CUSTOMER"), "{\"email\":\"viewer@example.test\"}"),
+                    410,
+                    "OUTFIT_EMAIL_SHARING_RETIRED");
         }
-        // The public route is open for GET only; any other method still needs a token.
-        send(post(PUBLIC + "/anything"), null, "{}").andExpect(status().isUnauthorized());
-        send(get(PUBLIC + "/anything"), null, null).andExpect(status().isNotFound());
+        assertProblem(
+                send(get(SHARED), token(viewer, "CUSTOMER"), null),
+                410,
+                "OUTFIT_EMAIL_SHARING_RETIRED");
+        assertProblem(
+                send(get(SHARED + "/" + id), token(viewer, "CUSTOMER"), null),
+                410,
+                "OUTFIT_EMAIL_SHARING_RETIRED");
+        assertProblem(
+                send(get(OUTFITS + "/" + id + "/shares"), token(stranger, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        pair(owner, viewer);
+        assertProblem(
+                send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        assertThat(count("outfit_share")).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT revoked_at FROM outfit_share WHERE outfit_share_id=?",
+                                OffsetDateTime.class,
+                                grant))
+                .isNull();
+        org.mockito.Mockito.verifyNoInteractions(mail);
+    }
+
+    @Test
+    void friendsModePermitsAllCurrentFriendsButNeverPrivateOrAnotherParent() throws Exception {
+        UUID secondFriend = account("another@example.test", "Another Friend");
+        pair(owner, viewer);
+        pair(owner, secondFriend);
+        UUID visible = seedOutfit(owner, "Friends look", OffsetDateTime.now(), variant);
+        UUID hidden = seedOutfit(owner, "Private look", OffsetDateTime.now(), variant);
+        mode(visible, "FRIENDS");
+        for (UUID actor : List.of(viewer, secondFriend)) {
+            var list =
+                    json(
+                            send(get(friendList(owner)), token(actor, "CUSTOMER"), null)
+                                    .andExpect(status().isOk()));
+            assertThat(list.path("total_elements").asInt()).isEqualTo(1);
+            assertThat(list.path("items").get(0).path("outfit_id").asText())
+                    .isEqualTo(visible.toString());
+            var detail =
+                    json(
+                            send(get(friendDetail(owner, visible)), token(actor, "CUSTOMER"), null)
+                                    .andExpect(status().isOk()));
+            assertThat(detail.path("items").get(0).path("variant_id").asText())
+                    .isEqualTo(variant.toString());
+            assertThat(detail.has("public_token")).isFalse();
+            assertThat(detail.has("owner_account_id")).isFalse();
+            assertThat(detail.has("email")).isFalse();
+            assertProblem(
+                    send(get(friendDetail(owner, hidden)), token(actor, "CUSTOMER"), null),
+                    404,
+                    "RESOURCE_NOT_FOUND");
+        }
+        assertProblem(
+                send(get(friendList(owner)), token(stranger, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        assertProblem(
+                send(get(friendList(owner)), token(owner, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        pair(viewer, stranger);
+        assertProblem(
+                send(get(friendDetail(stranger, visible)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
         assertThat(count("outfit_share")).isZero();
-    }
-
-    // ---------------------------------------------------------------- sharing by email
-
-    @Test
-    void newShareReturns201NormalizesTheEmailAndSendsExactlyOneInvitation() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Weekend look", OffsetDateTime.now(), variant);
-
-        JsonNode share = json(shareWith(owner, outfitId, "  Viewer@Example.TEST ").andExpect(status().isCreated()));
-
-        assertThat(share.fieldNames()).toIterable().containsExactlyInAnyOrder("share_id", "email", "granted_at");
-        assertThat(share.path("email").asText()).isEqualTo("viewer@example.test");
-        assertThat(share.path("granted_at").asText()).isNotBlank();
-        assertThat(count("outfit_share")).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT recipient_email FROM public.outfit_share", String.class))
-                .isEqualTo("viewer@example.test");
-        verify(mail, times(1)).send("viewer@example.test", "Linh Tran", "Weekend look", outfitId);
+        org.mockito.Mockito.verifyNoInteractions(mail);
     }
 
     @Test
-    void sharingWithAnActiveRecipientReturns200WithTheSameShareAndNoSecondInvitation() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        JsonNode first = json(shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated()));
-
-        JsonNode again = json(shareWith(owner, outfitId, "VIEWER@example.test").andExpect(status().isOk()));
-
-        assertThat(again.path("share_id").asText()).isEqualTo(first.path("share_id").asText());
-        assertThat(again.path("granted_at").asText()).isEqualTo(first.path("granted_at").asText());
-        assertThat(count("outfit_share")).isEqualTo(1);
-        verify(mail, times(1)).send(any(), any(), any(), any());
-    }
-
-    @Test
-    void sharingAgainAfterRevokeReturns201ReusesTheRowAndInvitesAgain() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        JsonNode first = json(shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated()));
-        UUID shareId = UUID.fromString(first.path("share_id").asText());
-        send(delete(OUTFITS + "/" + outfitId + "/shares/" + shareId), token(owner, "CUSTOMER"), null)
-                .andExpect(status().isNoContent());
-        assertThat(jdbc.queryForObject("SELECT revoked_at FROM public.outfit_share", OffsetDateTime.class)).isNotNull();
-
-        JsonNode again = json(shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated()));
-
-        assertThat(again.path("share_id").asText()).isEqualTo(shareId.toString());
-        assertThat(count("outfit_share")).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT revoked_at FROM public.outfit_share", OffsetDateTime.class)).isNull();
-        verify(mail, times(2)).send("viewer@example.test", "Linh Tran", "Look", outfitId);
-    }
-
-    @Test
-    void sharingWithTheOwnerIsRejected() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-
-        assertProblem(shareWith(owner, outfitId, "OWNER@example.test"), 400, "OUTFIT_SHARE_SELF");
-
-        assertThat(count("outfit_share")).isZero();
-        verify(mail, never()).send(any(), any(), any(), any());
-    }
-
-    @Test
-    void twentyActiveSharesBlockTheNextOneButAnExistingRecipientStays200() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        for (int i = 0; i < 20; i++) {
-            seedShare(outfitId, "friend" + i + "@example.test", OffsetDateTime.now().minusDays(3), null);
+    void privateNeverLeaksThroughCountsOrStablePaginationAndListNeverCallsCommerce()
+            throws Exception {
+        pair(owner, viewer);
+        OffsetDateTime time = OffsetDateTime.now().minusDays(1);
+        for (int i = 0; i < 3; i++) {
+            UUID id = seedOutfit(owner, "Visible " + i, time, variant);
+            mode(id, i == 1 ? "PUBLIC" : "FRIENDS");
         }
-
-        assertProblem(shareWith(owner, outfitId, "one-more@example.test"), 409, "OUTFIT_SHARE_LIMIT_REACHED");
-        shareWith(owner, outfitId, "friend3@example.test").andExpect(status().isOk());
-
-        assertThat(count("outfit_share")).isEqualTo(20);
-        // A revoked share frees a slot.
-        jdbc.update("UPDATE public.outfit_share SET revoked_at = now() WHERE recipient_email = 'friend0@example.test'");
-        shareWith(owner, outfitId, "one-more@example.test").andExpect(status().isCreated());
-    }
-
-    @Test
-    void thirtyGrantsInTheLastDayAcrossOutfitsAreRateLimited() throws Exception {
-        UUID target = seedOutfit(owner, "Target", OffsetDateTime.now(), variant);
-        UUID other = seedOutfit(owner, "Other", OffsetDateTime.now(), variant);
-        for (int i = 0; i < 30; i++) {
-            // Revoked grants still count as grants.
-            seedShare(other, "old" + i + "@example.test", OffsetDateTime.now().minusHours(2),
-                    i % 2 == 0 ? OffsetDateTime.now().minusHours(1) : null);
+        seedOutfit(owner, "Secret", OffsetDateTime.now(), variant);
+        // Fix equal timestamps to exercise the UUID tie break without depending on write clock.
+        jdbc.update("UPDATE outfit SET updated_at=? WHERE visibility<>'PRIVATE'", time);
+        var expected =
+                jdbc.queryForList(
+                        "SELECT outfit_id::text FROM outfit WHERE visibility<>'PRIVATE' ORDER BY"
+                            + " updated_at DESC,outfit_id DESC",
+                        String.class);
+        for (int page = 0; page < 3; page++) {
+            var result =
+                    json(
+                            send(
+                                    get(friendList(owner))
+                                            .param("page", String.valueOf(page))
+                                            .param("size", "1"),
+                                    token(viewer, "CUSTOMER"),
+                                    null));
+            assertThat(result.path("total_elements").asInt()).isEqualTo(3);
+            assertThat(result.path("total_pages").asInt()).isEqualTo(3);
+            assertThat(result.path("items").get(0).path("outfit_id").asText())
+                    .isEqualTo(expected.get(page));
         }
-
-        assertProblem(shareWith(owner, target, "new@example.test"), 429, "SHARE_RATE_LIMITED");
-        // An already active recipient is not a new grant.
-        shareWith(owner, other, "old1@example.test").andExpect(status().isOk());
-
-        jdbc.update("UPDATE public.outfit_share SET granted_at = now() - interval '25 hours'");
-        shareWith(owner, target, "new@example.test").andExpect(status().isCreated());
-    }
-
-    @Test
-    void invitationFailureDoesNotFailOrRollBackTheShare() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        doThrow(new RuntimeException("notification down")).when(mail).send(any(), any(), any(), any());
-
-        shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated());
-
-        assertThat(count("outfit_share")).isEqualTo(1);
-    }
-
-    @Test
-    void identityFailureIs503AndNothingIsWrittenOrSent() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        seedShare(outfitId, "viewer@example.test", OffsetDateTime.now(), null);
-        doThrow(new ApiOperationException(HttpStatus.SERVICE_UNAVAILABLE, "IDENTITY_UNAVAILABLE",
-                "Account directory is temporarily unavailable")).when(identity).lookup(any());
-
-        assertProblem(shareWith(owner, outfitId, "new@example.test"), 503, "IDENTITY_UNAVAILABLE");
-        assertProblem(send(get(SHARED), token(viewer, "CUSTOMER"), null), 503, "IDENTITY_UNAVAILABLE");
-        assertProblem(send(get(SHARED + "/" + outfitId), token(viewer, "CUSTOMER"), null), 503, "IDENTITY_UNAVAILABLE");
-
-        assertThat(count("outfit_share")).isEqualTo(1);
-        verify(mail, never()).send(any(), any(), any(), any());
-    }
-
-    @Test
-    void sharingValidatesTheBodyTheIdsAndOwnership() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        UUID foreign = seedOutfit(stranger, "Not mine", OffsetDateTime.now(), variant);
-        UUID foreignShare = seedShare(foreign, "someone@example.test", OffsetDateTime.now(), null);
-        String ownerToken = token(owner, "CUSTOMER");
-        String path = OUTFITS + "/" + outfitId + "/shares";
-
-        for (String invalid : List.of("{}", "{\"email\":\"\"}", "{\"email\":\"   \"}", "{\"email\":\"nope\"}",
-                "{\"email\":\"a@b\"}", "{\"email\":\"a@@example.test\"}", "{\"email\":\"a b@example.test\"}",
-                "{\"email\":\"a@exa mple.test\"}", "{\"email\":null}", "{\"email\":5}",
-                "{\"email\":\"" + "a".repeat(250) + "@example.test\"}",
-                "{\"email\":\"" + "a".repeat(65) + "@example.test\"}",
-                "{\"email\":\"viewer@example.test\",\"role\":\"ADMIN\"}", "{bad-json")) {
-            assertProblem(send(post(path), ownerToken, invalid), 400, "INVALID_REQUEST");
-        }
-        assertThat(count("outfit_share")).isEqualTo(1);
-
-        assertProblem(shareWith(owner, foreign, "viewer@example.test"), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(get(OUTFITS + "/" + foreign + "/shares"), ownerToken, null), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(delete(OUTFITS + "/" + foreign + "/shares/" + foreignShare), ownerToken, null), 404,
-                "RESOURCE_NOT_FOUND");
-        assertProblem(send(put(OUTFITS + "/" + foreign + "/public-link"), ownerToken, null), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(delete(OUTFITS + "/" + foreign + "/public-link"), ownerToken, null), 404,
-                "RESOURCE_NOT_FOUND");
-        // A share id that belongs to another outfit is 404 for the owner of this one.
-        assertProblem(send(delete(path + "/" + foreignShare), ownerToken, null), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(get(OUTFITS + "/not-a-uuid/shares"), ownerToken, null), 400, "INVALID_REQUEST");
-        assertProblem(send(delete(path + "/not-a-uuid"), ownerToken, null), 400, "INVALID_REQUEST");
-        assertThat(jdbc.queryForObject("SELECT revoked_at FROM public.outfit_share WHERE outfit_share_id = ?",
-                OffsetDateTime.class, foreignShare)).isNull();
-    }
-
-    @Test
-    void listingSharesShowsOnlyActiveOnesAndRevokingTwiceIs404() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        UUID active = seedShare(outfitId, "b@example.test", OffsetDateTime.now().minusHours(1), null);
-        UUID newer = seedShare(outfitId, "c@example.test", OffsetDateTime.now(), null);
-        UUID revoked = seedShare(outfitId, "a@example.test", OffsetDateTime.now().minusHours(2), OffsetDateTime.now());
-        String ownerToken = token(owner, "CUSTOMER");
-
-        JsonNode list = json(send(get(OUTFITS + "/" + outfitId + "/shares"), ownerToken, null)
-                .andExpect(status().isOk()));
-        assertThat(list.path("items")).hasSize(2);
-        assertThat(list.path("items").get(0).path("share_id").asText()).isEqualTo(newer.toString());
-        assertThat(list.path("items").get(1).path("share_id").asText()).isEqualTo(active.toString());
-        assertThat(list.path("items").get(0).fieldNames()).toIterable()
-                .containsExactlyInAnyOrder("share_id", "email", "granted_at");
-
-        send(delete(OUTFITS + "/" + outfitId + "/shares/" + active), ownerToken, null).andExpect(status().isNoContent());
-        assertProblem(send(delete(OUTFITS + "/" + outfitId + "/shares/" + active), ownerToken, null), 404,
-                "RESOURCE_NOT_FOUND");
-        assertProblem(send(delete(OUTFITS + "/" + outfitId + "/shares/" + revoked), ownerToken, null), 404,
-                "RESOURCE_NOT_FOUND");
-    }
-
-    // ---------------------------------------------------------------- viewer
-
-    @Test
-    void viewerSeesASharedOutfitWithoutOwnerPrivateFields() throws Exception {
-        UUID shirt = variantNamed("Linen Shirt");
-        UUID outfitId = seedOutfit(owner, "Weekend look", OffsetDateTime.now(), shirt, variant);
-        jdbc.update("UPDATE public.outfit SET public_token = 'secret-public-token-value' WHERE outfit_id = ?", outfitId);
-        shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated());
-        shareWith(owner, outfitId, "other-friend@example.test").andExpect(status().isCreated());
-        String viewerToken = token(viewer, "CUSTOMER");
-
-        JsonNode list = json(send(get(SHARED), viewerToken, null).andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store")));
+        var beyond =
+                json(
+                        send(
+                                get(friendList(owner))
+                                        .param("page", "2147483647")
+                                        .param("size", "100"),
+                                token(viewer, "CUSTOMER"),
+                                null));
+        assertThat(beyond.path("items")).isEmpty();
+        assertThat(beyond.path("total_elements").asInt()).isEqualTo(3);
+        for (var route :
+                List.of(
+                        get(friendList(owner)).param("page", "-1"),
+                        get(friendList(owner)).param("size", "101"),
+                        get(friendList(owner)).param("size", "0"),
+                        get(friendList(owner)).param("page", "0", "1"),
+                        get(friendList(owner)).param("sort", "name")))
+            assertProblem(send(route, token(viewer, "CUSTOMER"), null), 400, "INVALID_REQUEST");
         verify(catalog, never()).lookup(any());
-        assertThat(list.path("total_elements").asLong()).isEqualTo(1);
-        JsonNode summary = list.path("items").get(0);
-        assertThat(summary.fieldNames()).toIterable().containsExactlyInAnyOrder("outfit_id", "name",
-                "owner_display_name", "item_count", "granted_at");
-        assertThat(summary.path("owner_display_name").asText()).isEqualTo("Linh Tran");
-        assertThat(summary.path("item_count").asInt()).isEqualTo(2);
-
-        ResultActions detail = send(get(SHARED + "/" + outfitId), viewerToken, null).andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
-        String raw = detail.andReturn().getResponse().getContentAsString();
-        JsonNode view = mapper.readTree(raw);
-        assertThat(view.fieldNames()).toIterable()
-                .containsExactlyInAnyOrder("outfit_id", "name", "owner_display_name", "items");
-        assertThat(view.path("owner_display_name").asText()).isEqualTo("Linh Tran");
-        assertThat(view.path("items")).hasSize(2);
-        assertThat(view.path("items").get(0).path("product_name").asText()).isEqualTo("Linen Shirt");
-        assertThat(view.path("items").get(0).path("available").asBoolean()).isTrue();
-        assertThat(raw).doesNotContain(owner.toString()).doesNotContain("owner@example.test")
-                .doesNotContain("creation_source").doesNotContain("public_token").doesNotContain("secret-public-token-value")
-                .doesNotContain("other-friend").doesNotContain("shares").doesNotContain("owner_account_id");
     }
 
     @Test
-    void revokedOrForeignViewersAndTheOwnerGet404() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        JsonNode share = json(shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated()));
-        String viewerToken = token(viewer, "CUSTOMER");
-        send(get(SHARED + "/" + outfitId), viewerToken, null).andExpect(status().isOk());
-
-        assertProblem(send(get(SHARED + "/" + outfitId), token(stranger, "CUSTOMER"), null), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(get(SHARED + "/" + outfitId), token(owner, "CUSTOMER"), null), 404, "RESOURCE_NOT_FOUND");
-        assertThat(json(send(get(SHARED), token(stranger, "CUSTOMER"), null)).path("items")).isEmpty();
-        assertProblem(send(get(SHARED + "/" + UUID.randomUUID()), viewerToken, null), 404, "RESOURCE_NOT_FOUND");
-        assertProblem(send(get(SHARED + "/not-a-uuid"), viewerToken, null), 400, "INVALID_REQUEST");
-
-        send(delete(OUTFITS + "/" + outfitId + "/shares/" + share.path("share_id").asText()), token(owner, "CUSTOMER"),
-                null).andExpect(status().isNoContent());
-        assertProblem(send(get(SHARED + "/" + outfitId), viewerToken, null), 404, "RESOURCE_NOT_FOUND");
-        assertThat(json(send(get(SHARED), viewerToken, null)).path("items")).isEmpty();
+    void publicLinkSurvivesOffOnAndAliasesDoNotChangeFriendsOrNoopTimestamps() throws Exception {
+        UUID id = seedOutfit(owner, "Public look", OffsetDateTime.now().minusDays(1), variant);
+        var published = mode(id, "PUBLIC");
+        String link = published.path("public_token").asText();
+        assertThat(link).hasSize(43);
+        Object updated =
+                jdbc.queryForObject(
+                        "SELECT updated_at FROM outfit WHERE outfit_id=?",
+                        OffsetDateTime.class,
+                        id);
+        var again = mode(id, "PUBLIC");
+        assertThat(again).isEqualTo(published);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT updated_at FROM outfit WHERE outfit_id=?",
+                                OffsetDateTime.class,
+                                id))
+                .isEqualTo(updated);
+        var guest =
+                json(
+                        send(get(PUBLIC + "/" + link), null, null)
+                                .andExpect(status().isOk())
+                                .andExpect(header().string("Cache-Control", "no-store")));
+        assertThat(guest.has("public_token")).isFalse();
+        assertThat(guest.has("owner_account_id")).isFalse();
+        mode(id, "FRIENDS");
+        send(delete(OUTFITS + "/" + id + "/public-link"), token(owner, "CUSTOMER"), null)
+                .andExpect(status().isNoContent());
+        var inactive = json(send(get(settings(id)), token(owner, "CUSTOMER"), null));
+        assertThat(inactive.path("visibility").asText()).isEqualTo("FRIENDS");
+        assertThat(inactive.path("public_token").asText()).isEqualTo(link);
+        var denied = send(get(PUBLIC + "/" + link), null, null);
+        assertProblem(denied, 404, "RESOURCE_NOT_FOUND");
+        assertThat(json(denied).path("instance").asText())
+                .isEqualTo(PUBLIC); // No credential in error metadata.
+        var alias =
+                json(
+                        send(
+                                        put(OUTFITS + "/" + id + "/public-link"),
+                                        token(owner, "CUSTOMER"),
+                                        null)
+                                .andExpect(status().isOk()));
+        assertThat(alias.path("public_token").asText()).isEqualTo(link);
+        send(delete(OUTFITS + "/" + id + "/public-link"), token(owner, "CUSTOMER"), null)
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
+        assertThat(
+                        json(send(get(settings(id)), token(owner, "CUSTOMER"), null))
+                                .path("visibility")
+                                .asText())
+                .isEqualTo("PRIVATE");
+        assertProblem(send(get(PUBLIC + "/" + link), null, null), 404, "RESOURCE_NOT_FOUND");
+        assertThat(mode(id, "PUBLIC").path("public_token").asText()).isEqualTo(link);
     }
 
     @Test
-    void sharedListIsPagedByGrantNewestFirstAndRejectsBadPagination() throws Exception {
-        UUID a = seedOutfit(owner, "A", OffsetDateTime.now(), variant);
-        UUID b = seedOutfit(owner, "B", OffsetDateTime.now(), variant, variantNamed("Two"));
-        UUID c = seedOutfit(owner, "C", OffsetDateTime.now(), variant);
-        UUID revoked = seedOutfit(owner, "Revoked", OffsetDateTime.now(), variant);
-        OffsetDateTime base = OffsetDateTime.now().minusDays(1);
-        seedShare(a, "viewer@example.test", base, null);
-        seedShare(b, "viewer@example.test", base.plusHours(1), null);
-        seedShare(c, "viewer@example.test", base.plusHours(2), null);
-        seedShare(revoked, "viewer@example.test", base.plusHours(3), OffsetDateTime.now());
-        String viewerToken = token(viewer, "CUSTOMER");
+    void viewersCannotMutateOwnerResourcesAndDeleteInvalidatesEveryReadPath() throws Exception {
+        pair(owner, viewer);
+        UUID id = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
+        String link = mode(id, "PUBLIC").path("public_token").asText();
+        UUID item =
+                jdbc.queryForObject(
+                        "SELECT outfit_item_id FROM outfit_item WHERE outfit_id=?", UUID.class, id);
+        for (var route :
+                List.of(
+                        patch(OUTFITS + "/" + id),
+                        post(OUTFITS + "/" + id + "/items"),
+                        patch(OUTFITS + "/" + id + "/items/" + item),
+                        delete(OUTFITS + "/" + id + "/items/" + item),
+                        delete(OUTFITS + "/" + id),
+                        put(OUTFITS + "/" + id + "/public-link"),
+                        delete(OUTFITS + "/" + id + "/public-link"))) {
+            String body = mapper.writeValueAsString(Map.of("name", "Changed"));
+            // Each route receives the valid payload for that operation so validation cannot mask
+            // ownership.
+            String uri =
+                    route.buildRequest(new org.springframework.mock.web.MockServletContext())
+                            .getRequestURI();
+            if (uri.contains("/items"))
+                body = mapper.writeValueAsString(Map.of("variant_id", variant.toString()));
+            send(route, token(viewer, "CUSTOMER"), body).andExpect(status().isNotFound());
+        }
+        send(delete(OUTFITS + "/" + id), token(owner, "CUSTOMER"), null)
+                .andExpect(status().isNoContent());
+        assertProblem(send(get(PUBLIC + "/" + link), null, null), 404, "RESOURCE_NOT_FOUND");
+        assertProblem(
+                send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+    }
 
-        JsonNode first = json(send(get(SHARED + "?page=0&size=2"), viewerToken, null).andExpect(status().isOk()));
-        assertThat(first.path("total_elements").asLong()).isEqualTo(3);
-        assertThat(first.path("total_pages").asLong()).isEqualTo(2);
-        assertThat(first.path("items").get(0).path("outfit_id").asText()).isEqualTo(c.toString());
-        assertThat(first.path("items").get(1).path("outfit_id").asText()).isEqualTo(b.toString());
-        assertThat(first.path("items").get(1).path("item_count").asInt()).isEqualTo(2);
-        assertThat(json(send(get(SHARED + "?page=1&size=2"), viewerToken, null)).path("items").get(0)
-                .path("outfit_id").asText()).isEqualTo(a.toString());
-        for (String query : List.of("?page=-1", "?size=0", "?size=101", "?page=x", "?sort=name")) {
-            assertProblem(send(get(SHARED + query), viewerToken, null), 400, "INVALID_REQUEST");
+    @Test
+    void unfriendBlocksBothDirectionsAndRefriendRestoresOnlyVisibleOutfits() throws Exception {
+        UUID pair = pair(owner, viewer);
+        UUID id = seedOutfit(owner, "Friends", OffsetDateTime.now(), variant);
+        mode(id, "FRIENDS");
+        UUID hidden = seedOutfit(owner, "Private", OffsetDateTime.now(), variant);
+        friendshipService.unfriend(owner, viewer);
+        assertProblem(
+                send(get(friendList(owner)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        assertProblem(
+                send(get(friendList(viewer)), token(owner, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        jdbc.update(
+                "UPDATE friendship SET unfriended_at=NULL,established_at=updated_at WHERE"
+                    + " friendship_id=?",
+                pair);
+        send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null)
+                .andExpect(status().isOk());
+        assertProblem(
+                send(get(friendDetail(owner, hidden)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void rechecksVisibilityAfterCatalogIoWithoutKeepingDatabaseTransactionOpen() throws Exception {
+        pair(owner, viewer);
+        UUID id = seedOutfit(owner, "Friends", OffsetDateTime.now(), variant);
+        mode(id, "FRIENDS");
+        org.mockito.Mockito.doAnswer(
+                        call -> {
+                            assertThat(
+                                            TransactionSynchronizationManager
+                                                    .isActualTransactionActive())
+                                    .isFalse();
+                            sharing.changeVisibility(owner, id, "PRIVATE");
+                            return Map.copyOf(commerce);
+                        })
+                .when(catalog)
+                .lookup(any());
+        assertProblem(
+                send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void rechecksUnfriendAfterCatalogIoAndFriendshipAfterListIdentityIo() throws Exception {
+        pair(owner, viewer);
+        UUID id = seedOutfit(owner, "Friends", OffsetDateTime.now(), variant);
+        mode(id, "FRIENDS");
+        org.mockito.Mockito.doAnswer(
+                        call -> {
+                            friendshipService.unfriend(owner, viewer);
+                            return Map.copyOf(commerce);
+                        })
+                .when(catalog)
+                .lookup(any());
+        assertProblem(
+                send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        jdbc.update("UPDATE friendship SET unfriended_at=NULL,established_at=updated_at");
+        org.mockito.Mockito.doAnswer(
+                        call -> {
+                            assertThat(
+                                            TransactionSynchronizationManager
+                                                    .isActualTransactionActive())
+                                    .isFalse();
+                            friendshipService.unfriend(owner, viewer);
+                            return Map.copyOf(accounts);
+                        })
+                .when(identity)
+                .lookup(any());
+        assertProblem(
+                send(get(friendList(owner)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void publicReaderRechecksAfterIoAndKeepsUnavailableItems() throws Exception {
+        UUID id = seedOutfit(owner, "Public", OffsetDateTime.now(), variant);
+        String link = mode(id, "PUBLIC").path("public_token").asText();
+        commerce.clear();
+        var unavailable =
+                json(send(get(PUBLIC + "/" + link), null, null).andExpect(status().isOk()));
+        assertThat(unavailable.path("items")).hasSize(1);
+        assertThat(unavailable.path("items").get(0).path("available").asBoolean()).isFalse();
+        org.mockito.Mockito.doAnswer(
+                        call -> {
+                            sharing.changeVisibility(owner, id, "PRIVATE");
+                            return Map.of();
+                        })
+                .when(catalog)
+                .lookup(any());
+        assertProblem(send(get(PUBLIC + "/" + link), null, null), 404, "RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void downstreamFailureDoesNotBypassModeOrLeakPrivateMetadata() throws Exception {
+        pair(owner, viewer);
+        UUID id = seedOutfit(owner, "Hidden", OffsetDateTime.now(), variant);
+        doThrow(
+                        new ApiOperationException(
+                                HttpStatus.SERVICE_UNAVAILABLE,
+                                "CATALOG_UNAVAILABLE",
+                                "Catalog is unavailable"))
+                .when(catalog)
+                .lookup(any());
+        assertProblem(
+                send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null),
+                404,
+                "RESOURCE_NOT_FOUND");
+        verify(catalog, never()).lookup(any());
+        mode(id, "FRIENDS");
+        send(get(friendDetail(owner, id)), token(viewer, "CUSTOMER"), null)
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void writeWaitsForOwnedRowLockAndTransactionRollbackPreservesLinkState() throws Exception {
+        UUID id = seedOutfit(owner, "Concurrent", OffsetDateTime.now(), variant);
+        CountDownLatch locked = new CountDownLatch(1), release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder =
+                    pool.submit(
+                            () ->
+                                    transaction.executeWithoutResult(
+                                            tx -> {
+                                                outfits.findLockedByOutfitIdAndOwnerAccountId(
+                                                                id, owner)
+                                                        .orElseThrow();
+                                                locked.countDown();
+                                                try {
+                                                    if (!release.await(10, TimeUnit.SECONDS))
+                                                        throw new IllegalStateException(
+                                                                "Test lock timeout");
+                                                } catch (InterruptedException e) {
+                                                    Thread.currentThread().interrupt();
+                                                    throw new IllegalStateException(e);
+                                                }
+                                            }));
+            assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+            CountDownLatch started = new CountDownLatch(1);
+            Future<?> writer =
+                    pool.submit(
+                            () -> {
+                                started.countDown();
+                                return sharing.changeVisibility(owner, id, "PUBLIC");
+                            });
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> writer.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+            release.countDown();
+            holder.get(10, TimeUnit.SECONDS);
+            writer.get(10, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+        var before = sharing.settings(owner, id);
+        assertThatThrownBy(
+                        () ->
+                                transaction.executeWithoutResult(
+                                        tx -> {
+                                            sharing.changeVisibility(owner, id, "FRIENDS");
+                                            throw new IllegalStateException("fixture rollback");
+                                        }))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(sharing.settings(owner, id)).isEqualTo(before);
+        var executor = Executors.newFixedThreadPool(4);
+        try {
+            List<Callable<Void>> calls = new ArrayList<>();
+            for (String mode : List.of("PRIVATE", "PUBLIC", "FRIENDS", "PUBLIC"))
+                calls.add(
+                        () -> {
+                            sharing.changeVisibility(owner, id, mode);
+                            return null;
+                        });
+            for (Future<Void> result : executor.invokeAll(calls)) result.get(10, TimeUnit.SECONDS);
+            var after = sharing.settings(owner, id);
+            assertThat(after.publicToken()).isEqualTo(before.publicToken());
+            assertThat(after.publicEnabled()).isEqualTo("PUBLIC".equals(after.visibility()));
+        } finally {
+            executor.shutdownNow();
         }
     }
 
     @Test
-    void commerceFailureIs503ForTheViewerDetailAndThePublicView() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        seedShare(outfitId, "viewer@example.test", OffsetDateTime.now(), null);
-        String publicToken = json(send(put(OUTFITS + "/" + outfitId + "/public-link"), token(owner, "CUSTOMER"), null)
-                .andExpect(status().isOk())).path("public_token").asText();
-        doThrow(new ApiOperationException(HttpStatus.SERVICE_UNAVAILABLE, "CATALOG_UNAVAILABLE",
-                "Product catalog is temporarily unavailable")).when(catalog).lookup(any());
-
-        assertProblem(send(get(SHARED + "/" + outfitId), token(viewer, "CUSTOMER"), null), 503, "CATALOG_UNAVAILABLE");
-        assertProblem(send(get(PUBLIC + "/" + publicToken), null, null), 503, "CATALOG_UNAVAILABLE");
-        // The shared list never needs Commerce.
-        send(get(SHARED), token(viewer, "CUSTOMER"), null).andExpect(status().isOk());
+    void swaggerExposesNewPathsAndDeprecatesLegacyEmailSharing() throws Exception {
+        var spec = json(send(get("/v3/api-docs"), null, null).andExpect(status().isOk()));
+        assertThat(spec.path("paths").has(OUTFITS + "/{outfitId}/sharing")).isTrue();
+        assertThat(spec.path("paths").has("/api/v1/me/friends/{friendAccountId}/outfits")).isTrue();
+        assertThat(
+                        spec.path("paths")
+                                .path(OUTFITS + "/{outfitId}/shares")
+                                .path("post")
+                                .path("deprecated")
+                                .asBoolean())
+                .isTrue();
+        assertThat(
+                        spec.path("paths")
+                                .path(OUTFITS + "/{outfitId}/shares")
+                                .path("post")
+                                .path("responses")
+                                .has("410"))
+                .isTrue();
+        var values =
+                spec.path("components")
+                        .path("schemas")
+                        .path("OutfitVisibilityRequest")
+                        .path("properties")
+                        .path("visibility")
+                        .path("enum");
+        assertThat(values.isArray()).isTrue();
+        assertThat(values.toString()).contains("PRIVATE", "FRIENDS", "PUBLIC");
     }
 
-    // ---------------------------------------------------------------- public link
-
-    @Test
-    void publicLinkLifecycleIssuesNewTokensAndNeverReusesADisabledOne() throws Exception {
-        UUID shirt = variantNamed("Linen Shirt");
-        UUID outfitId = seedOutfit(owner, "Weekend look", OffsetDateTime.now(), shirt);
-        String ownerToken = token(owner, "CUSTOMER");
-        assertThat(json(send(get(OUTFITS + "/" + outfitId), ownerToken, null)).path("public_token").isNull()).isTrue();
-
-        JsonNode enabled = json(send(put(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null)
-                .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store")));
-        String first = enabled.path("public_token").asText();
-        assertThat(first).matches("[A-Za-z0-9_-]{43}");
-        assertThat(enabled.path("enabled_at").asText()).isNotBlank();
-        assertThat(enabled.fieldNames()).toIterable().containsExactlyInAnyOrder("public_token", "enabled_at");
-        assertThat(json(send(put(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null)).path("public_token")
-                .asText()).isEqualTo(first);
-        assertThat(json(send(get(OUTFITS + "/" + outfitId), ownerToken, null)).path("public_token").asText())
-                .isEqualTo(first);
-
-        ResultActions open = send(get(PUBLIC + "/" + first), null, null).andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
-        JsonNode view = mapper.readTree(open.andReturn().getResponse().getContentAsString());
-        assertThat(view.fieldNames()).toIterable()
-                .containsExactlyInAnyOrder("outfit_id", "name", "owner_display_name", "items");
-        assertThat(view.path("owner_display_name").asText()).isEqualTo("Linh Tran");
-        assertThat(view.path("items").get(0).path("product_name").asText()).isEqualTo("Linen Shirt");
-        assertThat(open.andReturn().getResponse().getContentAsString()).doesNotContain(first)
-                .doesNotContain(owner.toString()).doesNotContain("owner@example.test");
-
-        send(delete(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null).andExpect(status().isNoContent());
-        assertProblem(send(get(PUBLIC + "/" + first), null, null), 404, "RESOURCE_NOT_FOUND");
-        assertThat(jdbc.queryForObject("SELECT public_token FROM public.outfit", String.class)).isNull();
-        send(delete(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null).andExpect(status().isNoContent());
-
-        String second = json(send(put(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null))
-                .path("public_token").asText();
-        assertThat(second).isNotEqualTo(first);
-        assertProblem(send(get(PUBLIC + "/" + first), null, null), 404, "RESOURCE_NOT_FOUND");
-        send(get(PUBLIC + "/" + second), null, null).andExpect(status().isOk());
-        for (String bogus : List.of("short", "A".repeat(43), "A".repeat(200))) {
-            assertProblem(send(get(PUBLIC + "/" + bogus), null, null), 404, "RESOURCE_NOT_FOUND");
-        }
+    private String settings(UUID id) {
+        return OUTFITS + "/" + id + "/sharing";
     }
 
-    @Test
-    void deletingTheOutfitRemovesItsSharesAndPublicLink() throws Exception {
-        UUID outfitId = seedOutfit(owner, "Look", OffsetDateTime.now(), variant);
-        shareWith(owner, outfitId, "viewer@example.test").andExpect(status().isCreated());
-        String ownerToken = token(owner, "CUSTOMER");
-        String publicToken = json(send(put(OUTFITS + "/" + outfitId + "/public-link"), ownerToken, null))
-                .path("public_token").asText();
-        assertThat(json(send(get(SHARED), token(viewer, "CUSTOMER"), null)).path("items")).hasSize(1);
+    private String friendList(UUID peer) {
+        return "/api/v1/me/friends/" + peer + "/outfits";
+    }
 
-        send(delete(OUTFITS + "/" + outfitId), ownerToken, null).andExpect(status().isNoContent());
+    private String friendDetail(UUID peer, UUID id) {
+        return friendList(peer) + "/" + id;
+    }
 
-        assertThat(json(send(get(SHARED), token(viewer, "CUSTOMER"), null)).path("items")).isEmpty();
-        assertProblem(send(get(PUBLIC + "/" + publicToken), null, null), 404, "RESOURCE_NOT_FOUND");
-        assertThat(count("outfit_share")).isZero();
+    private JsonNode mode(UUID id, String mode) throws Exception {
+        return json(
+                send(
+                                patch(settings(id)),
+                                token(owner, "CUSTOMER"),
+                                mapper.writeValueAsString(Map.of("visibility", mode)))
+                        .andExpect(status().isOk())
+                        .andExpect(header().string("Cache-Control", "no-store")));
+    }
+
+    private UUID pair(UUID a, UUID b) {
+        UUID low = a.toString().compareTo(b.toString()) < 0 ? a : b,
+                high = low.equals(a) ? b : a,
+                id = UUID.randomUUID();
+        OffsetDateTime time = OffsetDateTime.now().minusDays(1);
+        jdbc.update(
+                "INSERT INTO"
+                    + " friendship(friendship_id,account_low_id,account_high_id,established_at,created_at,updated_at)"
+                    + " VALUES (?,?,?,?,?,?)",
+                id,
+                low,
+                high,
+                time,
+                time,
+                time);
+        return id;
     }
 
     // ---------------------------------------------------------------- helpers
 
     private ResultActions shareWith(UUID ownerId, UUID outfitId, String email) throws Exception {
-        return send(post(OUTFITS + "/" + outfitId + "/shares"), token(ownerId, "CUSTOMER"),
+        return send(
+                post(OUTFITS + "/" + outfitId + "/shares"),
+                token(ownerId, "CUSTOMER"),
                 mapper.writeValueAsString(Map.of("email", email)));
     }
 
@@ -513,32 +759,62 @@ class OutfitSharePostgresIntegrationTests {
 
     private UUID variantNamed(String productName) {
         UUID variantId = UUID.randomUUID();
-        commerce.put(variantId, new VariantLookupItem(variantId, UUID.randomUUID(), productName, "ACTIVE", "ACTIVE",
-                "White", "M", 100000L, "/api/v1/variant-images/img/content", true));
+        commerce.put(
+                variantId,
+                new VariantLookupItem(
+                        variantId,
+                        UUID.randomUUID(),
+                        productName,
+                        "ACTIVE",
+                        "ACTIVE",
+                        "White",
+                        "M",
+                        100000L,
+                        "/api/v1/variant-images/img/content",
+                        true));
         return variantId;
     }
 
     private UUID seedOutfit(UUID ownerId, String name, OffsetDateTime updatedAt, UUID... variants) {
         UUID outfitId = UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO public.outfit(outfit_id, owner_account_id, name, creation_source, created_at, updated_at)
                 VALUES (?, ?, ?, 'MANUAL', ?, ?)
-                """, outfitId, ownerId, name, updatedAt, updatedAt);
+                """,
+                outfitId,
+                ownerId,
+                name,
+                updatedAt,
+                updatedAt);
         for (int position = 0; position < variants.length; position++) {
-            jdbc.update("""
+            jdbc.update(
+                    """
                     INSERT INTO public.outfit_item(outfit_item_id, outfit_id, variant_id, display_order, created_at)
                     VALUES (?, ?, ?, ?, ?)
-                    """, UUID.randomUUID(), outfitId, variants[position], position, updatedAt);
+                    """,
+                    UUID.randomUUID(),
+                    outfitId,
+                    variants[position],
+                    position,
+                    updatedAt);
         }
         return outfitId;
     }
 
-    private UUID seedShare(UUID outfitId, String email, OffsetDateTime grantedAt, OffsetDateTime revokedAt) {
+    private UUID seedShare(
+            UUID outfitId, String email, OffsetDateTime grantedAt, OffsetDateTime revokedAt) {
         UUID shareId = UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO public.outfit_share(outfit_share_id, outfit_id, recipient_email, granted_at, revoked_at)
                 VALUES (?, ?, ?, ?, ?)
-                """, shareId, outfitId, email, grantedAt, revokedAt);
+                """,
+                shareId,
+                outfitId,
+                email,
+                grantedAt,
+                revokedAt);
         return shareId;
     }
 
@@ -546,7 +822,8 @@ class OutfitSharePostgresIntegrationTests {
         return jdbc.queryForObject("SELECT count(*) FROM public." + table, Integer.class);
     }
 
-    private ResultActions send(MockHttpServletRequestBuilder request, String token, String body) throws Exception {
+    private ResultActions send(MockHttpServletRequestBuilder request, String token, String body)
+            throws Exception {
         if (token != null) {
             request.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         }
@@ -566,15 +843,18 @@ class OutfitSharePostgresIntegrationTests {
 
     private String token(UUID subject, String role) {
         Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(subject.toString())
-                .claim("roles", List.of(role))
-                .issuedAt(now.minusSeconds(60))
-                .expiresAt(now.plusSeconds(300))
-                .build();
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(SIGNING_KEY.getKeyID()).build();
+        JwtClaimsSet claims =
+                JwtClaimsSet.builder()
+                        .subject(subject.toString())
+                        .claim("roles", List.of(role))
+                        .issuedAt(now.minusSeconds(60))
+                        .expiresAt(now.plusSeconds(300))
+                        .build();
+        JwsHeader header =
+                JwsHeader.with(SignatureAlgorithm.RS256).keyId(SIGNING_KEY.getKeyID()).build();
         return new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(SIGNING_KEY)))
-                .encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+                .encode(JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
     }
 
     private static RSAKey generateRsaKey() {

@@ -50,6 +50,14 @@
             "url": "{{baseUrl}}/api/v1/admin/branches/{{branchId}}",
             "body": {"mode": "raw", "raw": "{\n  \"branch_code\": \"HN01\",\n  \"name\": \"Ha Noi\",\n  \"address_line\": \"1 Main St, Ha Noi\",\n  \"contact_phone\": null,\n  \"branch_status\": \"INACTIVE\"\n}"}
           }
+        },
+        {
+          "name": "Admin Soft-delete Branch (sets branch_status=INACTIVE)",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{branchId}}"
+          }
         }
       ]
     },

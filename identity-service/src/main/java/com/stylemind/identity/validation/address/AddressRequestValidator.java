@@ -3,12 +3,12 @@ package com.stylemind.identity.validation.address;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.identity.directory.VietnamAdministrativeDirectory;
 import com.stylemind.identity.errors.ApiOperationException;
-import com.stylemind.identity.model.address.AddressPatch;
-import com.stylemind.identity.model.address.AddressValues;
+import com.stylemind.identity.dto.address.AddressCreateRequest;
+import com.stylemind.identity.dto.address.AddressPatchRequest;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
-import org.springframework.http.HttpStatus;
+import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +22,7 @@ public final class AddressRequestValidator {
         this.directory = directory;
     }
 
-    public AddressValues validateCreate(JsonNode body) {
+    public AddressCreateRequest validateCreate(JsonNode body) {
         requireObject(body);
         checkFields(body);
         String label = optionalNullableText(body, "label", 50, false);
@@ -30,10 +30,10 @@ public final class AddressRequestValidator {
         String phone = phoneValidator.canonicalize(requiredTextRaw(body, "recipient_phone", 64));
         String line = requiredText(body, "address_line", 500);
         String ward = optionalNullableText(body, "ward_code", 16, true);
-        return new AddressValues(label, name, phone, line, ward);
+        return new AddressCreateRequest(label, name, phone, line, ward);
     }
 
-    public AddressPatch validatePatch(JsonNode body) {
+    public AddressPatchRequest validatePatch(JsonNode body) {
         requireObject(body);
         checkFields(body);
         if (body.isEmpty()) {
@@ -49,7 +49,8 @@ public final class AddressRequestValidator {
         String phone = hasPhone ? phoneValidator.canonicalize(requiredTextRaw(body, "recipient_phone", 64)) : null;
         String line = hasLine ? requiredText(body, "address_line", 500) : null;
         String ward = hasWard ? optionalNullableText(body, "ward_code", 16, true) : null;
-        return new AddressPatch(hasLabel, label, hasName, name, hasPhone, phone, hasLine, line, hasWard, ward);
+        return new AddressPatchRequest(hasLabel, label, hasName, name, hasPhone, phone,
+                hasLine, line, hasWard, ward);
     }
 
     private void checkFields(JsonNode body) {
@@ -136,6 +137,6 @@ public final class AddressRequestValidator {
     }
 
     private static ApiOperationException invalid() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request is invalid", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is invalid");
     }
 }

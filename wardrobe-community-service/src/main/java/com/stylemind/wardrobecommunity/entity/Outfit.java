@@ -17,6 +17,7 @@ public class Outfit {
     @Column(name = "owner_account_id", nullable = false) private UUID ownerAccountId;
     @Column(name = "name", nullable = false, columnDefinition = "text") private String name;
     @Column(name = "creation_source", nullable = false, columnDefinition = "text") private String creationSource;
+    @Column(name = "visibility", nullable = false, columnDefinition = "text") private String visibility = "PRIVATE";
     @Column(name = "created_at", nullable = false) private OffsetDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private OffsetDateTime updatedAt;
     @Column(name = "public_token", columnDefinition = "text") private String publicToken;

@@ -28,7 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "stylemind.payment.sepay.qr-bank-name=TESTBANK", "stylemind.payment.sepay.qr-account-number=000-test-only"})
 @Testcontainers
 class PaymentEventDispatcherPostgresIntegrationTests {
-    @Container static final PostgreSQLContainer<?> DB = new PostgreSQLContainer<>("postgres:18.6")
+    @Container static final PostgreSQLContainer<?> DB = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("payment_dispatch_test").withUsername("dispatch_test").withPassword("test-only");
     static final AtomicReference<String> MODE = new AtomicReference<>("success");
     static final Map<String, String> METHODS = new ConcurrentHashMap<>();

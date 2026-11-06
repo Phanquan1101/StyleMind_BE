@@ -69,3 +69,16 @@ The owner chose COD PENDING_PAYMENT -> PLACED after Payment attempt acknowledgem
 ## US-04.03 COD collection delivery - 2026-10-27
 
 The owner requested completion of COD PaymentConfirmed delivery and explicitly approved Commerce V8 to expand the existing inbox payment_method CHECK to COD/SEPAY_VIETQR, preserving V7 and existing data. [Scoped contract](../planning/US-04.03_COD_COLLECTION_CONTRACT.md). A committed, settled ledger/outbox is delivered without Notification; Commerce records COD collection without changing fulfilment/history. This supersedes the earlier COD-delivery exclusion only for this story. No public payment-state column/API, refund or paid-cancellation workflow is approved. Local tests use disposable databases only.
+
+## Guest checkout supplement - 2026-11-02
+
+The owner explicitly approved guest checkout without any Identity changes and the exact Commerce V9 / Payment V2 migrations in the [guest contract](../planning/GUEST_CHECKOUT_PROPOSAL.md). Guest orders store direct delivery snapshots and a Commerce-owned session digest; Order, Payment attempt and Payment inbox customer_id may be null for guests. Existing customer checkout and COD/SePay rules remain. No synthetic Identity accounts or cross-service database access is introduced. Source/migration changes do not imply application to any persistent database. The earlier Payment JPA and mapper refactors are also explicitly owner-requested and remain scoped to Payment. See the [implementation report](../qa/GUEST_CHECKOUT_IMPLEMENTATION_REPORT.md) for current evidence and limitations.
+
+## Guest checkout temporarily removed - 2026-11-02
+
+Latest explicit owner instruction supersedes the active guest-checkout contract: remove the newly added guest checkout only; keep the existing guest cart and Payment JPA/mapper work. The guest controller/service/validator and public security exceptions are removed; new Payment snapshots again require a customer UUID. Existing registered checkout remains. Commerce V9 and Payment V2 are retained unchanged because their application to an owner-run Docker database is unknown; do not erase migration history or rewrite/delete persisted guest data. Null-safe financial event/ledger handling is compatibility only, not a guest creation API. Historical guest documents are marked withdrawn. See [removal evidence](../qa/GUEST_CHECKOUT_REMOVAL_REPORT.md).
+
+
+## Guest checkout restored — 2026-11-02
+
+The owner explicitly requested restoring guest checkout after the temporary removal. The guest contract and simplified phone rule are active again; Identity remains unchanged. Guest order creation, owner-scoped detail and payment recovery use the existing guest cart credential and direct delivery snapshots. New credential-authenticated internal Payment snapshots permit explicit null customer_id, while omitted/malformed owners remain invalid. Payment JPA/mapper and all existing COD/SePay guards remain. The owner confirmed Commerce V9 guest checkout has already run; its SQL remains unchanged. The conflicting, unexecuted image/inventory migration is renumbered V10 with unchanged SQL. No persistent database mutation is authorized by this restoration. See [restoration report](../qa/GUEST_CHECKOUT_RESTORATION_REPORT.md).

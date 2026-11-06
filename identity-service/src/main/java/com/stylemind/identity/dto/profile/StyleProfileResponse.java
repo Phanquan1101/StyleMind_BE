@@ -1,9 +1,12 @@
 package com.stylemind.identity.dto.profile;
 
+import com.stylemind.identity.entity.StyleProfile;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

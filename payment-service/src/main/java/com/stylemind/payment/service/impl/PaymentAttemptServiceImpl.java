@@ -7,8 +7,8 @@ import com.stylemind.payment.dto.ConfirmCodCollectionRequest;
 import com.stylemind.payment.dto.CreatePaymentAttemptRequest;
 import com.stylemind.payment.dto.PaymentAttemptResponse;
 import com.stylemind.payment.dto.PaymentExceptionListResponse;
-import com.stylemind.payment.dto.PaymentExceptionResponse;
 import com.stylemind.payment.errors.PaymentApiException;
+import com.stylemind.payment.mapper.PaymentMapper;
 import com.stylemind.payment.model.PaymentAttemptCreation;
 import com.stylemind.payment.model.PaymentAttemptSnapshot;
 import com.stylemind.payment.model.PaymentAttemptStatus;
@@ -40,18 +40,21 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     private final SepayQrPayloadBuilder qrPayloadBuilder;
     private final SepayPaymentProperties sepayProperties;
     private final CommerceOrderClient commerceOrderClient;
+    private final PaymentMapper mapper;
 
     public PaymentAttemptServiceImpl(
             PaymentAttemptRepository repository,
             PaymentOutboxService outboxService,
             SepayQrPayloadBuilder qrPayloadBuilder,
             SepayPaymentProperties sepayProperties,
-            CommerceOrderClient commerceOrderClient) {
+            CommerceOrderClient commerceOrderClient,
+            PaymentMapper mapper) {
         this.repository = repository;
         this.outboxService = outboxService;
         this.qrPayloadBuilder = qrPayloadBuilder;
         this.sepayProperties = sepayProperties;
         this.commerceOrderClient = commerceOrderClient;
+        this.mapper = mapper;
     }
 
     @Transactional
@@ -72,6 +75,9 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     @Transactional
     @Override
     public PaymentAttemptResponse createOrderAttempt(com.stylemind.payment.dto.OrderPaymentRequest request, Instant now) {
+        if (request == null || request.order() == null) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Order payment snapshot is invalid");
+        }
         CommerceOrderPaymentSnapshot order = request.order();
         repository.lockOrder(order.orderId());
         repository.expireStaleOnlineAttempts(now);
@@ -103,7 +109,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
                     "Payment attempt already has a financial transaction");
         }
         outboxService.recordPaymentConfirmed(attempt, request.collectedAmountVnd(), collectedAt);
-        return responseForSnapshot(attempt, PaymentAttemptStatus.SETTLED.name(), null, null, collectedAt);
+        return mapper.toResponse(attempt, PaymentAttemptStatus.SETTLED.name());
     }
 
     private void validateCollectionAttempt(ConfirmCodCollectionRequest request, PaymentAttemptSnapshot attempt) {
@@ -132,7 +138,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
         if (filter != null && (filter.length() > 100 || filter.codePoints().anyMatch(Character::isISOControl)))
             throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid exception status");
         List<PaymentExceptionView> items = repository.findExceptions(filter, limit, offset);
-        return new PaymentExceptionListResponse(items.stream().map(this::toResponse).toList(), limit, offset);
+        return mapper.toExceptionListResponse(items, limit, offset);
     }
 
     private PaymentAttemptResponse createNewAttempt(
@@ -177,16 +183,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             throw new PaymentApiException(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST",
                     "Duplicate payment attempt request");
         }
-        return new PaymentAttemptResponse(
-                paymentAttemptId,
-                order.orderId(),
-                order.paymentMethod().name(),
-                order.acceptedTotalVnd(),
-                paymentReference,
-                toApiStatus(PaymentAttemptStatus.PENDING.name()),
-                expiresAt,
-                transferContent,
-                qrPayload);
+        return mapper.toResponse(creation);
     }
 
     private PaymentAttemptResponse existingAttemptResponse(
@@ -194,12 +191,12 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             CommerceOrderPaymentSnapshot order,
             UUID customerId) {
         if (existing.expectedAmountVnd() != order.acceptedTotalVnd()
-                || !existing.customerId().equals(customerId)
+                || !java.util.Objects.equals(existing.customerId(), customerId)
                 || !order.paymentMethod().name().equals(existing.paymentMethod())) {
             throw new PaymentApiException(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST_MISMATCH",
                     "Duplicate request key does not match the original payment attempt");
         }
-        return responseForSnapshot(existing, existing.attemptStatus(), null, null, null);
+        return mapper.toResponse(existing);
     }
 
     private void validateCreateRequest(CreatePaymentAttemptRequest request) {
@@ -219,7 +216,7 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     }
 
     private void validateOrderSnapshot(CommerceOrderPaymentSnapshot order, UUID customerId) {
-        if (!order.customerId().equals(customerId)) {
+        if (customerId == null || !customerId.equals(order.customerId())) {
             throw new PaymentApiException(HttpStatus.FORBIDDEN, "ORDER_OWNERSHIP_MISMATCH",
                     "Order does not belong to the authenticated customer");
         }
@@ -255,46 +252,6 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     private String buildPaymentReference(UUID paymentAttemptId) {
         String compact = paymentAttemptId.toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
         return sepayProperties.paymentCodePrefix() + compact;
-    }
-
-    private PaymentAttemptResponse responseForSnapshot(
-            PaymentAttemptSnapshot attempt,
-            String status,
-            String qrPayload,
-            String transferContent,
-            Instant generatedAt) {
-        return new PaymentAttemptResponse(
-                attempt.paymentAttemptId(),
-                attempt.orderId(),
-                attempt.paymentMethod(),
-                attempt.expectedAmountVnd(),
-                attempt.paymentReference(),
-                toApiStatus(status),
-                attempt.expiresAt(),
-                transferContent == null ? attempt.transferContent() : transferContent,
-                qrPayload == null ? attempt.qrPayload() : qrPayload);
-    }
-
-    private String toApiStatus(String status) {
-        return switch (status) {
-            case "SETTLED" -> "PAID";
-            case "REQUIRES_RECONCILIATION" -> "EXCEPTION";
-            default -> status;
-        };
-    }
-
-    private PaymentExceptionResponse toResponse(PaymentExceptionView view) {
-        return new PaymentExceptionResponse(
-                view.exceptionId(),
-                view.paymentAttemptId(),
-                view.providerName(),
-                view.providerEventId(),
-                view.receivedReference(),
-                view.receivedAmountVnd(),
-                view.exceptionReason(),
-                view.reconciliationStatus(),
-                view.reviewedByUserId(),
-                view.detectedAt());
     }
 
     private String normalizeBlankToNull(String value) {

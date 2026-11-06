@@ -1,0 +1,418 @@
+{
+  "info": {
+    "name": "StyleMind Guest Checkout",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Guest cart, direct shipping, COD/SePay order and owner-scoped payment recovery. Run against a disposable/local environment with valid catalog data. Possession of the guest key grants access; do not share/export a live key."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/commerce"
+    },
+    {
+      "key": "variant_id",
+      "value": ""
+    },
+    {
+      "key": "guest_session_key",
+      "value": ""
+    },
+    {
+      "key": "other_guest_session_key",
+      "value": ""
+    },
+    {
+      "key": "checkout_key",
+      "value": ""
+    },
+    {
+      "key": "payment_method",
+      "value": "COD"
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "['guest_session_key','other_guest_session_key','checkout_key'].forEach(function (name) { if (!pm.collectionVariables.get(name)) pm.collectionVariables.set(name, pm.variables.replaceIn('{{$guid}}')); });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Add guest cart item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/cart/items",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cart",
+            "items"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1,\n  \"guest_session_key\": \"{{guest_session_key}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Preview server prices",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/checkout/prices",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "checkout",
+            "prices"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Checkout guest (COD or SEPAY_VIETQR)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"checkout_key\": \"{{checkout_key}}\",\n  \"payment_method\": \"{{payment_method}}\",\n  \"shipping_address\": {\n    \"recipient_name\": \"Guest Buyer\",\n    \"recipient_phone\": \"0912345678\",\n    \"address_line\": \"1 Nguyen Trai, Ha Noi\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 201', function () { pm.response.to.have.status(201); });",
+              "if (pm.response.code === 201) { pm.collectionVariables.set('order_id', pm.response.json().order_id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Read own order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders/{{order_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders",
+            "{{order_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Recover initial payment / get QR",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders/{{order_id}}/payment-attempt",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders",
+            "{{order_id}}",
+            "payment-attempt"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Other guest cannot read order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{other_guest_session_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders/{{order_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders",
+            "{{order_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 404', function () { pm.response.to.have.status(404); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Missing credential",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders/{{order_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders",
+            "{{order_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Duplicate checkout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"checkout_key\": \"{{checkout_key}}\",\n  \"payment_method\": \"{{payment_method}}\",\n  \"shipping_address\": {\n    \"recipient_name\": \"Guest Buyer\",\n    \"recipient_phone\": \"0912345678\",\n    \"address_line\": \"1 Nguyen Trai, Ha Noi\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 409', function () { pm.response.to.have.status(409); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Reject unknown shipping fields",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Guest-Session-Key",
+            "value": "{{guest_session_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/guest/orders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "guest",
+            "orders"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"checkout_key\": \"{{checkout_key}}\",\n  \"payment_method\": \"{{payment_method}}\",\n  \"shipping_address\": {\n    \"recipient_name\": \"Guest Buyer\",\n    \"recipient_phone\": \"0912345678\",\n    \"address_line\": \"1 Nguyen Trai, Ha Noi\",\n    \"customer_id\": \"injected\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected HTTP 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

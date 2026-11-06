@@ -14,7 +14,7 @@ import lombok.Setter;
 public class VariantImage {
     @Id @Column(name = "image_id") private UUID imageId;
     @Column(name = "variant_id", nullable = false) private UUID variantId;
-    @Column(name = "image_url", nullable = false, columnDefinition = "text") private String imageUrl;
+    @Column(name = "image_asset_id", nullable = false) private UUID imageAssetId;
     @Column(name = "alt_text", columnDefinition = "text") private String altText;
     @Column(name = "display_order", nullable = false) private int displayOrder;
     @Column(name = "is_primary", nullable = false) private boolean primary;

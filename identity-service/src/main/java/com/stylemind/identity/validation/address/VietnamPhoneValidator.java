@@ -5,7 +5,7 @@ import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
 import com.stylemind.identity.errors.ApiOperationException;
 import java.util.regex.Pattern;
-import org.springframework.http.HttpStatus;
+import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,7 +34,7 @@ public final class VietnamPhoneValidator {
     }
 
     private static ApiOperationException invalid() {
-        return new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request is invalid", 0);
+        return new ApiOperationException(ErrorCode.INVALID_REQUEST, "Request is invalid");
     }
 
     private static String trimUnicode(String value) {

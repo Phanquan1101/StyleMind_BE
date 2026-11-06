@@ -1,52 +1,56 @@
 package com.stylemind.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verifyNoInteractions;
+
+import com.stylemind.identity.entity.Account;
+import com.stylemind.identity.entity.CustomerAddress;
+import com.stylemind.identity.repository.AddressRepository;
+import com.stylemind.identity.service.AddressService;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.stylemind.identity.repository.address.AddressRepository;
-import com.stylemind.identity.entity.CustomerAddress;
-import com.stylemind.identity.service.address.ManageAddressService;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "management.health.db.enabled=false")
 @Testcontainers
+@Import(RepositoryCallHooks.ConfigurationForTests.class)
 class ManageAddressPostgresIntegrationTests {
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
             .withDatabaseName("stylemind_identity_address_test")
@@ -71,13 +75,12 @@ class ManageAddressPostgresIntegrationTests {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper mapper;
     @LocalServerPort private int port;
-    @MockitoSpyBean private AddressRepository repository;
-    @MockitoSpyBean private ManageAddressService addressService;
+    @MockitoSpyBean private AddressService addressService;
 
     @BeforeEach
     void clearDisposableAddressRows() {
-        reset(repository);
         reset(addressService);
+        RepositoryCallHooks.clearCalls();
         jdbc.update("DELETE FROM public.customer_address");
     }
 
@@ -299,46 +302,63 @@ class ManageAddressPostgresIntegrationTests {
     void writeFailuresRollbackCreatePatchDefaultSwitchAndDelete() throws Exception {
         UUID owner = account("CUSTOMER");
         String bearer = token(owner, "CUSTOMER");
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only insert failure after write");
-        }).when(repository).saveAndFlush(argThat(address -> owner.equals(address.getAccountId())));
-        assertThat(send("POST", ADDRESSES, bearer, body(null, "A", "0912345678", "A", null)).statusCode()).isEqualTo(500);
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("addressRepository".equals(bean) && "saveAndFlush".equals(method.getName())
+                    && arguments[0] instanceof CustomerAddress address && owner.equals(address.getAccountId())) {
+                throw new IllegalStateException("test-only insert failure after write");
+            }
+            return result;
+        })) {
+            assertThat(send("POST", ADDRESSES, bearer, body(null, "A", "0912345678", "A", null))
+                    .statusCode()).isEqualTo(500);
+        }
         assertThat(count(owner)).isZero();
-        reset(repository);
 
         UUID first = create(owner, bearer, "A");
         UUID second = create(owner, bearer, "B");
         var before = state(owner);
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only patch failure after write");
-        }).when(repository).saveAndFlush(argThat(address -> second.equals(address.getAddressId())));
-        assertThat(send("PATCH", ADDRESSES + "/" + second, bearer, "{\"label\":\"Changed\"}")
-                .statusCode()).isEqualTo(500);
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("addressRepository".equals(bean) && "saveAndFlush".equals(method.getName())
+                    && arguments[0] instanceof CustomerAddress address && second.equals(address.getAddressId())) {
+                throw new IllegalStateException("test-only patch failure after write");
+            }
+            return result;
+        })) {
+            assertThat(send("PATCH", ADDRESSES + "/" + second, bearer, "{\"label\":\"Changed\"}")
+                    .statusCode()).isEqualTo(500);
+        }
         assertThat(state(owner)).isEqualTo(before);
-        reset(repository);
 
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only default failure after write");
-        }).when(repository).saveAll(argThat(addresses -> {
-            for (CustomerAddress address : addresses) {
-                if (second.equals(address.getAddressId()) && address.isDefaultAddress()) {
-                    return true;
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("addressRepository".equals(bean) && "saveAll".equals(method.getName())
+                    && arguments[0] instanceof Iterable<?> addresses) {
+                for (Object value : addresses) {
+                    if (value instanceof CustomerAddress address && second.equals(address.getAddressId())
+                            && address.isDefaultAddress()) {
+                        throw new IllegalStateException("test-only default failure after write");
+                    }
                 }
             }
-            return false;
-        }));
-        assertThat(send("PUT", ADDRESSES + "/" + second + "/default", bearer, null).statusCode()).isEqualTo(500);
+            return result;
+        })) {
+            assertThat(send("PUT", ADDRESSES + "/" + second + "/default", bearer, null).statusCode())
+                    .isEqualTo(500);
+        }
         assertThat(state(owner)).isEqualTo(before);
-        reset(repository);
 
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            throw new IllegalStateException("test-only delete failure after write");
-        }).when(repository).delete(argThat(address -> second.equals(address.getAddressId())));
-        assertThat(send("DELETE", ADDRESSES + "/" + second, bearer, null).statusCode()).isEqualTo(500);
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            Object result = invocation.proceed();
+            if ("addressRepository".equals(bean) && "delete".equals(method.getName())
+                    && arguments[0] instanceof CustomerAddress address && second.equals(address.getAddressId())) {
+                throw new IllegalStateException("test-only delete failure after write");
+            }
+            return result;
+        })) {
+            assertThat(send("DELETE", ADDRESSES + "/" + second, bearer, null).statusCode()).isEqualTo(500);
+        }
         assertThat(state(owner)).isEqualTo(before);
         assertThat(defaultCount(owner)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_address WHERE address_id IN (?, ?)",
@@ -484,18 +504,19 @@ class ManageAddressPostgresIntegrationTests {
         CountDownLatch transactionHoldingOwnerLock = new CountDownLatch(1);
         CountDownLatch releaseTransaction = new CountDownLatch(1);
         AtomicInteger findAllCalls = new AtomicInteger();
-        doAnswer(invocation -> {
-            if (findAllCalls.incrementAndGet() == 1) {
+        try (AutoCloseable hook = RepositoryCallHooks.install((bean, method, arguments, invocation) -> {
+            if ("addressRepository".equals(bean) && "findByAccountId".equals(method.getName())
+                    && findAllCalls.incrementAndGet() == 1) {
                 transactionHoldingOwnerLock.countDown();
                 if (!releaseTransaction.await(10, TimeUnit.SECONDS)) {
                     throw new AssertionError("Timed out waiting to release the first address transaction");
                 }
             }
-            return invocation.callRealMethod();
-        }).when(repository).findByAccountId(org.mockito.ArgumentMatchers.any(UUID.class));
-        CompletableFuture<HttpResponse<String>> a = concurrentRequest(bearer, methodA, pathA, bodyA, ready, start);
-        CompletableFuture<HttpResponse<String>> b = concurrentRequest(bearer, methodB, pathB, bodyB, ready, start);
-        try {
+            return invocation.proceed();
+        })) {
+            CompletableFuture<HttpResponse<String>> a = concurrentRequest(bearer, methodA, pathA, bodyA, ready, start);
+            CompletableFuture<HttpResponse<String>> b = concurrentRequest(bearer, methodB, pathB, bodyB, ready, start);
+            try {
             assertThat(ready.await(5, TimeUnit.SECONDS)).as("both requests reach the start barrier").isTrue();
             start.countDown();
             assertThat(transactionHoldingOwnerLock.await(10, TimeUnit.SECONDS))
@@ -504,8 +525,9 @@ class ManageAddressPostgresIntegrationTests {
         } finally {
             start.countDown();
             releaseTransaction.countDown();
+            }
+            return new RaceResult(a.get(20, TimeUnit.SECONDS), b.get(20, TimeUnit.SECONDS));
         }
-        return new RaceResult(a.get(20, TimeUnit.SECONDS), b.get(20, TimeUnit.SECONDS));
     }
 
     private record RaceResult(HttpResponse<String> a, HttpResponse<String> b) { }

@@ -50,13 +50,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "management.health.db.enabled=false")
+@SpringBootTest(properties = {"management.health.db.enabled=false",
+        "stylemind.commerce.inventory.expiry-enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 @Import(BranchCartOrderPostgresIntegrationTests.TestConfig.class)
 class BranchCartOrderPostgresIntegrationTests {
 
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_commerce_bco_test")
             .withUsername("commerce_bco_test")
             .withPassword("test-only-not-a-secret");
@@ -83,6 +84,8 @@ class BranchCartOrderPostgresIntegrationTests {
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private com.stylemind.commerce.client.payment.PaymentClient payment;
 
+    private static final java.util.concurrent.atomic.AtomicInteger IDENTITY_CALLS = new java.util.concurrent.atomic.AtomicInteger();
+
     private UUID variantId;
     private UUID inactiveVariantId;
 
@@ -99,6 +102,7 @@ class BranchCartOrderPostgresIntegrationTests {
                     request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
         });
         jdbc.update("DELETE FROM public.cancellation_request");
+        jdbc.update("DELETE FROM public.inventory_reservation");
         jdbc.update("DELETE FROM public.order_status_history");
         jdbc.update("DELETE FROM public.order_item");
         jdbc.update("DELETE FROM public.order_address_snapshot");
@@ -106,6 +110,8 @@ class BranchCartOrderPostgresIntegrationTests {
         jdbc.update("DELETE FROM public.cart_item");
         jdbc.update("DELETE FROM public.cart");
         jdbc.update("DELETE FROM public.variant_image");
+        jdbc.update("DELETE FROM public.image_asset");
+        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.branch");
@@ -132,6 +138,36 @@ class BranchCartOrderPostgresIntegrationTests {
                 INSERT INTO public.product_variant(variant_id, product_id, sku, unit_price_vnd, variant_status)
                 VALUES (?, ?, 'SKU-X', 90000, 'INACTIVE')
                 """, inactiveVariantId, productId);
+        jdbc.update("""
+                INSERT INTO public.variant_inventory(variant_id, on_hand_quantity, reserved_quantity, updated_at)
+                VALUES (?, 100, 0, now()), (?, 100, 0, now())
+                """, variantId, inactiveVariantId);
+    }
+
+    @Test
+    void guestHeaderCartCrudPreservesOwnerIsolation() throws Exception {
+        String owner = "guest-header-integration-owner-a";
+        String foreign = "guest-header-integration-owner-b";
+        JsonNode cart = json(postJson("/api/v1/cart/items", null,
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":\"" + owner + "\"}"));
+        String itemId = cart.path("items").get(0).path("cart_item_id").asText();
+        mockMvc.perform(get("/api/v1/cart").header("X-Guest-Session-Key", owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.total_vnd").value(200000));
+        mockMvc.perform(get("/api/v1/cart").header("X-Guest-Session-Key", foreign))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+        mockMvc.perform(get("/api/v1/guest/checkout/prices").header("X-Guest-Session-Key", owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total_vnd").value(200000));
+        mockMvc.perform(delete("/api/v1/cart/items/" + itemId).header("X-Guest-Session-Key", foreign))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/cart/items/" + itemId).header("X-Guest-Session-Key", owner))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/cart").header("X-Guest-Session-Key", owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+        postJson("/api/v1/cart/items", null,
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":\"" + owner + "\"}");
+        mockMvc.perform(delete("/api/v1/cart/items").header("X-Guest-Session-Key", owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test
@@ -154,6 +190,21 @@ class BranchCartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.branch_status").value("INACTIVE"));
+        mockMvc.perform(put("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(branchBody("HN01", "ACTIVE")))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT branch_status FROM public.branch WHERE branch_id = ?",
+                String.class, branchId)).isEqualTo("INACTIVE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.branch WHERE branch_id = ?",
+                Integer.class, branchId)).isEqualTo(1);
     }
 
     @Test
@@ -410,6 +461,105 @@ class BranchCartOrderPostgresIntegrationTests {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COD_CONFIRMATION_REQUIRED"));
     }
 
+    @Test
+    void guestCheckoutSupportsBothMethodsDirectShippingAndOwnerIsolation() throws Exception {
+        int identityBefore = IDENTITY_CALLS.get();
+        for (String method : List.of("COD", "SEPAY_VIETQR")) {
+            String key = "guest-checkout-" + method;
+            addGuestItem(key);
+            mockMvc.perform(get("/api/v1/guest/checkout/prices").header("X-Guest-Session-Key", key))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.total_vnd").value(100000));
+            var result = guestCheckout(key, "checkout-" + method, method);
+            assertThat(result.getResponse().getStatus()).isEqualTo(201);
+            var order = json(result); String id = order.path("order_id").asText();
+            assertThat(order.get("customer_id").isNull()).isTrue();
+            assertThat(order.path("order_status").asText()).isEqualTo(method.equals("COD") ? "PLACED" : "PENDING_PAYMENT");
+            assertThat(order.path("address").path("recipient_phone").asText()).isEqualTo("my phone 123");
+            assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+            assertThat(result.getResponse().getContentAsString()).doesNotContain("guest_session_hash", key);
+            mockMvc.perform(get("/api/v1/guest/orders/" + id).header("X-Guest-Session-Key", key)).andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/guest/orders/" + id).header("X-Guest-Session-Key", "other-guest-checkout-key"))
+                    .andExpect(status().isNotFound());
+            mockMvc.perform(get("/api/v1/orders/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                    .andExpect(status().isNotFound());
+            mockMvc.perform(get("/api/v1/admin/orders/" + id).header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                    .andExpect(status().isOk());
+            mockMvc.perform(post("/api/v1/orders/" + id + "/cancellation-requests")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"please cancel\"}")).andExpect(status().isNotFound());
+            mockMvc.perform(post("/api/v1/guest/orders/" + id + "/payment-attempt")
+                    .header("X-Guest-Session-Key", "other-guest-checkout-key")).andExpect(status().isNotFound());
+            mockMvc.perform(post("/api/v1/guest/orders/" + id + "/payment-attempt")
+                    .header("X-Guest-Session-Key", key)).andExpect(status().isOk());
+            assertProblem(guestCheckout(key, "checkout-" + method, method),409,"DUPLICATE_CHECKOUT");
+            jdbc.update("UPDATE public.customer_order SET order_status='CANCELLED' WHERE order_id=?", UUID.fromString(id));
+            mockMvc.perform(post("/api/v1/guest/orders/" + id + "/payment-attempt")
+                    .header("X-Guest-Session-Key", key)).andExpect(status().isConflict());
+        }
+        assertThat(IDENTITY_CALLS.get()).isEqualTo(identityBefore);
+    }
+
+    @Test
+    void concurrentGuestCheckoutConsumesOnlyOneCart() throws Exception {
+        String key = "guest-concurrent-checkout"; addGuestItem(key);
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int i=0;i<2;i++) {
+                final int index=i;
+                tasks.add(pool.submit(() -> { ready.countDown(); start.await();
+                    return guestCheckout(key,"concurrent-key-"+index,"COD").getResponse().getStatus(); }));
+            }
+            assertThat(ready.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue(); start.countDown();
+            var statuses = new java.util.ArrayList<Integer>();
+            for (var task:tasks) statuses.add(task.get(30,java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(statuses).containsExactlyInAnyOrder(201,409);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT cart_status FROM public.cart WHERE guest_session_key=?",String.class,key)).isEqualTo("CHECKED_OUT");
+    }
+
+    @Test
+    void failedGuestCheckoutRollsBackOrderCartAndInventoryAndDoesNotCallPayment() throws Exception {
+        String key="guest-rollback-checkout"; addGuestItem(key);
+        jdbc.execute("CREATE OR REPLACE FUNCTION fail_guest_address_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test-only persistence failure'; END $$");
+        jdbc.execute("CREATE TRIGGER fail_guest_address_test BEFORE INSERT ON public.order_address_snapshot FOR EACH ROW EXECUTE FUNCTION fail_guest_address_test()");
+        try {
+            assertThat(guestCheckout(key,"rollback-checkout-key","COD").getResponse().getStatus()).isEqualTo(500);
+        } finally { jdbc.execute("DROP TRIGGER fail_guest_address_test ON public.order_address_snapshot"); }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order",Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT cart_status FROM public.cart WHERE guest_session_key=?",String.class,key)).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?",Integer.class,variantId)).isEqualTo(100);
+        org.mockito.Mockito.verifyNoInteractions(payment);
+        assertThat(guestCheckout(key,"rollback-checkout-key","COD").getResponse().getStatus()).isEqualTo(201);
+    }
+
+    @Test
+    void guestPaymentFailureLeavesSavedOrderForRecovery() throws Exception {
+        String key="guest-payment-failure";addGuestItem(key);
+        org.mockito.Mockito.doThrow(new IllegalStateException("test-only outage")).when(payment).create(org.mockito.ArgumentMatchers.any());
+        var result=guestCheckout(key,"guest-failure-key","COD");
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(json(result).path("order_status").asText()).isEqualTo("PENDING_PAYMENT");
+        mockMvc.perform(post("/api/v1/guest/orders/"+json(result).path("order_id").asText()+"/payment-attempt")
+                .header("X-Guest-Session-Key",key)).andExpect(status().isInternalServerError());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order",Integer.class)).isEqualTo(1);
+    }
+
+    private void addGuestItem(String key) throws Exception {
+        assertThat(postJson("/api/v1/cart/items",null,"{\"variant_id\":\""+variantId+"\",\"quantity\":1,\"guest_session_key\":\""+key+"\"}")
+                .getResponse().getStatus()).isEqualTo(200);
+    }
+
+    private MvcResult guestCheckout(String key,String checkoutKey,String method) throws Exception {
+        return mockMvc.perform(post("/api/v1/guest/orders").header("X-Guest-Session-Key",key)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"checkout_key":"%s","payment_method":"%s","shipping_address":
+                 {"recipient_name":" Guest Buyer ","recipient_phone":" my phone 123 ","address_line":" 1 Main St, Hanoi "}}
+                """.formatted(checkoutKey,method))).andReturn();
+    }
+
     private MvcResult createCod(String key) throws Exception {
         postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
         return postJson("/api/v1/orders", customerToken(), "{\"checkout_key\":\"" + key
@@ -496,6 +646,7 @@ class BranchCartOrderPostgresIntegrationTests {
             return new IdentityAddressClient(null) {
                 @Override
                 public AddressSnapshot getAddress(UUID addressId, String authorizationHeader) {
+                    IDENTITY_CALLS.incrementAndGet();
                     if (!ADDRESS_ID.equals(addressId)) {
                         throw new com.stylemind.commerce.errors.ApiOperationException(
                                 org.springframework.http.HttpStatus.CONFLICT, "INVALID_SHIPPING_ADDRESS",

@@ -16,6 +16,7 @@ import com.stylemind.commerce.validation.product.ProductRequestValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
@@ -45,6 +46,7 @@ public class ProductController {
     private final ProductRequestValidator validator;
 
     @GetMapping(path = "/api/v1/products", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "List active products",
             description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, page and size filters.")
     public ProductListResponse listProducts(HttpServletRequest request) {
@@ -53,6 +55,7 @@ public class ProductController {
     }
 
     @GetMapping(path = "/api/v1/products/{productId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Get active product detail")
     public ProductResponse getProduct(@PathVariable String productId) {
         return productService.getPublicProduct(validator.pathId(productId));
@@ -60,6 +63,7 @@ public class ProductController {
 
     @PostMapping(path = "/api/v1/variants/batch-lookup", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirements
     @Operation(summary = "Batch lookup active variants with current prices")
     public VariantBatchLookupResponse batchLookup(@RequestBody VariantBatchLookupRequest request) {
         return productService.activeVariantLookup(validator.variantIds(request));
@@ -88,7 +92,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/products/{productId}")
-    @Operation(summary = "Delete product (ADMIN only)")
+    @Operation(summary = "Soft-delete product by marking it inactive (ADMIN only)")
     public ResponseEntity<Void> deleteProduct(@PathVariable String productId) {
         productService.deleteProduct(validator.pathId(productId));
         return ResponseEntity.noContent().build();
@@ -111,7 +115,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/variants/{variantId}")
-    @Operation(summary = "Delete product variant (ADMIN only)")
+    @Operation(summary = "Soft-delete product variant by marking it inactive (ADMIN only)")
     public ResponseEntity<Void> deleteVariant(@PathVariable String variantId) {
         productService.deleteVariant(validator.pathId(variantId));
         return ResponseEntity.noContent().build();
@@ -119,7 +123,7 @@ public class ProductController {
 
     @PostMapping(path = "/api/v1/admin/variants/{variantId}/images",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Upload variant image to local Commerce storage (ADMIN only)",
+    @Operation(summary = "Upload variant image to Cloudinary (ADMIN only)",
             responses = {
                     @ApiResponse(responseCode = "201", description = "Image metadata created"),
                     @ApiResponse(responseCode = "400", description = "Invalid image file"),
@@ -146,14 +150,15 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/variant-images/{imageId}")
-    @Operation(summary = "Delete variant image (ADMIN only)")
+    @Operation(summary = "Permanently delete variant image metadata and Cloudinary asset (ADMIN only)")
     public ResponseEntity<Void> deleteImage(@PathVariable String imageId) {
         productService.deleteImage(validator.pathId(imageId));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/v1/variant-images/{imageId}/content")
-    @Operation(summary = "Read locally stored variant image content")
+    @SecurityRequirements
+    @Operation(summary = "Read legacy locally stored variant image content")
     public ResponseEntity<Resource> imageContent(@PathVariable String imageId) {
         UUID id = validator.pathId(imageId);
         Resource resource = imageStorage.load(id).orElseThrow(() ->
