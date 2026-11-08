@@ -9,6 +9,7 @@ import com.stylemind.commerce.errors.ApiOperationException;
 import com.stylemind.commerce.security.CurrentUser;
 import com.stylemind.commerce.service.order.OrderService;
 import com.stylemind.commerce.validation.order.OrderRequestValidator;
+import com.stylemind.commerce.validation.order.CheckoutSelectionValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.UUID;
@@ -31,6 +32,28 @@ public class OrderController {
 
     private final OrderService service;
     private final OrderRequestValidator validator;
+    private final CheckoutSelectionValidator selectionValidator;
+
+    @PostMapping(path = "/api/v1/checkout/recover", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<OrderResponse> recoverCheckout(Authentication authentication, @RequestBody JsonNode body) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(service.recoverCheckout(requireSubject(authentication), selectionValidator.recoveryKey(body)));
+    }
+
+    @PostMapping(path = {"/api/v1/checkout/selected/prices", "/api/v1/checkout/buy-now/prices"}, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public CheckoutPriceResponse previewSelection(Authentication authentication, HttpServletRequest request, @RequestBody JsonNode body) {
+        boolean buyNow = request.getRequestURI().contains("/buy-now/");
+        return service.previewSelection(requireSubject(authentication), selectionValidator.selection(body, buyNow, false));
+    }
+
+    @PostMapping(path = {"/api/v1/orders/selected", "/api/v1/orders/buy-now"}, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<OrderResponse> checkoutSelection(Authentication authentication, HttpServletRequest request, @RequestBody JsonNode body) {
+        boolean buyNow = request.getRequestURI().endsWith("/buy-now");
+        var selection = selectionValidator.selection(body, buyNow, true);
+        OrderResponse created = service.checkoutSelection(requireSubject(authentication), request.getHeader(HttpHeaders.AUTHORIZATION), validator.checkout(selectionValidator.accountCheckoutFields(body)), selection);
+        if ("COD".equals(created.paymentMethod())) created = service.get(requireSubject(authentication), false, created.orderId());
+        return ResponseEntity.created(URI.create("/api/v1/orders/" + created.orderId())).body(created);
+    }
 
     @GetMapping(path = "/api/v1/checkout/prices", produces = MediaType.APPLICATION_JSON_VALUE)
     public CheckoutPriceResponse preview(Authentication authentication) {

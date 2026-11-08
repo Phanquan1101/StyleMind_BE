@@ -2,16 +2,22 @@ package com.stylemind.commerce.repository.cart;
 
 import com.stylemind.commerce.entity.CartItem;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
 public interface CartItemRepository extends JpaRepository<CartItem, UUID> {
     Optional<CartItem> findByCartIdAndVariantId(UUID cartId, UUID variantId);
     List<CartItem> findByCartIdOrderByAddedAtAscCartItemIdAsc(UUID cartId);
     void deleteByCartId(UUID cartId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select item from CartItem item where item.cartId = :cartId and item.cartItemId in :ids")
+    List<CartItem> lockSelected(@Param("cartId") UUID cartId, @Param("ids") Collection<UUID> ids);
     @Query(value = """
             select ci.cart_item_id, ci.cart_id, ci.variant_id, v.sku, p.name, b.name,
                    v.color, v.size, v.material, ci.quantity, v.unit_price_vnd,

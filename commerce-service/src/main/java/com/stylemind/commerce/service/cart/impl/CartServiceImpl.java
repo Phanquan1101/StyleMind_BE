@@ -40,8 +40,9 @@ public class CartServiceImpl implements CartService {
 
     @Transactional
     public CartResponse addItem(CartOwner owner, CartItemCommand command) {
-        VariantPurchaseInfo variant = activeVariant(command.variantId());
         UUID cartId = findOrCreateActiveCart(owner);
+        lockActiveCart(cartId);
+        VariantPurchaseInfo variant = activeVariant(command.variantId());
         upsertItem(cartId, variant.variantId(), command.quantity(), variant.unitPriceVnd(),
                 variant.availableQuantity(), true);
         return response(cart(cartId));
@@ -49,8 +50,9 @@ public class CartServiceImpl implements CartService {
 
     @Transactional
     public CartResponse updateItem(CartOwner owner, UUID cartItemId, CartItemCommand command) {
-        requireItemOwner(owner, cartItemId);
         UUID cartId = findActiveCartId(owner).orElseThrow(this::notFound);
+        lockActiveCart(cartId);
+        requireItemOwner(owner, cartItemId);
         CartItem existing = items(cartId).stream()
                 .filter(item -> item.cartItemId().equals(cartItemId)).findFirst().orElseThrow(this::notFound);
         VariantPurchaseInfo variant = activeVariant(existing.variantId());
@@ -63,6 +65,8 @@ public class CartServiceImpl implements CartService {
 
     @Transactional
     public void removeItem(CartOwner owner, UUID cartItemId) {
+        UUID cartId = findActiveCartId(owner).orElseThrow(this::notFound);
+        lockActiveCart(cartId);
         requireItemOwner(owner, cartItemId);
         if (deleteItem(cartItemId) != 1) {
             throw notFound();
@@ -72,6 +76,7 @@ public class CartServiceImpl implements CartService {
     @Transactional
     public CartResponse clear(CartOwner owner) {
         UUID cartId = findOrCreateActiveCart(owner);
+        lockActiveCart(cartId);
         clearCart(cartId);
         return response(cart(cartId));
     }
@@ -84,6 +89,14 @@ public class CartServiceImpl implements CartService {
         if (guestCartId == null || guestCartId.equals(customerCartId)) {
             return response(cart(customerCartId));
         }
+        UUID first = guestCartId.compareTo(customerCartId) < 0 ? guestCartId : customerCartId;
+        UUID second = first.equals(guestCartId) ? customerCartId : guestCartId;
+        String firstStatus = carts.lockStatus(first).orElseThrow(this::notFound);
+        String secondStatus = carts.lockStatus(second).orElseThrow(this::notFound);
+        String customerStatus = first.equals(customerCartId) ? firstStatus : secondStatus;
+        String guestStatus = first.equals(guestCartId) ? firstStatus : secondStatus;
+        if (!"ACTIVE".equals(customerStatus)) throw notFound();
+        if (!"ACTIVE".equals(guestStatus)) return response(cart(customerCartId));
         List<CartItem> guestItems = items(guestCartId);
         Map<UUID, VariantPurchaseInfo> active = activeVariantInfo(
                 guestItems.stream().map(CartItem::variantId).toList()).stream()
@@ -99,6 +112,10 @@ public class CartServiceImpl implements CartService {
         }
         markMerged(guestCartId);
         return response(cart(customerCartId));
+    }
+
+    private void lockActiveCart(UUID cartId) {
+        if (!"ACTIVE".equals(carts.lockStatus(cartId).orElseThrow(this::notFound))) throw notFound();
     }
 
     private void requireItemOwner(CartOwner owner, UUID cartItemId) {

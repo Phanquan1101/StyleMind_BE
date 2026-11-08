@@ -4,6 +4,7 @@ import com.stylemind.commerce.client.payment.OrderPaymentRequest;
 import com.stylemind.commerce.dto.cart.CartItemResponse;
 import com.stylemind.commerce.dto.order.CancellationRequestResponse;
 import com.stylemind.commerce.dto.order.CheckoutPriceResponse;
+import com.stylemind.commerce.dto.order.CheckoutSelection;
 import com.stylemind.commerce.dto.order.OrderAddressResponse;
 import com.stylemind.commerce.dto.order.OrderHistoryResponse;
 import com.stylemind.commerce.dto.order.OrderItemResponse;
@@ -64,11 +65,37 @@ public class OrderServiceImpl implements OrderService {
     private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
+    public OrderResponse recoverCheckout(UUID customerId, String checkoutKey) {
+        return response(detail(findByCheckoutKey(customerId, checkoutKey).orElseThrow(this::notFound)));
+    }
+
+    @Transactional(readOnly = true)
+    public OrderResponse recoverGuestCheckout(String guestSessionKey, String checkoutKey) {
+        String hash = com.stylemind.commerce.security.GuestOrderAccess.digest(guestSessionKey);
+        return response(detail(orderRepository.findByGuestSessionHashAndCheckoutKey(hash, checkoutKey)
+                .map(this::summary).orElseThrow(this::notFound)));
+    }
+
+    @Transactional(readOnly = true)
     public CheckoutPriceResponse preview(UUID customerId) {
         UUID cartId = findActiveCartId(CartOwner.customer(customerId)).orElseThrow(this::emptyCart);
         List<CartItem> refreshed = refreshedItems(cartId);
         return new CheckoutPriceResponse(refreshed.stream().map(this::cartItemResponse).toList(),
                 refreshed.stream().mapToLong(CartItem::lineTotalVnd).sum());
+    }
+
+    @Transactional(readOnly = true)
+    public CheckoutPriceResponse previewSelection(UUID customerId, CheckoutSelection selection) {
+        List<CartItem> items = selectionItems(CartOwner.customer(customerId), selection, false);
+        return new CheckoutPriceResponse(items.stream().map(this::cartItemResponse).toList(),
+                items.stream().mapToLong(CartItem::lineTotalVnd).sum());
+    }
+
+    @Transactional
+    public OrderResponse checkoutSelection(UUID customerId, String authorizationHeader,
+            OrderRequestValidator.CheckoutCommand command, CheckoutSelection selection) {
+        return createCheckout(CartOwner.customer(customerId), null, command.checkoutKey(), command.paymentMethod(),
+                () -> identityAddressClient.getAddress(command.shippingAddressId(), authorizationHeader), selection);
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +105,21 @@ public class OrderServiceImpl implements OrderService {
         List<CartItem> items = refreshedItems(cartId);
         return new CheckoutPriceResponse(items.stream().map(this::cartItemResponse).toList(),
                 items.stream().mapToLong(CartItem::lineTotalVnd).sum());
+    }
+
+    @Transactional(readOnly = true)
+    public CheckoutPriceResponse previewGuestSelection(String guestSessionKey, CheckoutSelection selection) {
+        String key = com.stylemind.commerce.security.GuestOrderAccess.requireKey(guestSessionKey);
+        List<CartItem> items = selectionItems(CartOwner.guest(key), selection, false);
+        return new CheckoutPriceResponse(items.stream().map(this::cartItemResponse).toList(), items.stream().mapToLong(CartItem::lineTotalVnd).sum());
+    }
+
+    @Transactional
+    public OrderResponse checkoutGuestSelection(String guestSessionKey,
+            com.stylemind.commerce.validation.order.GuestCheckoutValidator.CheckoutCommand command, CheckoutSelection selection) {
+        String key = com.stylemind.commerce.security.GuestOrderAccess.requireKey(guestSessionKey);
+        return createCheckout(CartOwner.guest(key), com.stylemind.commerce.security.GuestOrderAccess.digest(key),
+                command.checkoutKey(), command.paymentMethod(), command::address, selection);
     }
 
     @Transactional(readOnly = true)
@@ -105,17 +147,27 @@ public class OrderServiceImpl implements OrderService {
     private OrderResponse createCheckout(CartOwner owner, String guestHash, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod,
             java.util.function.Supplier<AddressSnapshot> addressSupplier) {
+        return createCheckout(owner, guestHash, checkoutKey, paymentMethod, addressSupplier, null);
+    }
+
+    private OrderResponse createCheckout(CartOwner owner, String guestHash, String checkoutKey,
+            com.stylemind.commerce.enums.PaymentMethod paymentMethod,
+            java.util.function.Supplier<AddressSnapshot> addressSupplier, CheckoutSelection selection) {
         UUID customerId = owner.customerId();
-        boolean duplicate = owner.customer()
-                ? findByCheckoutKey(customerId, checkoutKey).isPresent()
-                : orderRepository.findByGuestSessionHashAndCheckoutKey(guestHash, checkoutKey).isPresent();
-        if (duplicate) {
-            throw new ApiOperationException(HttpStatus.CONFLICT, "DUPLICATE_CHECKOUT",
-                    "Checkout key was already used for an order");
+        if (checkoutExists(owner, guestHash, checkoutKey)) throw duplicateCheckout();
+        UUID cartId = null;
+        if (selection == null || !selection.buyNow()) {
+            var activeCart = findActiveCartId(owner);
+            if (activeCart.isEmpty()) {
+                if (checkoutExists(owner, guestHash, checkoutKey)) throw duplicateCheckout();
+                throw emptyCart();
+            }
+            cartId = activeCart.get();
+            String cartStatus = cartRepository.lockStatus(cartId).orElse(null);
+            if (checkoutExists(owner, guestHash, checkoutKey)) throw duplicateCheckout();
+            if (!"ACTIVE".equals(cartStatus)) throw emptyCart();
         }
-        UUID cartId = findActiveCartId(owner).orElseThrow(this::emptyCart);
-        lockCart(cartId);
-        List<CartItem> items = refreshedItems(cartId);
+        List<CartItem> items = selection == null ? refreshedItems(cartId) : selectionItems(owner, selection, true);
         if (items.isEmpty()) {
             throw emptyCart();
         }
@@ -134,10 +186,13 @@ public class OrderServiceImpl implements OrderService {
             }
             insertAddress(orderId, address);
             insertItems(orderId, items);
-            markCartCheckedOut(cartId, now);
+            if (selection == null) markCartCheckedOut(cartId, now);
+            else if (!selection.buyNow()) {
+                cartItemRepository.deleteAllByIdInBatch(selection.cartItemIds());
+                cartRepository.findById(cartId).ifPresent(cart -> { cart.setUpdatedAt(now); cartRepository.saveAndFlush(cart); });
+            }
         } catch (DuplicateKeyException exception) {
-            throw new ApiOperationException(HttpStatus.CONFLICT, "DUPLICATE_CHECKOUT",
-                    "Checkout key was already used for an order");
+            throw duplicateCheckout();
         }
         OrderResponse created = response(detail(findSummary(orderId).orElseThrow()));
         events.publishEvent(OrderPaymentRequest.from(created));
@@ -232,7 +287,27 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private List<CartItem> refreshedItems(UUID cartId) {
-        List<CartItem> items = cartItems(cartId);
+        return refreshItems(cartItems(cartId));
+    }
+
+    private List<CartItem> selectionItems(CartOwner owner, CheckoutSelection selection, boolean locked) {
+        if (selection.buyNow()) {
+            VariantPurchaseInfo variant = activeVariantInfo(List.of(selection.variantId())).stream().findFirst()
+                    .orElseThrow(() -> new ApiOperationException(HttpStatus.CONFLICT, "INVALID_CART_ITEM", "Variant is inactive or unavailable"));
+            if (selection.quantity() > variant.availableQuantity()) throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "Requested quantity exceeds available stock");
+            return List.of(new CartItem(UUID.randomUUID(), null, variant.variantId(), variant.sku(), variant.productName(),
+                    variant.brandName(), variant.color(), variant.size(), variant.material(), selection.quantity(),
+                    variant.unitPriceVnd(), (long) selection.quantity() * variant.unitPriceVnd()));
+        }
+        UUID cartId = findActiveCartId(owner).orElseThrow(this::emptyCart);
+        if (locked && cartItemRepository.lockSelected(cartId, selection.cartItemIds()).size() != selection.cartItemIds().size())
+            throw new ApiOperationException(HttpStatus.CONFLICT, "INVALID_CART_ITEM", "Selected cart items are unavailable");
+        List<CartItem> selected = cartItems(cartId).stream().filter(item -> selection.cartItemIds().contains(item.cartItemId())).toList();
+        if (selected.size() != selection.cartItemIds().size()) throw new ApiOperationException(HttpStatus.CONFLICT, "INVALID_CART_ITEM", "Selected cart items are unavailable");
+        return refreshItems(selected);
+    }
+
+    private List<CartItem> refreshItems(List<CartItem> items) {
         Map<UUID, VariantPurchaseInfo> active = activeVariantInfo(
                 items.stream().map(CartItem::variantId).toList()).stream()
                 .collect(Collectors.toMap(VariantPurchaseInfo::variantId, item -> item));
@@ -272,8 +347,14 @@ public class OrderServiceImpl implements OrderService {
                         ((Number) row[7]).longValue(), (String) row[8], ((Number) row[9]).intValue())).toList();
     }
 
-    private void lockCart(UUID cartId) {
-        if (!"ACTIVE".equals(cartRepository.lockStatus(cartId).orElseThrow(this::emptyCart))) throw emptyCart();
+    private boolean checkoutExists(CartOwner owner, String guestHash, String checkoutKey) {
+        return owner.customer() ? findByCheckoutKey(owner.customerId(), checkoutKey).isPresent()
+                : orderRepository.findByGuestSessionHashAndCheckoutKey(guestHash, checkoutKey).isPresent();
+    }
+
+    private ApiOperationException duplicateCheckout() {
+        return new ApiOperationException(HttpStatus.CONFLICT, "DUPLICATE_CHECKOUT",
+                "Checkout key was already used for an order");
     }
 
     private void insertOrder(UUID orderId, String orderNumber, UUID customerId, String guestHash, String checkoutKey,
