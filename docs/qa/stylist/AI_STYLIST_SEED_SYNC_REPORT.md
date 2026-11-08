@@ -28,6 +28,8 @@ Names, descriptions, colors, sizes, materials, and prices now match the current 
 
 All eight rows retain their existing eligibility labels and review signals. In particular, the child-title review row and unisex-for-women's-stylist review row remain review-only; no row was promoted or relabeled. Every row remains `SYNTHETIC_TEST_ONLY`, records its seed source and checksum, and states `NOT_RUNTIME_VERIFIED` with seed-snapshot price semantics. The source snapshot does not prove that the development seed has been loaded into a runtime Commerce database, approved as live AI catalog, or verified for current availability.
 
+The additional manual Postman handover files from the original worktree were also checked structurally: the collection and environment parse as JSON, the collection contains 11 requests, and token variables are empty/placeholder values. That manual collection was not separately executed by Newman; Newman runtime evidence below is from the checked-in Wave 2 collection.
+
 ## Files changed for this reconciliation
 
 - `stylist-service/src/test/resources/stylist/retrieval/p04-review-sample.synthetic-test-only.json`

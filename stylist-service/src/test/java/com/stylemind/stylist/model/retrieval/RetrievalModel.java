@@ -11,7 +11,7 @@ public final class RetrievalModel {
     public static final String FIXTURE_TAG = "SYNTHETIC_TEST_ONLY";
     public static final String SOURCE_SEED = "SOURCE_SEED";
     public static final String SOURCE_SEED_SHA256 =
-            "07A0AEEBFAB18CC42DC00EE034E499FC02A188B41C9F4DBF114A88AF7C1A1263";
+            "7390703932057DB9C1547837A177BE19F7A86356F4B401AF2D28FB0EC6AAD9C0";
     public static final String SOURCE_SEED_FILE =
             "commerce-service/src/main/resources/db/seed/development-catalog.json";
     public static final String SOURCE_RUNTIME_STATUS = "NOT_RUNTIME_VERIFIED";

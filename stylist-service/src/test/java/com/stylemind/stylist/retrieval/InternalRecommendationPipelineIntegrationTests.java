@@ -339,9 +339,9 @@ class InternalRecommendationPipelineIntegrationTests {
 
         clearRecordsOnly();
         COMMERCE.reset();
-        UUID colorRequest = createRequest(owner, null, false, "Pink", "EXCLUDE_COLOR");
+        UUID colorRequest = createRequest(owner, null, false, "Hồng", "EXCLUDE_COLOR");
         COMMERCE.afterBatch((call, ids) -> {
-            if (call == 2) COMMERCE.setColors(ids, "Pink");
+            if (call == 2) COMMERCE.setColors(ids, "Hồng");
         });
         assertThat(recommendationService.recommend(owner, colorRequest).outfits()).isEmpty();
     }

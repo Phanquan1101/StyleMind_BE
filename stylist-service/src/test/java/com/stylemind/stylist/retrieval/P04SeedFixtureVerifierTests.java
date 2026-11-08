@@ -48,4 +48,62 @@ class P04SeedFixtureVerifierTests {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("productId is absent from seed");
     }
+
+    @Test
+    void rejectsFixtureMetadataThatDoesNotMatchTheCurrentSeed() throws IOException {
+        List<CatalogCandidate> fixture = P04FixtureLoader.load();
+        CatalogCandidate original = fixture.getFirst();
+        byte[] seed = P04SeedFixtureVerifier.readSeedFromCheckout();
+
+        assertRejected(seed, copy(original, null, fixture.get(1).variantId(), null, null, null, null,
+                null, null, null, null, null), "variantId is absent under its product");
+        assertRejected(seed, copy(original, null, null, UUID.randomUUID(), null, null,
+                null, null, null, null, null, null), "categoryId differs from seed");
+        assertRejected(seed, copy(original, null, null, null, "wrong-category", null,
+                null, null, null, null, null, null), "slug differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, "UNISEX",
+                null, null, null, null, null, null), "demographicSegment differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                "wrong name", null, null, null, null, null), "name differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                null, "wrong description", null, null, null, null), "description differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                null, null, "wrong color", null, null, null), "color differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                null, null, null, "wrong size", null, null), "size differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                null, null, null, null, "unexpected material", null), "material differs from seed");
+        assertRejected(seed, copy(original, null, null, null, null, null,
+                null, null, null, null, null, original.seedPriceVndSnapshot() + 1),
+                "seed price differs from fixture snapshot");
+    }
+
+    private static void assertRejected(byte[] seed, CatalogCandidate candidate, String expectedMessage) {
+        assertThatThrownBy(() -> P04SeedFixtureVerifier.verify(seed, List.of(candidate)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(expectedMessage);
+    }
+
+    private static CatalogCandidate copy(CatalogCandidate source, UUID productId, UUID variantId,
+                                         UUID categoryId, String categorySlug, String demographic,
+                                         String name, String description, String color, String size,
+                                         String material, Long price) {
+        return new CatalogCandidate(
+                productId == null ? source.productId() : productId,
+                variantId == null ? source.variantId() : variantId,
+                categoryId == null ? source.categoryId() : categoryId,
+                categorySlug == null ? source.categorySlug() : categorySlug,
+                source.slot(),
+                demographic == null ? source.demographicSegmentRaw() : demographic,
+                name == null ? source.productName() : name,
+                description == null ? source.descriptionRaw() : description,
+                color == null ? source.colorRaw() : color,
+                size == null ? source.sizeRaw() : size,
+                material == null ? source.materialRaw() : material,
+                price == null ? source.seedPriceVndSnapshot() : price,
+                source.categoryMappingStatus(), source.fixtureEligibilityStatus(), source.reviewSignals(),
+                source.fixtureTag(), source.source(), source.sourceFile(), source.sourceSha256(),
+                source.sourceRuntimeStatus(), source.priceSemantics(), source.productStatusSource(),
+                source.variantStatusSource());
+    }
 }

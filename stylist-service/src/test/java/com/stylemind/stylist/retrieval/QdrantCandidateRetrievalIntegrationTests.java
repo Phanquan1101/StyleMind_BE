@@ -68,12 +68,12 @@ class QdrantCandidateRetrievalIntegrationTests {
         assertThat(tops.candidates().getFirst().candidate().variantId().toString())
                 .isEqualTo("55db1c3c-7dce-5a5e-a3ac-a11bc3a8245f");
         assertThat(bottoms.candidates().getFirst().candidate().variantId().toString())
-                .isEqualTo("2389bc86-ad6b-5dc8-87c1-29d2251633ad");
+                .isEqualTo("ab7f39f8-4a68-5539-a8d3-c81e06bb6656");
         assertThat(tops.candidates()).extracting(hit -> hit.candidate().variantId().toString())
                 .contains("55db1c3c-7dce-5a5e-a3ac-a11bc3a8245f")
-                .doesNotContain("2389bc86-ad6b-5dc8-87c1-29d2251633ad");
+                .doesNotContain("ab7f39f8-4a68-5539-a8d3-c81e06bb6656");
         assertThat(bottoms.candidates()).extracting(hit -> hit.candidate().variantId().toString())
-                .contains("2389bc86-ad6b-5dc8-87c1-29d2251633ad")
+                .contains("ab7f39f8-4a68-5539-a8d3-c81e06bb6656")
                 .doesNotContain("55db1c3c-7dce-5a5e-a3ac-a11bc3a8245f");
         assertThat(tops.candidates()).extracting(hit -> hit.candidate().variantId().toString())
                 .doesNotContain("e37df57b-bf8a-55a7-9bf1-0a32cb024a35", "eb910d8e-bb4c-56e0-855d-8c2ff473cd34");
