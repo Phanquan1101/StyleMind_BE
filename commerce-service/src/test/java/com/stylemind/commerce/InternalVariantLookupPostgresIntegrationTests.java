@@ -37,7 +37,7 @@ class InternalVariantLookupPostgresIntegrationTests {
     private static final String SERVICE_TOKEN = "test-only-internal-service-token-0123456789";
 
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_commerce_internal_test")
             .withUsername("commerce_internal_test")
             .withPassword("test-only-not-a-secret");

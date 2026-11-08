@@ -21,7 +21,9 @@ public final class ApiProblemDetails {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(title);
         problem.setType(URI.create("about:blank"));
-        problem.setInstance(URI.create(request.getRequestURI()));
+        String instance = request.getRequestURI();
+        if (instance.startsWith("/api/v1/public/outfits/")) instance = "/api/v1/public/outfits";
+        problem.setInstance(URI.create(instance));
         problem.setProperty("code", code);
         problem.setProperty("timestamp", Instant.now().toString());
 

@@ -36,7 +36,7 @@ public class PaymentEventRepository {
                 FROM public.payment_event_inbox WHERE order_id=:id AND outcome='APPLIED'
                 """).param("id", event.order_id()).query((rs, row) ->
                     event.payment_attempt_id().equals(rs.getObject(1, UUID.class))
-                    && event.customer_id().equals(rs.getObject(2, UUID.class))
+                    && java.util.Objects.equals(event.customer_id(), rs.getObject(2, UUID.class))
                     && event.payment_method().equals(rs.getString(3)) && event.payment_reference().equals(rs.getString(4))
                     && event.amount_vnd() == rs.getLong(5)
                     && event.confirmed_at().truncatedTo(ChronoUnit.MICROS).equals(rs.getTimestamp(6).toInstant())).optional();

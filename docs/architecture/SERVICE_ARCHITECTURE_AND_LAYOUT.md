@@ -1,8 +1,15 @@
 # StyleMind Backend — Service Architecture and Folder Layout
 
+**Owner persistence decision, 2026-10-28:** Use Spring Data JPA/Hibernate for forthcoming Stylist persistence, superseding previous JDBC instructions. Retain Controller -> Service interface/impl -> Repository. Schema/API/P03 implementation are not approved by this framework decision. Do not refactor other services.
+
+**Owner Prompt 08, 2026-10-29:** Stylist P03-A session/history API and exactly two-table V1 are now approved and implemented. This supersedes the preceding no-schema/API statement only for that slice. The current outfit scope is exactly TOP+BOTTOM. See [P03-A handover](../planning/stylist/EP-07_P03A_SESSION_HISTORY_REPORT.md); the rest of P03 remains incomplete.
+
+
 **Purpose:** Give contributors one repository reference for service ownership, the common code-layer convention, and the current source tree of each service.
 
 **Observed local architecture:** working tree as of 2026-10-12. Trees record what exists; a scaffold is not evidence that its business APIs are implemented.
+
+**Snapshot notice, 2026-10-27:** The trees and implementation-status prose below retain the October 12 snapshot; they are not a fresh source inventory. Commerce/Payment/Outfit sharing and prefixed Gateway routes now exist. For AI Stylist use [the current source review](../planning/stylist/EP-07_REVIEW_2026-10-27.md) and [feature-grouped structure](../planning/stylist/EP-07_TECHNICAL_DESIGN.md). Owner Prompt 08 and the JPA decision recorded above supersede older JDBC and no-approval notes only within their stated scope.
 
 ## 1. Architecture at a glance
 

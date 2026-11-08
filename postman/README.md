@@ -1,3 +1,16 @@
+## EP06 Share Outfit — 2026-10-29
+
+[Collection32 requests](StyleMind-EP06-Share-Outfits.postman_collection.json), [environment trống](StyleMind-Outfit-Sharing.postman_environment.example.json), [run guide](EP06_SHARE_OUTFITS_RUN_GUIDE.md). Actual Gateway/Newman32 requests/55 assertions pass; toàn harness6 collections/8 runs155 requests/380 assertions/0 failures. JSON structural check báo riêng. Legacy email-share collection giữ làm reference, endpoint nay trả410 theo approval. [Báo cáo](../docs/qa/wardrobe/EP06_TASK04_07_OUTFIT_SHARING_IMPLEMENTATION_REPORT.md).
+
+---
+## Checkpoint trước implementation — giữ nguyên để truy vết
+
+**EP06 verification 2026-10-28:** 5 collections **123 requests/325 assertions, 0 failures**; invitation đã chạy đủ 10/20 thành 3 fixture, source mẫu vẫn token trống/flags false. [Báo cáo](../docs/qa/wardrobe/EP06_TASK02_03_VERIFICATION_REPORT_2026-10-28.md). Các thông báo pending trước đó bên dưới là checkpoint.
+
+## EP06 Internal Friends dependencies — 2026-10-28
+
+[Collection nội bộ](StyleMind-EP06-Internal-Friends-Dependencies.postman_collection.json), [environment trống](StyleMind-Internal-Friends.postman_environment.example.json), [run guide](EP06_INTERNAL_FRIENDS_DEPENDENCIES_RUN_GUIDE.md). Service token chỉ dùng backend/test, không frontend. 6 requests / 12 scripts; read/send opt-ins mặc định false. HTTP/SMTP Java tests và structural Postman validation tách runtime Newman chưa chạy cho collection mới.
+
 ## US-04.03 Confirm COD Collection
 
 [Collection](StyleMind-COD-Two-Step.postman_collection.json), [run guide](COD_TWO_STEP_RUN_GUIDE.md), and [branch handover](../docs/setup/US-04.03_BRANCH_HANDOVER.md). Includes collection, outbox/inbox delivery and Commerce V8.
@@ -11,6 +24,24 @@
 Import [the creation/handoff collection](StyleMind-Commerce-Payment-Handoff.postman_collection.json) and follow [the US-04.01 guide](US-04.01_CREATE_SEPAY_PAYMENT_RUN_GUIDE.md). This branch includes creation only; webhook settlement and COD collection are deferred. See [scope, evidence and remaining gaps](../docs/qa/US-04.01_PART1_DELIVERY.md).
 
 # Manage Profile Postman Guide
+
+## EP06 Chat Images — Task 10 C
+
+Import [Chat Images](StyleMind-Wardrobe-Chat-Images.postman_collection.json) và [environment trống](StyleMind-Chat-Images.postman_environment.example.json); đọc [run guide ảnh](EP06_CHAT_IMAGES_RUN_GUIDE.md) và [cloud setup](../docs/operations/wardrobe/EP06_CHAT_IMAGES_CLOUD_SETUP.md). Multipart 1–5 ảnh, 5 MiB/ảnh, JPG/PNG/WebP, 40 MP Owner đã duyệt; private content qua JWT/current Friendship. S3-compatible adapter đã có, account/bucket thật để sau.
+
+**Runtime mới 2026-10-27:** [harness](../scripts/ep06-chat-runtime/README.md) đã chạy Identity/JWKS, Gateway và Wardrobe JAR thật với PostgreSQL disposable. Bốn collection Newman **113 requests/305 assertions, 0 failures**; gate Wardrobe **248 tests, 0 failed/error/skipped**. S3 HTTP fake chỉ phục vụ test, chưa live cloud hoặc browser pass. [Báo cáo](../docs/qa/wardrobe/EP06_TASK10_IMAGES_AND_RUNTIME_IMPLEMENTATION_REPORT.md).
+
+## EP06 Chat Messages/WebSocket — Task 10 A/B
+
+Import [Chat Messages](StyleMind-Wardrobe-Chat-Messages.postman_collection.json) và [environment mẫu](StyleMind-Chat-Messages.postman_environment.example.json); đọc [HTTP run guide](EP06_CHAT_MESSAGES_RUN_GUIDE.md) cùng [WebSocket/frontend guide](EP06_CHAT_WEBSOCKET_RUN_GUIDE.md). Text/history, retry/cursor và realtime giữ nguyên; collection 27 requests có opt-in ghi tin và unfriend riêng. Newman text đã pass 27 requests/69 assertions; Gateway native WS text/ảnh/JWT đã pass, browser chưa chạy. Task 10/11 vẫn PARTIAL cho live cloud/browser/invitation E2E.
+
+## EP06 Chat Sessions — Task 09
+
+Import [Chat Sessions](StyleMind-Wardrobe-Chat-Sessions.postman_collection.json) cùng [environment mẫu](StyleMind-Chat-Sessions.postman_environment.example.json); đọc [run guide](EP06_CHAT_SESSIONS_RUN_GUIDE.md). Ba API mở/lấy/list hội thoại theo Friendship, 30 requests; tạo session và unfriend có opt-in riêng, token gắn với account đã xác nhận từ server. Structural validation tách actual runtime: Newman sessions đã pass 30 requests/81 assertions qua Gateway thật. Text/history/WS và upload private xem Task 10 ở trên.
+
+## EP06 Manage Friends — Task 02 A
+
+Import [Manage Friends](StyleMind-Wardrobe-Manage-Friends.postman_collection.json) cùng [environment mẫu](StyleMind-Friends.postman_environment.example.json); đọc [run guide](EP06_MANAGE_FRIENDS_RUN_GUIDE.md). Ba API hiện có: list friends, list own outgoing invitations, unfriend. Collection có 28 requests; phần hủy kết bạn tách riêng và yêu cầu fixture/opt-in. Newman Friends đã chạy 28 requests/89 assertions, zero failures trên fixture disposable; send/accept/resend/incoming chưa triển khai. Chat session APIs có collection riêng ở trên.
 
 ## Manage Users — US-02.07
 
@@ -159,3 +190,7 @@ The limits (20 active shares per outfit, 30 grants per day), the 429, the 503 `I
 ### Verification status
 
 The collection JSON has been structurally validated (valid JSON, every script and request body parses). It has not been executed against a live Gateway stack by the author, so report the first real run result separately.
+# EP06 Friend Invitations — cập nhật 2026-10-28
+
+API mới đã viết, verification Docker/HTTP/Newman còn chờ. Import [collection lời mời](StyleMind-Wardrobe-Friend-Invitations.postman_collection.json), [env mẫu](StyleMind-Friend-Invitations.postman_environment.example.json) và đọc [run guide](EP06_FRIEND_INVITATIONS_RUN_GUIDE.md). Token trống, mutation flags false; chỉ dùng tài khoản .test/SMTP và DB test cô lập. Không dùng evidence collection cũ để đánh dấu invitation mới pass.
+

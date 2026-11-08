@@ -33,7 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class CatalogSeedInventoryPostgresIntegrationTests {
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6")
+    private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_catalog_inventory_test")
             .withUsername("catalog_inventory_test")
             .withPassword("test-only-not-a-secret");
@@ -54,13 +54,39 @@ class CatalogSeedInventoryPostgresIntegrationTests {
     @Test
     void seedCreatesExpectedCatalogSharesAssetsAndDoesNotResetExistingStock() throws Exception {
         jdbc.update("UPDATE public.variant_inventory SET on_hand_quantity=20,reserved_quantity=0");
-        assertThat(count("product")).isEqualTo(600);
-        assertThat(count("product_variant")).isEqualTo(2400);
+        assertThat(count("product")).isEqualTo(381);
+        assertThat(count("product_variant")).isEqualTo(2120);
         assertThat(count("image_asset")).isEqualTo(600);
         assertThat(count("variant_image")).isEqualTo(2400);
-        assertThat(count("variant_inventory")).isEqualTo(2400);
+        assertThat(count("variant_inventory")).isEqualTo(2120);
         assertThat(jdbc.queryForObject("SELECT sum(on_hand_quantity) FROM public.variant_inventory", Long.class))
-                .isEqualTo(48000L);
+                .isEqualTo(42400L);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM public.product WHERE name='Aneri - Quần legging nữ - Mẫu 39121' AND product_status='ACTIVE'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM public.product_variant v JOIN public.product p ON p.product_id=v.product_id
+                WHERE p.name='Aneri - Quần legging nữ - Mẫu 39121' AND v.variant_status='ACTIVE'
+                """, Integer.class)).isEqualTo(20);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(DISTINCT v.color) FROM public.product_variant v
+                JOIN public.product p ON p.product_id=v.product_id
+                WHERE p.name='Aneri - Quần legging nữ - Mẫu 39121'
+                """, Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM public.product_variant v
+                JOIN public.product p ON p.product_id=v.product_id
+                WHERE p.name='Aneri - Quần legging nữ - Mẫu 39121'
+                  AND v.color IN ('Hồng','Be','Đỏ','Xanh dương','Vàng')
+                """, Integer.class)).isEqualTo(20);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM public.image_asset
+                WHERE image_url LIKE '%/e_upscale/e_upscale/e_improve/f_auto/q_auto:best/%'
+                """, Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM public.image_asset
+                WHERE image_url LIKE 'https://res.cloudinary.com/%/image/upload/v%'
+                """, Integer.class)).isEqualTo(600);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM (
                     SELECT image_asset_id FROM public.variant_image
@@ -72,7 +98,7 @@ class CatalogSeedInventoryPostgresIntegrationTests {
         jdbc.update("UPDATE public.variant_inventory SET on_hand_quantity=7 WHERE variant_id=?", variantId);
         seedRunner.run(new DefaultApplicationArguments());
         assertThat(stock(variantId)).containsExactly(7, 0);
-        assertThat(count("product")).isEqualTo(600);
+        assertThat(count("product")).isEqualTo(381);
     }
 
     @Test

@@ -13,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface CartRepository extends JpaRepository<Cart, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<Cart> findLockedByCartId(UUID cartId);
+    // Scalar read avoids stale managed Cart state after waiting for another checkout's lock.
+    @Query(value = "SELECT cart_status FROM public.cart WHERE cart_id=:id FOR UPDATE", nativeQuery = true)
+    Optional<String> lockStatus(@Param("id") UUID cartId);
     Optional<Cart> findByCustomerIdAndCartStatus(UUID customerId, String cartStatus);
     Optional<Cart> findByGuestSessionKeyAndCartStatus(String guestSessionKey, String cartStatus);
     @Query(value = """

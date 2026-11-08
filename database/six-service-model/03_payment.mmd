@@ -4,7 +4,7 @@ erDiagram
     PAYMENT_ATTEMPT {
         uuid payment_attempt_id PK
         uuid order_id "REF commerce.ORDER.order_id"
-        uuid customer_id "REF identity.ACCOUNT.account_id"
+        uuid customer_id "REF identity.ACCOUNT.account_id; NULL for guest checkout"
         string payment_reference UK
         string request_key "UQ with order_id"
         string payment_method "COD or SEPAY_VIETQR"

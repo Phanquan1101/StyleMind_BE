@@ -1,0 +1,627 @@
+{
+  "info": {
+    "name": "StyleMind - EP06 Friend Invitations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Verified locally 2026-10-28: all 10 requests/20 assertions executed across separate main/retry/link fixtures with actual Identity/Notification/Wardrobe/Gateway and Mailpit. Dedicated disposable accounts + SMTP test only. All mutation flags default false; skips are not passes. Read EP06_FRIEND_INVITATIONS_RUN_GUIDE.md. Credentials remain local runtime values and must not be logged/exported."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "runInvitationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Read incoming invitations",
+      "item": [
+        {
+          "name": "Incoming invitations for B",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"\";",
+                  " ",
+                  " const bearer=pm.environment.get(\"accessTokenB\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " ",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Page shape\",()=>pm.expect(pm.response.json()).to.have.keys(\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/incoming"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Fresh invitation and explicit accept (opt-in)",
+      "item": [
+        {
+          "name": "A invites B",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenA\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " for(const name of [\"friendEmailA\",\"friendEmailB\"]) { const email=pm.environment.get(name)||\"\"; if(!/^[^\\s@]+@[^\\s@]+\\.test$/i.test(email)) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Use dedicated .test addresses with a test SMTP inbox only\"); } }",
+                  "pm.collectionVariables.unset(\"runInvitationId\");",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(201));",
+                  " if(pm.response.code!==201) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " const data=pm.response.json(); pm.test(\"SMTP accepted, not friendship yet\",()=>{pm.expect(data.status).to.eql(\"PENDING\");pm.expect(data.delivery_status).to.eql(\"SMTP_ACCEPTED\");}); pm.collectionVariables.set(\"runInvitationId\",data.friend_invitation_id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"recipient_email\":\"{{friendEmailB}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A repeats create without another email",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenA\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " for(const name of [\"friendEmailA\",\"friendEmailB\"]) { const email=pm.environment.get(name)||\"\"; if(!/^[^\\s@]+@[^\\s@]+\\.test$/i.test(email)) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Use dedicated .test addresses with a test SMTP inbox only\"); } }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " const data=pm.response.json();pm.test(\"Same pending invitation\",()=>{pm.expect(data.outcome).to.eql(\"PENDING_EXISTS\");pm.expect(data.friend_invitation_id).to.eql(pm.collectionVariables.get(\"runInvitationId\"));});",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"recipient_email\":\"{{friendEmailB}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "B receives accept action instead of sending reverse email",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenB\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " for(const name of [\"friendEmailA\",\"friendEmailB\"]) { const email=pm.environment.get(name)||\"\"; if(!/^[^\\s@]+@[^\\s@]+\\.test$/i.test(email)) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Use dedicated .test addresses with a test SMTP inbox only\"); } }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Incoming action only\",()=>pm.expect(pm.response.json().outcome).to.eql(\"INCOMING_EXISTS\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"recipient_email\":\"{{friendEmailA}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "C cannot accept B invitation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenC\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " ",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(404));",
+                  " if(pm.response.code!==404) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"No authority from invitation id\",()=>pm.expect(pm.response.json().code).to.eql(\"RESOURCE_NOT_FOUND\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/{{runInvitationId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "B explicitly accepts incoming invitation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenB\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " ",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Friendship created\",()=>pm.expect(pm.response.json().outcome).to.eql(\"FRIENDSHIP_ACCEPTED\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/{{runInvitationId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "B repeats accept without duplicate friendship",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenB\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " ",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Already friends\",()=>pm.expect(pm.response.json().outcome).to.eql(\"ALREADY_FRIENDS\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/{{runInvitationId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A cannot invite an existing friend again",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowFriendInvitationMutations\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenA\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " for(const name of [\"friendEmailA\",\"friendEmailB\"]) { const email=pm.environment.get(name)||\"\"; if(!/^[^\\s@]+@[^\\s@]+\\.test$/i.test(email)) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Use dedicated .test addresses with a test SMTP inbox only\"); } }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Existing friendship\",()=>pm.expect(pm.response.json().outcome).to.eql(\"ALREADY_FRIENDS\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"recipient_email\":\"{{friendEmailB}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Retry failed or expired invitation (separate fixture)",
+      "item": [
+        {
+          "name": "A retries a separately prepared unsuccessful or expired invitation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowRetryScenario\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenA\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " if(!/^[0-9a-f-]{36}$/i.test(pm.environment.get(\"retryInvitationId\")||\"\")) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Prepare the separate retry invitation fixture\"); }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Retry accepted by SMTP\",()=>pm.expect(pm.response.json().delivery_status).to.eql(\"SMTP_ACCEPTED\"));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/{{retryInvitationId}}/resend",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Email-link accept (separate pending fixture)",
+      "item": [
+        {
+          "name": "B accepts from a private test email link",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " const flag=\"allowEmailLinkScenario\";",
+                  " if (pm.environment.get(flag)!==\"true\") { if (pm.execution.skipRequest) { pm.execution.skipRequest(); return; } pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Enable the fixture flag only in an isolated test environment\"); }",
+                  " const bearer=pm.environment.get(\"accessTokenB\");",
+                  " if (!bearer) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Missing fixture actor token\"); }",
+                  " pm.request.headers.upsert({key:\"Authorization\",value:\"Bearer \"+bearer});",
+                  " if(!/^[A-Za-z0-9_-]{43}$/.test(pm.environment.get(\"invitationEmailToken\")||\"\") || !/^[0-9a-f-]{36}$/i.test(pm.environment.get(\"linkInvitationId\")||\"\")) { pm.request.url=\"http://127.0.0.1:1/disabled\"; throw new Error(\"Use a fresh pending link from the private SMTP test inbox\"); }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
+                  " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
+                  " pm.test(\"Explicit link acceptance\",()=>pm.expect(pm.response.json().outcome).to.eql(\"FRIENDSHIP_ACCEPTED\")); pm.environment.unset(\"invitationEmailToken\");",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wardrobe-community/api/v1/me/friend-invitations/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"friend_invitation_id\":\"{{linkInvitationId}}\",\"token\":\"{{invitationEmailToken}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

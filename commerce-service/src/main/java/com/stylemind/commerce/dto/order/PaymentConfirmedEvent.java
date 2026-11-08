@@ -15,7 +15,7 @@ public record PaymentConfirmedEvent(UUID event_id, String event_type, UUID payme
 
     public static PaymentConfirmedEvent parse(JsonNode node) {
         try {
-            if (!node.isObject() || node.size() != FIELDS.size()) throw invalid();
+            if (node == null || !node.isObject() || node.size() != FIELDS.size() || !node.has("customer_id")) throw invalid();
             node.fieldNames().forEachRemaining(key -> { if (!FIELDS.contains(key)) throw invalid(); });
             if (!"PaymentConfirmed".equals(text(node, "event_type"))
                     || !Set.of("SEPAY_VIETQR", "COD").contains(text(node, "payment_method"))) throw invalid();
@@ -25,7 +25,7 @@ public record PaymentConfirmedEvent(UUID event_id, String event_type, UUID payme
             if (reference.isBlank() || reference.length() > 100 || reference.codePoints().anyMatch(Character::isISOControl))
                 throw invalid();
             return new PaymentConfirmedEvent(uuid(node, "event_id"), "PaymentConfirmed", uuid(node, "payment_attempt_id"),
-                    uuid(node, "order_id"), uuid(node, "customer_id"), text(node, "payment_method"), reference,
+                    uuid(node, "order_id"), node.get("customer_id").isNull() ? null : uuid(node, "customer_id"), text(node, "payment_method"), reference,
                     amount.longValue(), Instant.parse(text(node, "confirmed_at")));
         } catch (IllegalArgumentException | java.time.DateTimeException failure) {
             throw invalid();

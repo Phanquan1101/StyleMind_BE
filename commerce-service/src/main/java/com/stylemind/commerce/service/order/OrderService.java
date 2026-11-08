@@ -9,6 +9,11 @@ import java.util.UUID;
 
 public interface OrderService {
 
+    CheckoutPriceResponse previewGuest(String guestSessionKey);
+    OrderResponse checkoutGuest(String guestSessionKey,
+            com.stylemind.commerce.validation.order.GuestCheckoutValidator.CheckoutCommand command);
+    OrderResponse getGuest(String guestSessionKey, UUID orderId);
+
     CheckoutPriceResponse preview(UUID customerId);
 
     OrderResponse checkout(UUID customerId, String authorizationHeader,

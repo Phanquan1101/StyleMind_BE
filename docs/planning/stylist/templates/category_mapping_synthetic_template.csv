@@ -1,0 +1,4 @@
+data_class,commerce_category_id,commerce_category_name,stylist_slot,reviewer,reviewed_at,mapping_version,approval_status,evidence_ref,notes
+SYNTHETIC_TEST_ONLY,,SYNTHETIC_TEST_ONLY category example TOP,TOP,,,fixture-v1,PENDING,,Example only; no real category ID
+SYNTHETIC_TEST_ONLY,,SYNTHETIC_TEST_ONLY category example BOTTOM,BOTTOM,,,fixture-v1,PENDING,,Example only; no real category ID
+SYNTHETIC_TEST_ONLY,,SYNTHETIC_TEST_ONLY unmapped category example,,,,fixture-v1,PENDING,,Unknown mapping is ineligible

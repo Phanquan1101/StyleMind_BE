@@ -1,5 +1,7 @@
 # StyleMind — AI Stylist: Business Analysis & Technical Roadmap
 
+**Historical analysis notice — 2026-10-27:** This file records the October 10 investigation/proposals. For current source status, implementation sequence, flow diagrams and Agent instructions, start at [the EP-07 planning index](../planning/stylist/README.md). Historical BA/AC/Q identifiers and proposals below are preserved; they are not current implementation approval. In particular, Commerce and saved-outfit sharing now have source code, while the target owned-garment context remains unresolved.
+
 Ngày khảo sát: 10/10/2026. Repository duy nhất: `C:\Users\FPTSHOP\Desktop\StyleMind_BE`.
 
 Branch tại thời điểm khảo sát: `dev`; HEAD: `6f3d30ac4b63a4a4539a98648064416b80b3ed60`.

@@ -37,7 +37,7 @@ public class PaymentEventServiceImpl implements PaymentEventService {
         }
         var order = repository.lockOrder(event.order_id());
         String reason = order.isEmpty() ? "ORDER_NOT_FOUND"
-                : !event.customer_id().equals(order.get().customer()) ? "OWNER_MISMATCH"
+                : !java.util.Objects.equals(event.customer_id(), order.get().customer()) ? "OWNER_MISMATCH"
                 : !event.payment_method().equals(order.get().method()) ? "METHOD_MISMATCH"
                 : event.amount_vnd() != order.get().amount() ? "AMOUNT_MISMATCH" : null;
         String outcome = "RECONCILIATION_REQUIRED";
