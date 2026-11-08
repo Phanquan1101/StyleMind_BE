@@ -12,6 +12,8 @@ import com.stylemind.commerce.service.order.CodOrderConfirmationService;
 import com.stylemind.commerce.service.order.OrderService;
 import com.stylemind.commerce.validation.order.GuestCheckoutValidator;
 import com.stylemind.commerce.validation.order.OrderRequestValidator;
+import com.stylemind.commerce.validation.order.CheckoutSelectionValidator;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,33 @@ public class GuestOrderController {
     private final OrderRequestValidator ids;
     private final PaymentClient payment;
     private final CodOrderConfirmationService codConfirmation;
+    private final CheckoutSelectionValidator selections;
+
+    @PostMapping(path = "/api/v1/guest/checkout/recover", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<OrderResponse> recoverCheckout(@RequestHeader(name = "X-Guest-Session-Key", required = false) String key,
+            @RequestBody JsonNode body) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(orders.recoverGuestCheckout(GuestOrderAccess.requireKey(key), selections.recoveryKey(body)));
+    }
+
+    @PostMapping(path = {"/api/v1/guest/checkout/selected/prices", "/api/v1/guest/checkout/buy-now/prices"}, consumes = "application/json", produces = "application/json")
+    public ResponseEntity<CheckoutPriceResponse> previewSelection(@RequestHeader(name = "X-Guest-Session-Key", required = false) String key,
+            HttpServletRequest request, @RequestBody JsonNode body) {
+        boolean buyNow = request.getRequestURI().contains("/buy-now/");
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(orders.previewGuestSelection(GuestOrderAccess.requireKey(key), selections.selection(body, buyNow, false, true)));
+    }
+
+    @PostMapping(path = {"/api/v1/guest/orders/selected", "/api/v1/guest/orders/buy-now"}, consumes = "application/json", produces = "application/json")
+    public ResponseEntity<OrderResponse> checkoutSelection(@RequestHeader(name = "X-Guest-Session-Key", required = false) String key,
+            HttpServletRequest request, @RequestBody JsonNode body) {
+        GuestOrderAccess.requireKey(key);
+        boolean buyNow = request.getRequestURI().endsWith("/buy-now");
+        var selection = selections.selection(body, buyNow, true, true);
+        OrderResponse created = orders.checkoutGuestSelection(key, checkoutValidator.checkout(selections.guestCheckoutFields(body)), selection);
+        if ("COD".equals(created.paymentMethod())) created = orders.getGuest(key, created.orderId());
+        return ResponseEntity.created(URI.create("/api/v1/guest/orders/" + created.orderId())).header("Cache-Control", "no-store").body(created);
+    }
 
     @GetMapping(path = "/api/v1/guest/checkout/prices", produces = "application/json")
     public ResponseEntity<CheckoutPriceResponse> preview(
