@@ -4,10 +4,27 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
   DEFAULT_LIMITS, APPROVED_FINAL_GATEWAY_PROFILE, APPROVED_FINAL_GATEWAY_LIMITS,
+  APPROVED_TWO_ITEM_LOCAL_SMOKE_PROFILE, APPROVED_TWO_ITEM_LOCAL_SMOKE_LIMITS,
+  APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_PROFILE, APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_LIMITS,
+  OWNER_LOCAL_INTERACTIVE_PROFILE, OWNER_LOCAL_INTERACTIVE_LIMITS,
+  OWNER_DISTINCT10_ONE_LIVE_PROFILE,
   limitsForProfile, classifyOperation, reserveAttempt, markDispatched,
   completeAttempt, failAttempt, safeProviderErrorDiagnostic, readBoundedResponse,
   safeTokenCountRequestMetadata
 } = require('./gemini-meter-core.cjs');
+
+test('owner distinct10 grant preserves cumulative history and permits exactly the approved additions', () => {
+  const limits = limitsForProfile(OWNER_DISTINCT10_ONE_LIVE_PROFILE);
+  assert.deepEqual(limits, { embedding: 29, tokenCount: 45, generation: 10 });
+  const previousEvent = { operation: 'generation', status: 200 };
+  const summary = { calls: { embedding: 18, tokenCount: 33, generation: 9 }, events: [previousEvent] };
+  for (const [operation, count] of Object.entries({ embedding: 11, tokenCount: 12, generation: 1 })) {
+    for (let index = 0; index < count; index++) assert.ok(reserveAttempt(summary, operation, 'approved-model', limits));
+    assert.equal(reserveAttempt(summary, operation, 'approved-model', limits), null);
+  }
+  assert.deepEqual(summary.calls, { embedding: 29, tokenCount: 45, generation: 10 });
+  assert.equal(summary.events[0], previousEvent);
+});
 
 test('all Gemini Developer API smoke routes classify into the shared meter', () => {
   assert.deepEqual(classifyOperation('POST', '/v1beta/models/gemini-2.5-flash:countTokens'), {
@@ -28,6 +45,12 @@ test('all Gemini Developer API smoke routes classify into the shared meter', () 
   assert.deepEqual(APPROVED_FINAL_GATEWAY_LIMITS, { embedding: 12, tokenCount: 23, generation: 6 });
   assert.equal(limitsForProfile(''), DEFAULT_LIMITS);
   assert.equal(limitsForProfile(APPROVED_FINAL_GATEWAY_PROFILE), APPROVED_FINAL_GATEWAY_LIMITS);
+  assert.deepEqual(APPROVED_TWO_ITEM_LOCAL_SMOKE_LIMITS, { embedding: 15, tokenCount: 27, generation: 7 });
+  assert.equal(limitsForProfile(APPROVED_TWO_ITEM_LOCAL_SMOKE_PROFILE), APPROVED_TWO_ITEM_LOCAL_SMOKE_LIMITS);
+  assert.deepEqual(APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_LIMITS, { embedding: 18, tokenCount: 31, generation: 8 });
+  assert.equal(limitsForProfile(APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_PROFILE), APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_LIMITS);
+  assert.deepEqual(OWNER_LOCAL_INTERACTIVE_LIMITS, { embedding: null, tokenCount: null, generation: null });
+  assert.equal(limitsForProfile(OWNER_LOCAL_INTERACTIVE_PROFILE), OWNER_LOCAL_INTERACTIVE_LIMITS);
   assert.throws(() => limitsForProfile('UNAPPROVED'), /meter-profile-unsupported/);
 });
 
@@ -141,4 +164,40 @@ test('approved final Gateway profile admits only the exact cumulative remainder'
   assert.equal(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', APPROVED_FINAL_GATEWAY_LIMITS), null);
   assert.equal(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', APPROVED_FINAL_GATEWAY_LIMITS), null);
   assert.deepEqual(summary.calls, { embedding: 12, tokenCount: 23, generation: 6 });
+});
+
+test('approved two-item local smoke profile admits exactly the owner-approved cumulative remainder', () => {
+  const limits = limitsForProfile(APPROVED_TWO_ITEM_LOCAL_SMOKE_PROFILE);
+  const summary = { calls: { embedding: 12, tokenCount: 23, generation: 6 }, events: [] };
+  for (let i = 0; i < 3; i++) assert.ok(reserveAttempt(summary, 'embedding', 'gemini-embedding-001', limits));
+  for (let i = 0; i < 4; i++) assert.ok(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', limits));
+  assert.ok(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', limits));
+  assert.deepEqual(summary.calls, { embedding: 15, tokenCount: 27, generation: 7 });
+  assert.equal(reserveAttempt(summary, 'embedding', 'gemini-embedding-001', limits), null);
+  assert.equal(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', limits), null);
+  assert.equal(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', limits), null);
+  assert.equal(summary.events.length, 8);
+});
+
+test('approved retry profile preserves the existing meter baseline and admits one fresh bounded flow', () => {
+  const limits = limitsForProfile(APPROVED_TWO_ITEM_LOCAL_SMOKE_RETRY_PROFILE);
+  const summary = { calls: { embedding: 15, tokenCount: 27, generation: 7, blocked: 1 }, events: [{ blocked: true }] };
+  for (let i = 0; i < 3; i++) assert.ok(reserveAttempt(summary, 'embedding', 'gemini-embedding-001', limits));
+  for (let i = 0; i < 4; i++) assert.ok(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', limits));
+  assert.ok(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', limits));
+  assert.deepEqual(summary.calls, { embedding: 18, tokenCount: 31, generation: 8, blocked: 1 });
+  assert.equal(reserveAttempt(summary, 'embedding', 'gemini-embedding-001', limits), null);
+  assert.equal(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', limits), null);
+  assert.equal(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', limits), null);
+  assert.equal(summary.events.length, 9);
+});
+
+test('owner-approved local interactive profile preserves cumulative counters and removes only local call caps', () => {
+  const limits = limitsForProfile(OWNER_LOCAL_INTERACTIVE_PROFILE);
+  const summary = { calls: { embedding: 17, tokenCount: 31, generation: 8 }, events: [] };
+  for (let i = 0; i < 3; i++) assert.ok(reserveAttempt(summary, 'embedding', 'gemini-embedding-001', limits));
+  for (let i = 0; i < 4; i++) assert.ok(reserveAttempt(summary, 'tokenCount', 'gemini-3.5-flash-lite', limits));
+  for (let i = 0; i < 2; i++) assert.ok(reserveAttempt(summary, 'generation', 'gemini-3.5-flash-lite', limits));
+  assert.deepEqual(summary.calls, { embedding: 20, tokenCount: 35, generation: 10 });
+  assert.equal(summary.events.length, 9);
 });

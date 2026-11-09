@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,6 +37,7 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
     public static final int PAGE_SIZE = 100;
     public static final int MAX_PAGES = 100;
     public static final int MAX_VARIANTS = 20_000;
+    private static final int MAX_ALLOWLISTED_VARIANTS = 10;
     private static final Pattern URL = Pattern.compile("(?i)https?://\\S+");
     private static final Pattern EMAIL = Pattern.compile("(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}");
     private static final Pattern PHONE = Pattern.compile("(?<!\\d)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\d)");
@@ -44,13 +46,28 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
     private final ReviewedCatalogPolicy policyLoader;
     private final RuntimeEmbeddingPort embeddings;
     private final RuntimeQdrantVectorStore qdrant;
+    private final Set<UUID> variantAllowlist;
 
+    @Autowired
+    public RuntimeCatalogImportRunner(CommerceCatalogClient commerce, ReviewedCatalogPolicy policyLoader,
+            RuntimeEmbeddingPort embeddings, RuntimeQdrantVectorStore qdrant,
+            @Value("${stylemind.stylist.catalog.import-variant-ids:}") String configuredVariantIds) {
+        this(commerce, policyLoader, embeddings, qdrant, parseVariantAllowlist(configuredVariantIds));
+    }
+
+    /** Convenience constructor for existing tests and unrestricted legacy imports. */
     public RuntimeCatalogImportRunner(CommerceCatalogClient commerce, ReviewedCatalogPolicy policyLoader,
             RuntimeEmbeddingPort embeddings, RuntimeQdrantVectorStore qdrant) {
+        this(commerce, policyLoader, embeddings, qdrant, Set.of());
+    }
+
+    private RuntimeCatalogImportRunner(CommerceCatalogClient commerce, ReviewedCatalogPolicy policyLoader,
+            RuntimeEmbeddingPort embeddings, RuntimeQdrantVectorStore qdrant, Set<UUID> variantAllowlist) {
         this.commerce = commerce;
         this.policyLoader = policyLoader;
         this.embeddings = embeddings;
         this.qdrant = qdrant;
+        this.variantAllowlist = Set.copyOf(variantAllowlist);
     }
 
     @Override
@@ -58,6 +75,10 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
         if (!embeddingsConfigured()) throw new StylistApiException(ErrorCode.GENERATION_RUNTIME_UNCONFIGURED);
         Policy policy = policyLoader.require();
         List<Indexable> catalog = readCatalog(policy);
+        if (!variantAllowlist.isEmpty()
+                && catalog.stream().map(Indexable::productId).distinct().count() != catalog.size()) {
+            throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR);
+        }
         if (catalog.isEmpty() || catalog.stream().noneMatch(item -> "TOP".equals(item.slot()))
                 || catalog.stream().noneMatch(item -> "BOTTOM".equals(item.slot()))) {
             throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR);
@@ -80,6 +101,7 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
         List<Indexable> candidates = new ArrayList<>();
         Set<UUID> productIds = new HashSet<>();
         Set<UUID> variantIds = new HashSet<>();
+        Set<UUID> matchedAllowlistIds = new HashSet<>();
         long advertisedTotalPages = -1;
         long advertisedTotalElements = -1;
         long receivedProducts = 0;
@@ -98,6 +120,7 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
                 if (receivedProducts != advertisedTotalElements || !response.items().isEmpty()) {
                     throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR);
                 }
+                requireAllAllowlistIdsMatched(matchedAllowlistIds);
                 return List.of();
             }
             receivedProducts = Math.addExact(receivedProducts, response.items().size());
@@ -116,8 +139,10 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
                 if (mapping.isEmpty()) continue;
                 for (VariantResponse variant : product.variants()) {
                     if (!"ACTIVE".equals(variant.variantStatus())) continue;
+                    if (!variantAllowlist.isEmpty() && !variantAllowlist.contains(variant.variantId())) continue;
                     String text = indexText(product.name(), variant.color(), variant.size(), variant.material());
                     if (text.isBlank()) continue;
+                    matchedAllowlistIds.add(variant.variantId());
                     candidates.add(new Indexable(product.productId(), variant.variantId(), product.categoryId(),
                             product.categoryName(), mapping.orElseThrow(), product.demographicSegment(),
                             product.name(), null, variant.color(), variant.size(), variant.material(), text));
@@ -127,10 +152,38 @@ public class RuntimeCatalogImportRunner implements ApplicationRunner {
                 if (receivedProducts != advertisedTotalElements || page + 1 != advertisedTotalPages) {
                     throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR);
                 }
+                requireAllAllowlistIdsMatched(matchedAllowlistIds);
                 return List.copyOf(candidates);
             }
         }
         throw new StylistApiException(ErrorCode.PAYLOAD_TOO_LARGE);
+    }
+
+    private void requireAllAllowlistIdsMatched(Set<UUID> matchedIds) {
+        if (!matchedIds.containsAll(variantAllowlist)) {
+            throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR);
+        }
+    }
+
+    private static Set<UUID> parseVariantAllowlist(String configuredIds) {
+        if (configuredIds == null || configuredIds.isBlank()) return Set.of();
+        String[] rawIds = configuredIds.split(",", -1);
+        if (rawIds.length > MAX_ALLOWLISTED_VARIANTS) {
+            throw new IllegalArgumentException("Catalog import variant allowlist supports at most 10 IDs");
+        }
+        Set<UUID> ids = new HashSet<>();
+        for (String rawId : rawIds) {
+            String value = rawId.trim();
+            try {
+                UUID id = UUID.fromString(value);
+                if (!id.toString().equalsIgnoreCase(value) || !ids.add(id)) {
+                    throw new IllegalArgumentException("Catalog import variant IDs must be unique canonical UUIDs");
+                }
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Catalog import variant IDs must be unique canonical UUIDs", exception);
+            }
+        }
+        return Set.copyOf(ids);
     }
 
     private static void validateProduct(ProductResponse product) {

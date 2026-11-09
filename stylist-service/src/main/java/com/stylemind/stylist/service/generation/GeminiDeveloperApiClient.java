@@ -18,6 +18,8 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -34,6 +36,7 @@ public final class GeminiDeveloperApiClient {
     public static final int EMBEDDING_DIMENSIONS = 1_536;
     public static final int EMBEDDING_MAX_COUNT_TOKENS = 2_041;
     private static final int MAX_RESPONSE_BYTES = 256 * 1024;
+    private static final Logger LOGGER = LoggerFactory.getLogger(GeminiDeveloperApiClient.class);
 
     private final URI baseUri;
     private final String apiKey;
@@ -148,32 +151,50 @@ public final class GeminiDeveloperApiClient {
                     .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody)).build();
             HttpResponse<byte[]> response = sendBounded(request, bounded);
             int status = response.statusCode();
-            if (status == 408 || status == 504) throw timeoutFailure();
+            if (status == 408 || status == 504) {
+                LOGGER.warn("Gemini HTTP provider returned timeout status {}", status);
+                throw timeoutFailure();
+            }
             if (status == 401 || status == 403 || status == 429 || status >= 500) {
+                LOGGER.warn("Gemini HTTP provider returned unavailable status {}", status);
                 throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_UNAVAILABLE);
             }
             if (status < 200 || status >= 300) throw protocol();
             try {
                 return json.readTree(response.body());
             } catch (IOException | IllegalArgumentException exception) {
+                LOGGER.warn("Gemini HTTP response parser rejected the response ({})",
+                        exception.getClass().getSimpleName());
                 throw protocol();
             }
         } catch (StylistApiException exception) {
             throw exception;
         } catch (TimeoutException exception) {
+            LOGGER.warn("Gemini HTTP request timed out");
             throw timeoutFailure();
         } catch (ExecutionException exception) {
             Throwable cause = exception.getCause();
-            if (hasCause(cause, java.net.http.HttpTimeoutException.class)) throw timeoutFailure();
+            if (hasCause(cause, java.net.http.HttpTimeoutException.class)) {
+                LOGGER.warn("Gemini HTTP transport timed out ({})", exceptionTypes(cause));
+                throw timeoutFailure();
+            }
             if (hasCause(cause, ResponseTooLargeException.class)) throw protocol();
-            if (cause instanceof RuntimeException runtimeException) throw runtimeException;
+            if (cause instanceof RuntimeException runtimeException) {
+                LOGGER.warn("Gemini HTTP client failed ({})", exceptionTypes(cause));
+                throw runtimeException;
+            }
+            LOGGER.warn("Gemini HTTP transport failed ({})", exceptionTypes(cause));
             throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_UNAVAILABLE);
         } catch (ResponseTooLargeException exception) {
+            LOGGER.warn("Gemini HTTP response exceeded the configured size limit");
             throw protocol();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
+            LOGGER.warn("Gemini HTTP request was interrupted");
             throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_UNAVAILABLE);
         } catch (IllegalArgumentException exception) {
+            LOGGER.warn("Gemini HTTP request could not be constructed ({})",
+                    exception.getClass().getSimpleName());
             throw new StylistApiException(ErrorCode.GENERATION_PROVIDER_UNAVAILABLE);
         }
     }
@@ -228,6 +249,17 @@ public final class GeminiDeveloperApiClient {
             if (causeType.isInstance(current)) return true;
         }
         return false;
+    }
+
+    private static String exceptionTypes(Throwable failure) {
+        if (failure == null) return "unknown";
+        StringBuilder types = new StringBuilder();
+        int count = 0;
+        for (Throwable current = failure; current != null && count < 4; current = current.getCause(), count++) {
+            if (count > 0) types.append(" -> ");
+            types.append(current.getClass().getSimpleName());
+        }
+        return types.toString();
     }
 
     private static final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {

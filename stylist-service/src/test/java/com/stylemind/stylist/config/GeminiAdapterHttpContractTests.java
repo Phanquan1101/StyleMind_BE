@@ -54,7 +54,16 @@ class GeminiAdapterHttpContractTests {
 
     @BeforeEach
     void startFixture() throws Exception {
+        generationCountStatus.set(200);
+        generationStatus.set(200);
+        embeddingCountStatus.set(200);
+        embeddingStatus.set(200);
+        generationTokens.set(220);
+        embeddingTokens.set(35);
+        generationDelayMillis.set(0);
         generationBodyDelayMillis.set(0);
+        generationOutput.set("valid");
+        vectorOutput.set("valid");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.setExecutor(Executors.newCachedThreadPool(task -> {
             Thread thread = new Thread(task, "gemini-contract-fixture");

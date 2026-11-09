@@ -400,7 +400,8 @@ function geminiHttpFixture() {
     tokenCounts: 0,
     generations: 0,
     queryEmbeddings: 0,
-    documentEmbeddings: 0
+    documentEmbeddings: 0,
+    queryTexts: []
   };
   geminiMockCounts = counts;
   geminiMockGenerationRequests = { countTokens: [], generateContent: [] };
@@ -457,8 +458,12 @@ function geminiHttpFixture() {
           return sendJson(response, 400, {});
         }
         counts.embeddings++;
-        if (taskType === 'RETRIEVAL_QUERY') counts.queryEmbeddings++;
-        else counts.documentEmbeddings++;
+        if (taskType === 'RETRIEVAL_QUERY') {
+          counts.queryEmbeddings++;
+          counts.queryTexts.push(text);
+        } else {
+          counts.documentEmbeddings++;
+        }
         return sendJson(response, 200, {
           embeddings: [{ values: Array(1536).fill(0.001) }]
         });
@@ -470,6 +475,29 @@ function geminiHttpFixture() {
         const userText = body.contents?.[0]?.parts?.[0]?.text;
         if (body.model || typeof userText !== 'string' || !validFlashLiteGenerationConfig(config)) {
           return sendJson(response, 400, {});
+        }
+        const intentSchema = config.responseFormat?.text?.schema?.properties?.preferred_colors;
+        if (intentSchema) {
+          const allowedColors = intentSchema.items?.enum;
+          if (!Array.isArray(allowedColors)) return sendJson(response, 400, {});
+          counts.generations++;
+          geminiMockGenerationRequests.generateContent.push({
+            path_model: model,
+            request_model_in_body: body.model || null,
+            thinking_level: config.thinkingConfig.thinkingLevel,
+            response_mime_type: config.responseFormat.text.mimeType,
+            structured_schema_present: true,
+            legacy_fields_absent: true
+          });
+          const preferred = userText.toLowerCase().includes('trắng') && allowedColors.includes('white')
+            ? ['white'] : [];
+          return sendJson(response, 200, {
+            candidates: [{
+              content: { role: 'model', parts: [{ text: JSON.stringify({ preferred_colors: preferred }) }] },
+              finishReason: 'STOP'
+            }],
+            usageMetadata: { promptTokenCount: 16, candidatesTokenCount: 8 }
+          });
         }
         let input;
         try { input = JSON.parse(userText); } catch (_) { return sendJson(response, 400, {}); }
@@ -528,7 +556,7 @@ function validFlashLiteGenerationConfig(config) {
   const text = config.responseFormat?.text;
   return Object.keys(config).sort().join(',') === 'candidateCount,maxOutputTokens,responseFormat,thinkingConfig'
     && config.candidateCount === 1
-    && config.maxOutputTokens === 2000
+    && [128, 2000].includes(config.maxOutputTokens)
     && Object.keys(config.thinkingConfig || {}).sort().join(',') === 'thinkingLevel'
     && config.thinkingConfig.thinkingLevel === 'MINIMAL'
     && Object.keys(config.responseFormat || {}).sort().join(',') === 'text'
@@ -806,7 +834,7 @@ async function runGeminiPositiveFlow(gatewayBaseUrl, customerAToken, customerBTo
 
   const intake = await call(customerAToken, 'POST',
     '/stylist/api/v1/stylist/sessions/' + session.json.session_id + '/requests', {
-      message: 'Synthetic test only: I need a simple neutral outfit for a workday.',
+      message: 'Synthetic test only: I prefer the color trắng for a workday.',
       occasion: 'work',
       style_context: 'minimal',
       max_budget_vnd: 850000,
@@ -843,7 +871,10 @@ async function runGeminiPositiveFlow(gatewayBaseUrl, customerAToken, customerBTo
   evidence.recommendation_count = generated.json.recommendations.length;
   evidence.item_slots = recommendation.items.map(item => item.slot_name);
   const afterGenerate = await providerSnapshot();
-  assertOperationDelta(beforeGenerate, afterGenerate, { embedding: 1, tokenCount: 2, generation: 1 }, 'Gateway generation');
+  assertOperationDelta(beforeGenerate, afterGenerate, { embedding: 1, tokenCount: 3, generation: 2 }, 'Gateway generation');
+  if (!geminiMockCounts.queryTexts.some(text => text.includes('Preferred colors: white'))) {
+    throw new Error('Parsed explicit color intent was not included in the retrieval query.');
+  }
 
   const list = await call(customerAToken, 'GET',
     '/stylist/api/v1/stylist/requests/' + intake.json.request_id + '/recommendations');
@@ -920,7 +951,7 @@ async function runGeminiPositiveFlow(gatewayBaseUrl, customerAToken, customerBTo
   assertCountsUnchanged(afterReplay, afterForeign, 'Foreign-owner denial');
   evidence.foreign_owner_status = foreign.status;
   evidence.foreign_owner_added_provider_calls = 0;
-  assertOperationDelta(providerStart, afterForeign, { embedding: 1, tokenCount: 2, generation: 1 },
+  assertOperationDelta(providerStart, afterForeign, { embedding: 1, tokenCount: 3, generation: 2 },
     'Gateway generation, read-back, replay and foreign-owner flow');
   return { evidence, meterAfter: afterForeign, requestId: intake.json.request_id };
 }
@@ -1046,7 +1077,11 @@ async function main() {
     }
     if (serviceChild.exitCode !== null) throw new Error('Stylist stopped during startup:\n' + redact(outputBuffers.get(serviceChild) || ''));
 
-    const gatewayPort = await freePort();
+    const gatewayPort = process.env.STYLEMIND_WAVE2_GATEWAY_PORT
+      ? Number(process.env.STYLEMIND_WAVE2_GATEWAY_PORT) : await freePort();
+    if (!Number.isInteger(gatewayPort) || gatewayPort < 1 || gatewayPort > 65_535) {
+      throw new Error('STYLEMIND_WAVE2_GATEWAY_PORT must be a valid TCP port.');
+    }
     progress('starting the existing API Gateway route against the disposable Stylist');
     await startGateway(gatewayPort, servicePort);
     if (serviceChild.exitCode !== null) throw new Error('Stylist stopped before Gateway run:\n' + redact(outputBuffers.get(serviceChild) || ''));
@@ -1121,10 +1156,10 @@ async function main() {
     if (geminiMockMode) {
       const before = providerCallCounts(beforePostmanCalls);
       const after = providerCallCounts(afterPostman);
-      if (after.generation - before.generation !== 1
+      if (after.generation - before.generation !== 2
           || after.embedding - before.embedding < 1
-          || after.tokenCount - before.tokenCount < 2) {
-        throw new Error('Gemini HTTP mock did not observe the expected retrieval embedding, token preflight and one generation.');
+          || after.tokenCount - before.tokenCount < 3) {
+        throw new Error('Gemini HTTP mock did not observe color intent, retrieval embedding, token preflights and outfit generation.');
       }
     } else if (afterPostman.embeddings !== 3 || afterPostman.tokenCounts !== 2 || afterPostman.generations !== 1) {
       throw new Error('Postman model-call counts were unexpected (catalog import + generation + over-budget preflight only expected): '
@@ -1231,7 +1266,7 @@ async function main() {
       generation: after.generation - before.generation
     };
     if (geminiMockMode) {
-      if (delta.embedding !== 1 || delta.tokenCount !== 2 || delta.generation !== 1) {
+      if (delta.embedding !== 1 || delta.tokenCount !== 3 || delta.generation !== 2) {
         throw new Error('Concurrent Gemini HTTP mock calls were not limited to the winning request: '
           + JSON.stringify(delta));
       }

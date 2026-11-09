@@ -1,0 +1,206 @@
+{
+  "status": "REAL_GEMINI_CHROME_PASS",
+  "verified_at": "2026-11-09T20:39:21.215613+07:00",
+  "request": {
+    "request_id": "de3c16ff-fac0-434b-8d7c-2bf7daa8fdca",
+    "session_id": "6d7e282a-1a63-4a91-9633-814df02ba521",
+    "request_status": "SUCCEEDED",
+    "max_budget_vnd": 800000,
+    "budget_is_hard": true,
+    "requested_at": "2026-11-09T13:35:01.010125+00:00",
+    "recommendation_id": "d0cb8b3d-b7cc-42c9-b026-8fb82a86491a",
+    "explanation": "Trang phục phù hợp cho đi làm với áo sơ mi nữ màu xanh dương thanh lịch kết hợp cùng quần dài.",
+    "styling_tips": "Phối cùng giày công sở để hoàn thiện vẻ ngoài trang nhã.",
+    "generated_at": "2026-11-09T13:35:05.92154+00:00",
+    "items": [
+      {
+        "slot": "TOP",
+        "variant_id": "64b1b82f-f3d6-53cc-ad80-8ce7ddde5b80",
+        "source_type": "SHOP_VARIANT",
+        "selection_reason": "Áo sơ mi màu xanh dương đáp ứng sở thích màu sắc lịch sự cho môi trường công sở."
+      },
+      {
+        "slot": "BOTTOM",
+        "variant_id": "3e650983-ead0-5131-918b-7e36ba93dd03",
+        "source_type": "SHOP_VARIANT",
+        "selection_reason": "Quần thể thao màu xanh navy dáng dài mang lại sự thoải mái khi làm việc."
+      }
+    ]
+  },
+  "items": [
+    {
+      "slot": "TOP",
+      "product_id": "4956d0a4-4047-5cfc-8597-42427cb69eba",
+      "variant_id": "64b1b82f-f3d6-53cc-ad80-8ce7ddde5b80",
+      "name": "Femella - Áo sơ mi nữ - Mẫu 59893",
+      "color": "Xanh dương",
+      "size": "M",
+      "price_vnd": 249000,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473116/stylemind/products/1f2927e7-07c5-5965-a736-825dd2f92cef.jpg",
+      "selection_reason": "Áo sơ mi màu xanh dương đáp ứng sở thích màu sắc lịch sự cho môi trường công sở."
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "3a9eef41-f434-5df9-9660-7399a822a0f7",
+      "variant_id": "3e650983-ead0-5131-918b-7e36ba93dd03",
+      "name": "Nike - Quần thể thao nữ - Mẫu 43081",
+      "color": "Xanh navy",
+      "size": "M",
+      "price_vnd": 329000,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473457/stylemind/products/7a5a67fe-8c4a-5236-b405-c7f46900c90e.jpg",
+      "selection_reason": "Quần thể thao màu xanh navy dáng dài mang lại sự thoải mái khi làm việc."
+    }
+  ],
+  "total_price_vnd": 578000,
+  "provider_attempts": [
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 489,
+      "inputTokens": 37
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 120,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 416,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6981069118597925,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 153,
+      "inputTokens": 584
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "latencyMs": 1433,
+      "promptTokens": 584,
+      "outputTokens": 186,
+      "thoughtTokens": null
+    }
+  ],
+  "meter_before": {
+    "metadata": 0,
+    "embedding": 28,
+    "tokenCount": 43,
+    "generation": 9,
+    "blocked": 3
+  },
+  "meter_after": {
+    "metadata": 0,
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 3
+  },
+  "no_provider_retry": true,
+  "remaining_attempts": {
+    "embedding": 0,
+    "tokenCount": 0,
+    "generation": 0
+  },
+  "database_counts_after": {
+    "sessions": 25,
+    "requests": 25,
+    "recommendations": 15,
+    "items": 30
+  },
+  "database_delta": {
+    "sessions": 1,
+    "requests": 1,
+    "recommendations": 1,
+    "items": 2
+  },
+  "http_evidence": [
+    "2026-11-09T20:35:01.063+07:00 INFO  service=stylist-service correlationId=436df826-befd-430e-9e8c-d12ba35796f9 [http-nio-18085-exec-1] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=436df826-befd-430e-9e8c-d12ba35796f9 method=POST path=/api/v1/stylist/sessions/6d7e282a-1a63-4a91-9633-814df02ba521/requests status=201 durationMs=271",
+    "2026-11-09T20:35:06.029+07:00 INFO  service=stylist-service correlationId=c044cf48-81a5-4a3f-baae-a24b17cab9ae [http-nio-18085-exec-2] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=c044cf48-81a5-4a3f-baae-a24b17cab9ae method=POST path=/api/v1/stylist/requests/de3c16ff-fac0-434b-8d7c-2bf7daa8fdca/generate status=200 durationMs=4937",
+    "2026-11-09T20:35:06.239+07:00 INFO  service=stylist-service correlationId=291695f4-58f8-45aa-8011-10fdfa336d80 [http-nio-18085-exec-3] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=291695f4-58f8-45aa-8011-10fdfa336d80 method=GET path=/api/v1/stylist/recommendations/d0cb8b3d-b7cc-42c9-b026-8fb82a86491a status=200 durationMs=189"
+  ],
+  "qdrant_retrieval_http": [
+    "2026-11-09T13:35:01.617007Z  INFO actix_web::middleware::logger: 172.17.0.1 \"GET /collections/stylemind_stylist_runtime_gemini_demo10_20261109/points/cdcc8bf8-e25e-3fda-bad9-b324da93b932 HTTP/1.1\" 200 6614 \"-\" \"Java-http-client/21.0.8\" 0.004299",
+    "2026-11-09T13:35:03.476397Z  INFO actix_web::middleware::logger: 172.17.0.1 \"POST /collections/stylemind_stylist_runtime_gemini_demo10_20261109/points/query HTTP/1.1\" 200 3775 \"-\" \"Java-http-client/21.0.8\" 0.009687",
+    "2026-11-09T13:35:03.525019Z  INFO actix_web::middleware::logger: 172.17.0.1 \"POST /collections/stylemind_stylist_runtime_gemini_demo10_20261109/points/query HTTP/1.1\" 200 3817 \"-\" \"Java-http-client/21.0.8\" 0.002716"
+  ],
+  "qdrant_alias": "stylemind_stylist_runtime_gemini_demo10_20261109",
+  "qdrant_collection": "stylemind_stylist_catalog_f89049e6d26a4a38875b2077c8f23cdc",
+  "qdrant_catalog_vectors": 10,
+  "unique_catalog_vectors": 10,
+  "chrome_url": "http://localhost:3000/wardrobes/new/ai",
+  "chrome_products_visually_observed": true,
+  "screenshot": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\reports\\gemini-10-product-demo\\gemini-live-10-products-chrome-2026-11-09.jpg",
+  "services_kept_running": true,
+  "commit_push": false,
+  "screenshot_sha256": "bb400b6513e5528f1296f2e19521998b86d91b31877506dcc525725ee0012da0",
+  "screenshot_width": 1440,
+  "screenshot_height": 852,
+  "screenshot_native_format": "JPEG",
+  "chrome_kept_open_on_result": true,
+  "provider_generation_http_status": 200,
+  "generation_model": "gemini-3.5-flash-lite",
+  "backend_generate_duration_ms": 4937,
+  "provider_generation_duration_ms": 1433,
+  "http_flow": [
+    "2026-11-09T20:35:00.105+07:00 INFO  service=stylist-service correlationId=ca3cec44-0926-4937-9eeb-cd5e56a6752d [http-nio-18085-exec-9] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=ca3cec44-0926-4937-9eeb-cd5e56a6752d method=POST path=/api/v1/stylist/sessions status=401 durationMs=708",
+    "2026-11-09T20:35:00.768+07:00 INFO  service=stylist-service correlationId=5f158b0a-d698-4dec-b2a4-466ef17a8751 [http-nio-18085-exec-10] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=5f158b0a-d698-4dec-b2a4-466ef17a8751 method=POST path=/api/v1/stylist/sessions status=201 durationMs=516",
+    "2026-11-09T20:35:01.063+07:00 INFO  service=stylist-service correlationId=436df826-befd-430e-9e8c-d12ba35796f9 [http-nio-18085-exec-1] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=436df826-befd-430e-9e8c-d12ba35796f9 method=POST path=/api/v1/stylist/sessions/6d7e282a-1a63-4a91-9633-814df02ba521/requests status=201 durationMs=271",
+    "2026-11-09T20:35:06.029+07:00 INFO  service=stylist-service correlationId=c044cf48-81a5-4a3f-baae-a24b17cab9ae [http-nio-18085-exec-2] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=c044cf48-81a5-4a3f-baae-a24b17cab9ae method=POST path=/api/v1/stylist/requests/de3c16ff-fac0-434b-8d7c-2bf7daa8fdca/generate status=200 durationMs=4937",
+    "2026-11-09T20:35:06.239+07:00 INFO  service=stylist-service correlationId=291695f4-58f8-45aa-8011-10fdfa336d80 [http-nio-18085-exec-3] c.s.s.logging.CorrelationIdFilter - Completed request service=stylist-service correlationId=291695f4-58f8-45aa-8011-10fdfa336d80 method=GET path=/api/v1/stylist/recommendations/d0cb8b3d-b7cc-42c9-b026-8fb82a86491a status=200 durationMs=189"
+  ],
+  "authentication_note": "An initial expired access token returned 401; the existing frontend refreshed authentication and created one session. No provider retry occurred.",
+  "completed_at": "2026-11-09T20:42:18.311241+07:00"
+}

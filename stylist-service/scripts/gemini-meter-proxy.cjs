@@ -51,7 +51,7 @@ if (seedFile) {
 }
 for (const operation of ['embedding', 'tokenCount', 'generation']) {
   if (!Number.isSafeInteger(summary.calls[operation]) || summary.calls[operation] < 0
-      || summary.calls[operation] > activeLimits[operation]) {
+      || (Number.isSafeInteger(activeLimits[operation]) && summary.calls[operation] > activeLimits[operation])) {
     throw new Error('Local meter seed exceeds the selected cumulative limit.');
   }
 }

@@ -167,6 +167,48 @@ class RuntimeCatalogImportRunnerIntegrationTests {
     }
 
     @Test
+    void configuredVariantAllowlistEmbedsOnlySelectedVariantsAndRejectsMissingIds() {
+        List<ObjectNode> products = baselineProducts();
+        UUID topVariantId = id(products.get(0).path("variants").get(0).path("variant_id").asText());
+        UUID bottomVariantId = id(products.get(1).path("variants").get(0).path("variant_id").asText());
+        addVariant(products.get(0), 101, "M", "blue", null);
+        addVariant(products.get(1), 102, "L", "grey", "linen");
+        PRODUCTS.set(List.copyOf(products));
+
+        String selectedIds = topVariantId + "," + bottomVariantId;
+        String unknownId = "53000000-0000-4000-8000-000000000999";
+        RuntimeCatalogImportRunner missingVariantImporter = new RuntimeCatalogImportRunner(commerce, policyLoader,
+                embeddings, qdrant, selectedIds + "," + unknownId);
+        assertThatThrownBy(() -> missingVariantImporter.run(new DefaultApplicationArguments(new String[0])))
+                .isInstanceOf(StylistApiException.class)
+                .satisfies(failure -> assertThat(((StylistApiException) failure).errorCode())
+                        .isEqualTo(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR));
+        assertThat(EMBEDDING_BATCH_SIZES).isEmpty();
+        assertThat(findPublishedCollection()).isNull();
+
+        RuntimeCatalogImportRunner repeatedProductImporter = new RuntimeCatalogImportRunner(commerce, policyLoader,
+                embeddings, qdrant, selectedIds + ",53000000-0000-4000-8000-000000000101");
+        assertThatThrownBy(() -> repeatedProductImporter.run(new DefaultApplicationArguments(new String[0])))
+                .isInstanceOf(StylistApiException.class)
+                .satisfies(failure -> assertThat(((StylistApiException) failure).errorCode())
+                        .isEqualTo(ErrorCode.GENERATION_PROVIDER_PROTOCOL_ERROR));
+        assertThat(EMBEDDING_BATCH_SIZES).isEmpty();
+        assertThat(findPublishedCollection()).isNull();
+
+        RuntimeCatalogImportRunner allowlistedImporter = new RuntimeCatalogImportRunner(commerce, policyLoader,
+                embeddings, qdrant, selectedIds);
+        allowlistedImporter.run(new DefaultApplicationArguments(new String[0]));
+
+        assertThat(EMBEDDING_BATCH_SIZES).containsExactly(2);
+        float[] query = new float[RuntimeQdrantVectorStore.DIMENSIONS];
+        query[0] = 1f;
+        var top = qdrant.search(query, "TOP", List.of(TOP_CATEGORY), 5, policyLoader.require().revision());
+        var bottom = qdrant.search(query, "BOTTOM", List.of(BOTTOM_CATEGORY), 5, policyLoader.require().revision());
+        assertThat(top).extracting(candidate -> candidate.variantId()).containsExactly(topVariantId);
+        assertThat(bottom).extracting(candidate -> candidate.variantId()).containsExactly(bottomVariantId);
+    }
+
+    @Test
     void duplicateIdsInvalidRequiredFieldsAndBlankOptionalMetadataDoNotPublishPartialIndex() {
         importer.run(new DefaultApplicationArguments(new String[0]));
         String originalCollection = publishedCollection();
@@ -288,6 +330,18 @@ class RuntimeCatalogImportRunnerIntegrationTests {
         nullable(row, "size", size); nullable(row, "color", color); nullable(row, "material", material);
         row.putArray("images");
         return root;
+    }
+
+    private static void addVariant(ObjectNode product, int index, String size, String color, String material) {
+        ObjectNode row = product.withArray("variants").addObject()
+                .put("variant_id", "53000000-0000-4000-8000-%012d".formatted(index))
+                .put("product_id", product.path("product_id").asText())
+                .put("sku", "TEST-SKU-" + index).put("unit_price_vnd", 250_000)
+                .put("variant_status", "ACTIVE");
+        nullable(row, "size", size);
+        nullable(row, "color", color);
+        nullable(row, "material", material);
+        row.putArray("images");
     }
 
     private static ObjectNode inactiveMenProduct(int index) {
