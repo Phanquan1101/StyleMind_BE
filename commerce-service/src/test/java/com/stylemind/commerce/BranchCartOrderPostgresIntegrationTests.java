@@ -202,6 +202,26 @@ class BranchCartOrderPostgresIntegrationTests {
     }
 
     @Test
+    void cartQuantityMustBeAWholeNumberBetweenOneAndNineHundredNinetyNine() throws Exception {
+        for (String bad : new String[] {"1.5", "0.9", "2.0", "0", "-1", "1000", "\"1\"", "null"}) {
+            assertProblem(postJson("/api/v1/cart/items", customerToken(),
+                    "{\"variant_id\":\"" + variantId + "\",\"quantity\":" + bad + ",\"guest_session_key\":null}"), 400, "INVALID_REQUEST");
+        }
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}"));
+        assertThat(cart.path("items").get(0).path("quantity").asInt()).isEqualTo(2);
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        for (String bad : new String[] {"1.5", "0", "-3"}) {
+            mockMvc.perform(put("/api/v1/cart/items/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":" + bad + ",\"guest_session_key\":null}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(put("/api/v1/cart/items/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":3,\"guest_session_key\":null}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void concurrentUpdateAndSelectedCheckoutDoNotDeadlock() throws Exception {
         JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
                 "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}"));

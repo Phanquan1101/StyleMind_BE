@@ -72,7 +72,7 @@ public class CartRequestValidator {
     }
 
     private int quantity(JsonNode node) {
-        if (node == null || !node.canConvertToInt() || node.intValue() < 1 || node.intValue() > 999) {
+        if (node == null || !node.isIntegralNumber() || !node.canConvertToInt() || node.intValue() < 1 || node.intValue() > 999) {
             throw invalidRequest();
         }
         return node.intValue();

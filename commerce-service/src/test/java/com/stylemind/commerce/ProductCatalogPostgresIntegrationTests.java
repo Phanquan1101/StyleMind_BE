@@ -148,6 +148,22 @@ class ProductCatalogPostgresIntegrationTests {
                 variantBody("SKU-BAD", -1, "ACTIVE")), 400, "INVALID_REQUEST");
         assertProblem(postJson("/api/v1/admin/products/" + productId + "/variants", adminToken(),
                 variantBody("SKU-002", 1, "ARCHIVED")), 400, "INVALID_REQUEST");
+        // Price must be a whole number of VND within the technical ceiling (1_000_000_000).
+        for (String badPrice : new String[] {"1.5", "9000000000000000000", "1000000001", "\"100\"", "null"}) {
+            assertProblem(postJson("/api/v1/admin/products/" + productId + "/variants", adminToken(),
+                    variantBody("SKU-P-" + Math.abs(badPrice.hashCode()), 1, "ACTIVE")
+                            .replace("\"unit_price_vnd\": 1,", "\"unit_price_vnd\": " + badPrice + ",")), 400, "INVALID_REQUEST");
+        }
+        mockMvc.perform(put("/api/v1/admin/variants/{id}", variantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(variantBody("SKU-001-EDIT", 1, "ACTIVE").replace("\"unit_price_vnd\": 1,", "\"unit_price_vnd\": 2.5,")))
+                .andExpect(status().isBadRequest());
+        JsonNode atCeiling = json(postJson("/api/v1/admin/products/" + productId + "/variants", adminToken(),
+                variantBody("SKU-MAX", 1_000_000_000L, "ACTIVE")));
+        assertThat(atCeiling.path("unit_price_vnd").asLong()).isEqualTo(1_000_000_000L);
+        assertThat(postJson("/api/v1/admin/products/" + productId + "/variants", adminToken(),
+                variantBody("SKU-ZERO", 0, "ACTIVE")).getResponse().getStatus()).isEqualTo(201);
 
         mockMvc.perform(delete("/api/v1/admin/variants/{id}", variantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
