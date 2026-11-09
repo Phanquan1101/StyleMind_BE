@@ -26,6 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Component
 public class ProductRequestValidator {
 
+    // Giới hạn kỹ thuật chống tràn số khi tính tổng (quantity × price), FR chưa quy định.
+    private static final long MAX_UNIT_PRICE_VND = 1_000_000_000L;
+
     private static final Set<String> PRODUCT_FIELDS = Set.of(
             "category_id", "brand_id", "name", "description", "demographic_segment", "product_status");
     private static final Set<String> VARIANT_FIELDS = Set.of(
@@ -57,7 +60,8 @@ public class ProductRequestValidator {
         String color = nullableBoundedText(body, "color", 64);
         String material = nullableBoundedText(body, "material", 64);
         JsonNode price = body.get("unit_price_vnd");
-        if (price == null || !price.canConvertToLong() || price.longValue() < 0) {
+        if (price == null || !price.isIntegralNumber() || !price.canConvertToLong()
+                || price.longValue() < 0 || price.longValue() > MAX_UNIT_PRICE_VND) {
             throw invalidRequest();
         }
         ProductVariantStatus status = enumValue(text(body, "variant_status", false), ProductVariantStatus.class);

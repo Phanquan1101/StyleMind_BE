@@ -145,6 +145,208 @@ class BranchCartOrderPostgresIntegrationTests {
     }
 
     @Test
+    void selectedCheckoutPreservesUnselectedCartAndRejectsForeignItems() throws Exception {
+        jdbc.update("UPDATE public.product_variant SET variant_status='ACTIVE' WHERE variant_id=?", inactiveVariantId);
+        JsonNode first = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}"));
+        String selected = first.path("items").get(0).path("cart_item_id").asText();
+        postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + inactiveVariantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        String ids = "[\"" + selected + "\"]";
+        mockMvc.perform(post("/api/v1/checkout/selected/prices").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"cart_item_ids\":[\"" + selected + "\",\"" + selected + "\"]}"))
+                .andExpect(status().isBadRequest());
+        postJson("/api/v1/cart/items", otherCustomerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        mockMvc.perform(post("/api/v1/checkout/selected/prices").header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/checkout/selected/prices").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        mockMvc.perform(post("/api/v1/orders/selected").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"selected-test-001\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\",\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.items.length()").value(1));
+        mockMvc.perform(post("/api/v1/checkout/recover").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"selected-test-001\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        mockMvc.perform(post("/api/v1/checkout/recover").header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"selected-test-001\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].variant_id").value(inactiveVariantId.toString()));
+        mockMvc.perform(post("/api/v1/checkout/selected/prices").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void simultaneousSelectedRequestsWithSameKeyReturnDuplicateForRecovery() throws Exception {
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}"));
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        String body = "{\"checkout_key\":\"same-selected-key-01\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\",\"cart_item_ids\":[\"" + id + "\"]}";
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<MvcResult>>();
+            for (int i = 0; i < 2; i++) tasks.add(pool.submit(() -> { ready.countDown(); start.await(); return postJson("/api/v1/orders/selected", customerToken(), body); }));
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); start.countDown();
+            var results = new java.util.ArrayList<MvcResult>();
+            for (var task : tasks) results.add(task.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(results.stream().map(result -> result.getResponse().getStatus()).toList()).containsExactlyInAnyOrder(201, 409);
+            MvcResult conflict = results.stream().filter(result -> result.getResponse().getStatus() == 409).findFirst().orElseThrow();
+            assertThat(json(conflict).path("code").asText()).isEqualTo("DUPLICATE_CHECKOUT");
+        }
+    }
+
+    @Test
+    void cartQuantityMustBeAWholeNumberBetweenOneAndNineHundredNinetyNine() throws Exception {
+        for (String bad : new String[] {"1.5", "0.9", "2.0", "0", "-1", "1000", "\"1\"", "null"}) {
+            assertProblem(postJson("/api/v1/cart/items", customerToken(),
+                    "{\"variant_id\":\"" + variantId + "\",\"quantity\":" + bad + ",\"guest_session_key\":null}"), 400, "INVALID_REQUEST");
+        }
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}"));
+        assertThat(cart.path("items").get(0).path("quantity").asInt()).isEqualTo(2);
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        for (String bad : new String[] {"1.5", "0", "-3"}) {
+            mockMvc.perform(put("/api/v1/cart/items/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":" + bad + ",\"guest_session_key\":null}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(put("/api/v1/cart/items/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":3,\"guest_session_key\":null}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void concurrentUpdateAndSelectedCheckoutDoNotDeadlock() throws Exception {
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}"));
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var checkout = pool.submit(() -> { ready.countDown(); start.await();
+                return postJson("/api/v1/orders/selected", customerToken(), "{\"checkout_key\":\"selected-update-race\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\",\"cart_item_ids\":[\"" + id + "\"]}").getResponse().getStatus(); });
+            var update = pool.submit(() -> { ready.countDown(); start.await();
+                return mockMvc.perform(put("/api/v1/cart/items/" + id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":2,\"guest_session_key\":null}")).andReturn().getResponse().getStatus(); });
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); start.countDown();
+            assertThat(checkout.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(201);
+            assertThat(update.get(30, java.util.concurrent.TimeUnit.SECONDS)).isIn(200, 404);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order", Integer.class)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void concurrentGuestMergeAndSelectedCheckoutDoNotDuplicatePurchasedItem() throws Exception {
+        String key = "guest-merge-race-0001";
+        JsonNode cart = json(postJson("/api/v1/cart/items", null,
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":\"" + key + "\"}"));
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var checkout = pool.submit(() -> { ready.countDown(); start.await();
+                return mockMvc.perform(post("/api/v1/guest/orders/selected").header("X-Guest-Session-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-merge-race-01\",\"payment_method\":\"COD\",\"shipping_address\":{\"recipient_name\":\"An\",\"recipient_phone\":\"0123456789\",\"address_line\":\"Ha Noi\"},\"cart_item_ids\":[\"" + id + "\"]}")).andReturn().getResponse().getStatus(); });
+            var merge = pool.submit(() -> { ready.countDown(); start.await();
+                return postJson("/api/v1/cart/merge", customerToken(), "{\"guest_session_key\":\"" + key + "\"}").getResponse().getStatus(); });
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); start.countDown();
+            int checkoutStatus = checkout.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(merge.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(200);
+            assertThat(checkoutStatus).isIn(201, 409);
+            int remaining = jdbc.queryForObject("SELECT count(*) FROM public.cart_item ci JOIN public.cart c ON c.cart_id=ci.cart_id WHERE c.customer_id=? AND c.cart_status='ACTIVE'", Integer.class, CUSTOMER_ID);
+            assertThat(remaining).isEqualTo(checkoutStatus == 201 ? 0 : 1);
+        }
+    }
+
+    @Test
+    void concurrentSelectedCheckoutCannotOrderSameCartItemTwice() throws Exception {
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}"));
+        String id = cart.path("items").get(0).path("cart_item_id").asText();
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int i = 0; i < 2; i++) {
+                final int index = i;
+                tasks.add(pool.submit(() -> { ready.countDown(); start.await();
+                    return postJson("/api/v1/orders/selected", customerToken(),
+                            "{\"checkout_key\":\"selected-race-" + index + "\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\",\"cart_item_ids\":[\"" + id + "\"]}").getResponse().getStatus(); }));
+            }
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            var statuses = new java.util.ArrayList<Integer>();
+            for (var task : tasks) statuses.add(task.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order", Integer.class)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void guestSelectedCheckoutKeepsUnselectedItemsAndRejectsAnotherGuest() throws Exception {
+        jdbc.update("UPDATE public.product_variant SET variant_status='ACTIVE' WHERE variant_id=?", inactiveVariantId);
+        String key = "guest-selected-owner-0001";
+        JsonNode first = json(postJson("/api/v1/cart/items", null,
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":\"" + key + "\"}"));
+        String id = first.path("items").get(0).path("cart_item_id").asText();
+        postJson("/api/v1/cart/items", null, "{\"variant_id\":\"" + inactiveVariantId + "\",\"quantity\":1,\"guest_session_key\":\"" + key + "\"}");
+        String ids = "[\"" + id + "\"]";
+        mockMvc.perform(post("/api/v1/guest/checkout/selected/prices").header("X-Guest-Session-Key", "guest-foreign-owner-0001")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/guest/orders/selected").header("X-Guest-Session-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-select-001\",\"payment_method\":\"COD\",\"shipping_address\":{\"recipient_name\":\"An\",\"recipient_phone\":\"0123456789\",\"address_line\":\"Ha Noi\"},\"cart_item_ids\":" + ids + "}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.items.length()").value(1));
+        mockMvc.perform(get("/api/v1/cart").header("X-Guest-Session-Key", key))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+    }
+
+    @Test
+    void guestBuyNowUsesGuestKeyAndLeavesCartUnchanged() throws Exception {
+        String key = "guest-buy-now-test-owner";
+        postJson("/api/v1/cart/items", null, "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":\"" + key + "\"}");
+        String item = "\"variant_id\":\"" + variantId + "\",\"quantity\":1";
+        mockMvc.perform(post("/api/v1/guest/checkout/buy-now/prices")
+                .contentType(MediaType.APPLICATION_JSON).content("{" + item + "}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/guest/checkout/buy-now/prices").header("X-Guest-Session-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content("{" + item + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(1));
+        mockMvc.perform(post("/api/v1/guest/orders/buy-now").header("X-Guest-Session-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-buynow-001\",\"payment_method\":\"COD\",\"shipping_address\":{\"recipient_name\":\"An\",\"recipient_phone\":\"0123456789\",\"address_line\":\"Ha Noi\"}," + item + "}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/guest/checkout/recover").header("X-Guest-Session-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-buynow-001\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(1));
+        mockMvc.perform(post("/api/v1/guest/checkout/recover").header("X-Guest-Session-Key", "guest-foreign-owner-0001")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-buynow-001\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/cart").header("X-Guest-Session-Key", key))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(2));
+    }
+
+    @Test
+    void buyNowDoesNotChangeExistingCart() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}");
+        String selection = "\"variant_id\":\"" + variantId + "\",\"quantity\":1";
+        mockMvc.perform(post("/api/v1/checkout/buy-now/prices").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{" + selection + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(1));
+        mockMvc.perform(post("/api/v1/orders/buy-now").header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"buynow-test-001\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\"," + selection + "}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.items[0].quantity").value(1));
+        mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(2));
+    }
+
+    @Test
     void guestHeaderCartCrudPreservesOwnerIsolation() throws Exception {
         String owner = "guest-header-integration-owner-a";
         String foreign = "guest-header-integration-owner-b";
