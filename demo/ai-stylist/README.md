@@ -11,13 +11,15 @@ Clone lần đầu:
 ```powershell
 git clone https://github.com/Phanquan1101/StyleMind_BE.git
 cd StyleMind_BE
-git switch feature/ep-07-ai-stylist
+git switch --track origin/dev
 ```
 
-Đã có repo thì cập nhật đúng branch team đã bàn giao, giữ lại công việc riêng trước khi pull:
+`dev` là nhánh BE chính. Nếu đã clone repo, chuyển sang `dev` rồi cập nhật; giữ lại công việc riêng trước khi pull:
 
 ```powershell
-git pull --ff-only
+git fetch origin
+git switch dev
+git pull --ff-only origin dev
 ```
 
 Từ thư mục gốc repository:
