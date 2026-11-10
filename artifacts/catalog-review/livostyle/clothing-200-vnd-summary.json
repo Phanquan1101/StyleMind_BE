@@ -1,0 +1,38 @@
+{
+  "status": "VND_REVIEW_DATA_NOT_DATABASE_IMPORT",
+  "products": 200,
+  "variants": 2705,
+  "currency": "VND",
+  "vnd_per_usd": 25730,
+  "rounding_increment_vnd": 1000,
+  "rounding": "HALF_UP",
+  "reference": {
+    "bank": "Vietcombank",
+    "rate_type": "USD selling reference",
+    "source_date": "2026-11-09",
+    "observed_on": "2026-11-10",
+    "url": "https://www.vietcombank.com.vn/To-chuc/Trang-chu-DCTC/KHTC---Ti-gia---DCTC",
+    "note": "Fixed reference for this dataset conversion; not a live or automatically updating rate."
+  },
+  "input": "clothing-200-cloudinary.json",
+  "input_sha256": "ecc7194b70461b5061ac645660381fb27333cdb35dfdee7c16ef4c84e554b3d7",
+  "min_unit_price_vnd": 514000,
+  "max_unit_price_vnd": 5120000,
+  "source_prices_preserved": true,
+  "cloudinary_urls_preserved": true,
+  "database_touched": false,
+  "examples": [
+    {
+      "usd": 19.99,
+      "vnd": 514000
+    },
+    {
+      "usd": 39.99,
+      "vnd": 1029000
+    },
+    {
+      "usd": 50,
+      "vnd": 1287000
+    }
+  ]
+}
