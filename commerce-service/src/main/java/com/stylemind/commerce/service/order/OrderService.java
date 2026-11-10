@@ -34,6 +34,10 @@ public interface OrderService {
 
     CancellationRequestResponse requestCancellation(UUID customerId, UUID orderId, String reason);
 
+    OrderResponse confirmOrder(UUID actorId, UUID orderId);
+
+    OrderResponse cancelOrder(UUID customerId, UUID orderId, String reason);
+
     CancellationRequestResponse reviewCancellation(UUID reviewerId, UUID requestId,
             OrderRequestValidator.CancellationReviewCommand command);
 }

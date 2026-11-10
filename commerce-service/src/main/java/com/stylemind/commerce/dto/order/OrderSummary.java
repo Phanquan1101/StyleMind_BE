@@ -14,5 +14,6 @@ public record OrderSummary(
         PaymentMethod paymentMethod,
         long acceptedTotalVnd,
         OffsetDateTime placedAt,
-        OffsetDateTime completedAt) {
+        OffsetDateTime completedAt,
+        String confirmationState) {
 }

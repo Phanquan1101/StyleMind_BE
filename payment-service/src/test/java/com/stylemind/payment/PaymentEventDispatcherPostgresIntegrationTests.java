@@ -51,10 +51,18 @@ class PaymentEventDispatcherPostgresIntegrationTests {
     @Autowired PaymentEventDeliveryService delivery;
     @Autowired com.stylemind.payment.config.CommerceClientProperties commerceProperties;
     @Autowired ObjectMapper mapper;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.stylemind.payment.client.CommerceOrderClient commerceOrderClient;
     @BeforeEach void reset() {
         jdbc.update("DELETE FROM public.payment_outbox"); jdbc.update("DELETE FROM public.payment_exception");
         jdbc.update("DELETE FROM public.financial_transaction"); jdbc.update("DELETE FROM public.payment_attempt");
         MODE.set("success"); RECEIVED.clear(); METHODS.clear(); FIXTURE_JDBC.set(jdbc); NO_WRITE_TX_DURING_HTTP.set(true);
+        org.mockito.Mockito.when(commerceOrderClient.getPaymentSnapshot(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            UUID orderId = invocation.getArgument(0);
+            return jdbc.queryForObject("SELECT customer_id, payment_method, expected_amount_vnd FROM public.payment_attempt WHERE order_id=? LIMIT 1",
+                    (rs, row) -> new CommerceOrderPaymentSnapshot(orderId, rs.getObject("customer_id", UUID.class),
+                            PaymentMethod.valueOf(rs.getString("payment_method")), rs.getLong("expected_amount_vnd"), "COMPLETED"), orderId);
+        });
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
 

@@ -29,6 +29,7 @@ import com.stylemind.commerce.repository.order.OrderAddressRepository;
 import com.stylemind.commerce.repository.order.OrderHistoryRepository;
 import com.stylemind.commerce.repository.order.OrderItemRepository;
 import com.stylemind.commerce.repository.order.OrderRepository;
+import com.stylemind.commerce.repository.order.PaymentEventRepository;
 import com.stylemind.commerce.repository.inventory.InventoryRepository;
 import com.stylemind.commerce.service.order.IdentityAddressClient;
 import com.stylemind.commerce.service.order.OrderService;
@@ -60,6 +61,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderHistoryRepository historyRepository;
     private final CancellationRepository cancellationRepository;
+    private final PaymentEventRepository paymentEventRepository;
     private final InventoryRepository inventory;
     private final IdentityAddressClient identityAddressClient;
     private final ApplicationEventPublisher events;
@@ -220,10 +222,19 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     public OrderResponse updateStatus(UUID actorId, UUID orderId, OrderRequestValidator.StatusCommand command) {
-        OrderSummary current = findSummary(orderId).orElseThrow(this::notFound);
+        OrderSummary current = summary(orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound));
+        if (command.orderStatus() == OrderStatus.CANCELLED
+                && (current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                    || paymentEventRepository.hasAppliedPayment(orderId))) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED",
+                    "Payment and refund must be resolved before cancelling");
+        }
         if (current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.COD
                 && current.orderStatus() == OrderStatus.PENDING_PAYMENT && command.orderStatus() != OrderStatus.CANCELLED) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "COD_CONFIRMATION_REQUIRED", "COD payment attempt must be confirmed first");
+        }
+        if (command.orderStatus() == OrderStatus.PROCESSING && "UNCONFIRMED".equals(current.confirmationState())) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_CONFIRMATION_REQUIRED", "Order must be confirmed before processing");
         }
         if (!ALLOWED_TRANSITIONS.getOrDefault(current.orderStatus(), List.of()).contains(command.orderStatus())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "INVALID_ORDER_STATUS_TRANSITION",
@@ -242,12 +253,60 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
+    public OrderResponse confirmOrder(UUID actorId, UUID orderId) {
+        var order = orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound);
+        if (!List.of("PLACED", "PAID").contains(order.getOrderStatus())) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_CONFIRMATION_NOT_ALLOWED", "Order cannot be confirmed in its current state");
+        }
+        if (!"CONFIRMED".equals(order.getConfirmationState())) {
+            order.setConfirmationState("CONFIRMED");
+            order.setConfirmedByUserId(actorId);
+            order.setConfirmedAt(OffsetDateTime.now());
+            orderRepository.saveAndFlush(order);
+        }
+        return response(detail(summary(order)));
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(UUID customerId, UUID orderId, String reason) {
+        var locked = orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound);
+        if (customerId == null || !customerId.equals(locked.getCustomerId())) throw notFound();
+        OrderStatus current = OrderStatus.valueOf(locked.getOrderStatus());
+        if (current == OrderStatus.CANCELLED) return response(detail(summary(locked)));
+        if (!"UNCONFIRMED".equals(locked.getConfirmationState())) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_REVIEW_REQUIRED", "Cancellation requires admin review");
+        }
+        if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT).contains(current)
+                || paymentEventRepository.hasAppliedPayment(orderId)) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
+                    "Cancellation is not allowed for this order state");
+        }
+        if ("SEPAY_VIETQR".equals(locked.getPaymentMethod())) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_CHECK_UNAVAILABLE", "Payment must be reconciled before cancellation");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        if (updateStatus(orderId, current, OrderStatus.CANCELLED, customerId, reason, now) != 1) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED", "Order status changed concurrently");
+        }
+        inventory.releaseForCancellation(orderId, now);
+        cancellationRepository.findLockedByOrderIdAndRequestStatus(orderId, CancellationStatus.PENDING.name())
+                .ifPresent(request -> {
+                    request.setRequestStatus(CancellationStatus.APPROVED.name());
+                    request.setReviewedByUserId(customerId);
+                    request.setReviewedAt(now);
+                    request.setDecisionReason("Customer cancelled the order directly");
+                    cancellationRepository.saveAndFlush(request);
+                });
+        return response(detail(summary(locked)));
+    }
+
+    @Transactional
     public CancellationRequestResponse requestCancellation(UUID customerId, UUID orderId, String reason) {
-        OrderSummary order = findSummary(orderId).orElseThrow(this::notFound);
+        OrderSummary order = summary(orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound));
         if (customerId == null || !customerId.equals(order.customerId())) {
             throw notFound();
         }
-        if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT).contains(order.orderStatus())) {
+        if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                     "Cancellation is not allowed for this order state");
         }
@@ -264,11 +323,15 @@ public class OrderServiceImpl implements OrderService {
     public CancellationRequestResponse reviewCancellation(UUID reviewerId, UUID requestId,
             OrderRequestValidator.CancellationReviewCommand command) {
         CancellationRequest request = cancellationById(requestId).orElseThrow(this::notFound);
-        OrderSummary order = findSummary(request.orderId()).orElseThrow(this::notFound);
+        OrderSummary order = summary(orderRepository.findLockedByOrderId(request.orderId()).orElseThrow(this::notFound));
         if (command.requestStatus() == CancellationStatus.APPROVED) {
-            if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT).contains(order.orderStatus())) {
+            if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT, OrderStatus.PROCESSING).contains(order.orderStatus())) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                         "Cancellation is not allowed for this order state");
+            }
+            if (order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                    || paymentEventRepository.hasAppliedPayment(order.orderId())) {
+                throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED", "Payment and refund must be resolved before approving cancellation");
             }
             OffsetDateTime now = OffsetDateTime.now();
             if (updateStatus(order.orderId(), order.orderStatus(), OrderStatus.CANCELLED, reviewerId,
@@ -367,6 +430,7 @@ public class OrderServiceImpl implements OrderService {
         entity.setGuestSessionHash(guestHash);
         entity.setCheckoutKey(checkoutKey);
         entity.setOrderStatus(status.name());
+        entity.setConfirmationState("UNCONFIRMED");
         entity.setPaymentMethod(paymentMethod.name());
         entity.setAcceptedTotalVnd(total);
         entity.setPlacedAt(now);
@@ -470,7 +534,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private java.util.Optional<CancellationRequest> cancellation(UUID orderId) {
-        return cancellationRepository.findByOrderId(orderId).map(this::cancellation);
+        return cancellationRepository.findFirstByOrderIdOrderByRequestedAtDescCancellationRequestIdDesc(orderId).map(this::cancellation);
     }
 
     private int updateStatus(UUID orderId, OrderStatus from, OrderStatus to, UUID actorId, String reason,
@@ -504,12 +568,12 @@ public class OrderServiceImpl implements OrderService {
         } catch (org.springframework.dao.DataIntegrityViolationException exception) {
             throw new DuplicateKeyException("Cancellation already exists", exception);
         }
-        return cancellation(orderId).orElseThrow();
+        return cancellation(entity);
     }
 
     private int reviewCancellation(UUID requestId, CancellationStatus status, UUID reviewerId, String decisionReason,
             OffsetDateTime now) {
-        return cancellationRepository.findById(requestId)
+        return cancellationRepository.findLockedByCancellationRequestId(requestId)
                 .filter(entity -> CancellationStatus.PENDING.name().equals(entity.getRequestStatus()))
                 .map(entity -> {
                     entity.setRequestStatus(status.name());
@@ -541,7 +605,7 @@ public class OrderServiceImpl implements OrderService {
         return new OrderSummary(entity.getOrderId(), entity.getOrderNumber(), entity.getCustomerId(),
                 entity.getCheckoutKey(), OrderStatus.valueOf(entity.getOrderStatus()),
                 com.stylemind.commerce.enums.PaymentMethod.valueOf(entity.getPaymentMethod()),
-                entity.getAcceptedTotalVnd(), entity.getPlacedAt(), entity.getCompletedAt());
+                entity.getAcceptedTotalVnd(), entity.getPlacedAt(), entity.getCompletedAt(), entity.getConfirmationState());
     }
 
     private CancellationRequest cancellation(com.stylemind.commerce.entity.CancellationRequest entity) {
@@ -558,7 +622,7 @@ public class OrderServiceImpl implements OrderService {
                 s.completedAt(), addressResponse(detail.address()),
                 detail.items().stream().map(this::orderItemResponse).toList(),
                 detail.history().stream().map(this::historyResponse).toList(),
-                detail.cancellationRequest() == null ? null : cancellationResponse(detail.cancellationRequest()));
+                detail.cancellationRequest() == null ? null : cancellationResponse(detail.cancellationRequest()), s.confirmationState());
     }
 
     private CartItemResponse cartItemResponse(CartItem item) {

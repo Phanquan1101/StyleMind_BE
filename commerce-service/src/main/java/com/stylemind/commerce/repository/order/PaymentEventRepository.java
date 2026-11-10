@@ -41,6 +41,10 @@ public class PaymentEventRepository {
                     && event.amount_vnd() == rs.getLong(5)
                     && event.confirmed_at().truncatedTo(ChronoUnit.MICROS).equals(rs.getTimestamp(6).toInstant())).optional();
     }
+    public boolean hasAppliedPayment(UUID orderId) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM public.payment_event_inbox WHERE order_id=:id AND outcome='APPLIED')")
+                .param("id", orderId).query(Boolean.class).single();
+    }
     public void paid(PaymentConfirmedEvent event, Instant now) {
         int changed = jdbc.sql("UPDATE public.customer_order SET order_status='PAID' WHERE order_id=:id AND order_status='PENDING_PAYMENT'")
                 .param("id", event.order_id()).update();

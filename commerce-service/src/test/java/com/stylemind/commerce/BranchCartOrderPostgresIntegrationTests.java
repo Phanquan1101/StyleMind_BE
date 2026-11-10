@@ -51,7 +51,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = {"management.health.db.enabled=false",
-        "stylemind.commerce.inventory.expiry-enabled=false"})
+        "stylemind.commerce.inventory.expiry-enabled=false",
+        "stylemind.security.service-token=isolated-test-token-01234567890123456789"})
 @AutoConfigureMockMvc
 @Testcontainers
 @Import(BranchCartOrderPostgresIntegrationTests.TestConfig.class)
@@ -101,6 +102,7 @@ class BranchCartOrderPostgresIntegrationTests {
             return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), request.orderId(),
                     request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
         });
+        jdbc.update("DELETE FROM public.payment_event_inbox");
         jdbc.update("DELETE FROM public.cancellation_request");
         jdbc.update("DELETE FROM public.inventory_reservation");
         jdbc.update("DELETE FROM public.order_status_history");
@@ -142,6 +144,194 @@ class BranchCartOrderPostgresIntegrationTests {
                 INSERT INTO public.variant_inventory(variant_id, on_hand_quantity, reserved_quantity, updated_at)
                 VALUES (?, 100, 0, now()), (?, 100, 0, now())
                 """, variantId, inactiveVariantId);
+    }
+
+    @Test
+    void adminCannotBypassQrReconciliationThroughStatusUpdate() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"admin-qr-cancel-001","shipping_address_id":"%s","payment_method":"SEPAY_VIETQR"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"order_status\":\"CANCELLED\",\"reason\":\"Khach yeu cau\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_RECONCILIATION_REQUIRED"));
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, UUID.fromString(id))).isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
+    void internalPaymentSnapshotRequiresServiceTokenAndReturnsOrderState() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"internal-snapshot-001","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        mockMvc.perform(get("/internal/v1/orders/{id}/payment-snapshot", id)).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/internal/v1/orders/{id}/payment-snapshot", id)
+                        .header("X-StyleMind-Service-Token", "isolated-test-token-01234567890123456789"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.order_id").value(id))
+                .andExpect(jsonPath("$.payment_method").value("COD"))
+                .andExpect(jsonPath("$.order_status").value("PLACED"));
+    }
+
+    @Test
+    void adminCanApproveUnpaidCodCancellationWhilePreparingButOnlyOnce() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"processing-cancel-001","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        UUID id = UUID.fromString(order.path("order_id").asText());
+        mockMvc.perform(post("/api/v1/admin/orders/{id}/confirm", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"order_status\":\"PROCESSING\",\"reason\":null}"))
+                .andExpect(status().isOk());
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        String requestId = request.path("cancellation_request_id").asText();
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.request_status").value("APPROVED"));
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, id)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+    }
+
+    @Test
+    void legacyOrdersRequireReviewAndShippingPreventsPendingApproval() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"legacy-cancel-001","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        UUID id = UUID.fromString(order.path("order_id").asText());
+        jdbc.update("UPDATE public.customer_order SET confirmation_state='LEGACY_UNKNOWN' WHERE order_id=?", id);
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_REVIEW_REQUIRED"));
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        jdbc.update("UPDATE public.customer_order SET order_status='SHIPPED' WHERE order_id=?", id);
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT order_status FROM public.customer_order WHERE order_id=?", String.class, id)).isEqualTo("SHIPPED");
+    }
+
+    @Test
+    void confirmedCodRequiresReviewAndRejectedRequestCanBeResubmitted() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"confirmed-cancel-001","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        mockMvc.perform(post("/api/v1/admin/orders/{id}/confirm", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.confirmation_state").value("CONFIRMED"));
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isConflict());
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"REJECTED\",\"decision_reason\":\"Dang chuan bi hang\"}"))
+                .andExpect(status().isOk());
+        JsonNode second = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        assertThat(second.path("cancellation_request_id").asText()).isNotEqualTo(request.path("cancellation_request_id").asText());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.cancellation_request WHERE order_id=?", Integer.class, UUID.fromString(id))).isEqualTo(2);
+    }
+
+    @Test
+    void customerCanCancelAnUnconfirmedOrderImmediatelyAndReleaseStock() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"direct-cancel-0001","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}");
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancellation_request.request_status").value("APPROVED"));
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("CANCELLED"));
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+    }
+
+    @Test
+    void customerCannotDirectlyCancelPaidOrder() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"direct-cancel-0002","shipping_address_id":"%s","payment_method":"SEPAY_VIETQR"}
+                """.formatted(ADDRESS_ID)));
+        UUID id = UUID.fromString(order.path("order_id").asText());
+        jdbc.update("UPDATE public.customer_order SET order_status='PAID' WHERE order_id=?", id);
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_NOT_ALLOWED"));
+    }
+
+    @Test
+    void directCancellationOfVietQrFailsClosedUntilPaymentCanBeCheckedSafely() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"direct-cancel-0003","shipping_address_id":"%s","payment_method":"SEPAY_VIETQR"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_CHECK_UNAVAILABLE"));
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+    }
+
+    @Test
+    void directCancellationRejectsCodCollectionAlreadyApplied() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"direct-cancel-0004","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        UUID id = UUID.fromString(order.path("order_id").asText());
+        jdbc.update("""
+                INSERT INTO public.payment_event_inbox(event_id,event_fingerprint,order_id,payment_attempt_id,customer_id,payment_method,payment_reference,amount_vnd,confirmed_at,received_at,outcome,reason)
+                VALUES (?, ?, ?, ?, ?, 'COD', 'test-reference', 100000, now(), now(), 'APPLIED', 'COD_COLLECTION_CONFIRMED')
+                """, UUID.randomUUID(), "a".repeat(64), id, UUID.randomUUID(), CUSTOMER_ID);
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_NOT_ALLOWED"));
+    }
+
+    @Test
+    void simultaneousDirectCancellationRestoresStockOnlyOnce() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}");
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"direct-cancel-0005","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        String id = order.path("order_id").asText();
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var start = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<Integer> cancel = () -> { start.await(); return mockMvc.perform(post("/api/v1/orders/{id}/cancel", id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"Khong con nhu cau\"}")).andReturn().getResponse().getStatus(); };
+            var a = pool.submit(cancel); var b = pool.submit(cancel); start.countDown();
+            assertThat(List.of(a.get(), b.get())).containsOnly(200);
+        }
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
     }
 
     @Test
