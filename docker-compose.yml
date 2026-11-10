@@ -210,11 +210,13 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.20.0
-    expose:
-      - "6333"
+    ports:
+      - "127.0.0.1:6333:6333"
 
   neo4j:
     image: neo4j:5.26-community
+    ports:
+      - "127.0.0.1:7687:7687"
     environment:
       NEO4J_AUTH: neo4j/${STYLEMIND_STYLIST_NEO4J_PASSWORD:?Set STYLEMIND_STYLIST_NEO4J_PASSWORD in .env}
       NEO4J_server_http_enabled: "false"

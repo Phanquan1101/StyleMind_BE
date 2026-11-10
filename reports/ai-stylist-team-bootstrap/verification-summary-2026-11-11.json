@@ -1,0 +1,20 @@
+{
+  "FreshProject": "stylemind-ai-demo-clean1111",
+  "VolumesBefore": 0,
+  "ContainersBefore": 0,
+  "RootEnvUnchanged": true,
+  "MeterBefore": {
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 4
+  },
+  "MeterAfter": {
+    "metadata": 0,
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 4
+  },
+  "BootstrapScriptSha256": "BFF669F7C5E01B8B1D785FBAA08E5BBE2A5382FB7233AC0B628FF770F40CA74F"
+}

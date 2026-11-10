@@ -59,6 +59,9 @@ import java.util.UUID;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -66,6 +69,7 @@ import org.springframework.stereotype.Service;
 /** The one runtime generation flow; all network work happens outside persistence transactions. */
 @Service
 public class StylistGenerationServiceImpl implements StylistGenerationService {
+    private static final Logger log = LoggerFactory.getLogger(StylistGenerationServiceImpl.class);
     private static final int RETRIEVAL_LIMIT_PER_SLOT = 20;
     private static final Duration MIN_PROVIDER_CALL_BUDGET = Duration.ofSeconds(8);
     private static final String NO_RESULT_BOUNDED = "BOUNDED_SEARCH_NO_OUTFIT";
@@ -121,7 +125,7 @@ public class StylistGenerationServiceImpl implements StylistGenerationService {
         if (context.sessionClosed()) throw new StylistApiException(ErrorCode.SESSION_CLOSED, requestId);
 
         Policy policy = catalogPolicy.require();
-        List<Exclusion> exclusions = exclusions(context, policy);
+        List<Exclusion> exclusions = exclusions(context, policy, requestId);
         runBeforeDeadline(() -> {
             requireRuntimeReady(policy, deadline);
             return null;
@@ -351,7 +355,7 @@ public class StylistGenerationServiceImpl implements StylistGenerationService {
         ensureTime(deadline);
     }
 
-    private static List<Exclusion> exclusions(RequestContext context, Policy policy) {
+    private static List<Exclusion> exclusions(RequestContext context, Policy policy, UUID requestId) {
         List<Exclusion> exclusions = new ArrayList<>();
         for (Constraint constraint : context.constraints()) {
             try {
@@ -360,7 +364,14 @@ public class StylistGenerationServiceImpl implements StylistGenerationService {
                             || constraint.textValue().isBlank()) throw invalidContext();
                     String raw = constraint.textValue().trim();
                     String canonical = policy.color(raw).orElse(null);
-                    if (constraint.hard() && canonical == null) throw invalidContext();
+                    if (constraint.hard() && canonical == null) {
+                        log.warn("Generation preflight rejected correlationId={} requestId={} sessionId={} "
+                                        + "endpoint=/api/v1/stylist/requests/{requestId}/generate status={} "
+                                        + "errorCode={} reason=UNMAPPED_HARD_COLOR",
+                                MDC.get("correlationId"), requestId, context.sessionId(),
+                                ErrorCode.INVALID_CONTEXT.status().value(), ErrorCode.INVALID_CONTEXT);
+                        throw new StylistApiException(ErrorCode.INVALID_CONTEXT, requestId);
+                    }
                     exclusions.add(new Exclusion(constraint.kind(), null,
                             canonical == null ? raw.toLowerCase(Locale.ROOT) : canonical, constraint.hard()));
                 } else {
