@@ -63,7 +63,6 @@ class InternalVariantLookupPostgresIntegrationTests {
     void seed() {
         jdbc.update("DELETE FROM public.variant_image");
         jdbc.update("DELETE FROM public.image_asset");
-        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
@@ -203,8 +202,8 @@ class InternalVariantLookupPostgresIntegrationTests {
 
     private void insertVariant(UUID id, UUID productId, String sku, String status) {
         jdbc.update("""
-                INSERT INTO public.product_variant(variant_id, product_id, sku, color, size, unit_price_vnd, variant_status)
-                VALUES (?, ?, ?, 'White', 'M', 100000, ?)
+                INSERT INTO public.product_variant(variant_id, product_id, sku, color, size, unit_price_vnd, quantity, variant_status)
+                VALUES (?, ?, ?, 'White', 'M', 100000, 20, ?)
                 """, id, productId, sku, status);
     }
 }

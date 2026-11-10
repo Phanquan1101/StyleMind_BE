@@ -100,7 +100,6 @@ class ProductCatalogPostgresIntegrationTests {
                 .thenReturn(Optional.of(new ByteArrayResource(new byte[] {(byte) 0x89, 'P', 'N', 'G'})));
         jdbc.update("DELETE FROM public.variant_image");
         jdbc.update("DELETE FROM public.image_asset");
-        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");
@@ -329,6 +328,7 @@ class ProductCatalogPostgresIntegrationTests {
                   "color": "White",
                   "material": "Linen",
                   "unit_price_vnd": %d,
+                  "quantity": 20,
                   "variant_status": "%s"
                 }
                 """.formatted(sku, price, status);

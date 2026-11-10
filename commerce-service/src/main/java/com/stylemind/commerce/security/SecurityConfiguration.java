@@ -38,7 +38,6 @@ public class SecurityConfiguration {
                                 "/api/v1/products", "/api/v1/products/*",
                                 "/api/v1/variant-images/*/content").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/variants/batch-lookup").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/branches", "/api/v1/branches/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/cart").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/cart/items").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/cart/items/*").permitAll()
@@ -49,7 +48,6 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/guest/checkout/selected/prices", "/api/v1/guest/checkout/buy-now/prices", "/api/v1/guest/checkout/recover", "/api/v1/guest/orders/selected", "/api/v1/guest/orders/buy-now").permitAll()
                         .requestMatchers("/api/v1/admin/categories", "/api/v1/admin/categories/**",
                                 "/api/v1/admin/brands", "/api/v1/admin/brands/**",
-                                "/api/v1/admin/branches", "/api/v1/admin/branches/**",
                                 "/api/v1/admin/products", "/api/v1/admin/products/**",
                                 "/api/v1/admin/variants", "/api/v1/admin/variants/**",
                                 "/api/v1/admin/variant-images", "/api/v1/admin/variant-images/**",
