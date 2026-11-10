@@ -131,7 +131,7 @@ Account checkout body:
 
 ```text
 PENDING_PAYMENT ──payment confirmation──> PAID ──> PROCESSING ──> SHIPPED ──> COMPLETED
-       │                                      
+       │
        └──────────────> CANCELLED
 
 PLACED ────────────────────────────────> PROCESSING ──> SHIPPED ──> COMPLETED
