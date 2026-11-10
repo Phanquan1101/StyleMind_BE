@@ -1,0 +1,53 @@
+{
+  "status": "IMPORTED",
+  "source": {
+    "container": "stylemind-task-postgres-1",
+    "database": "stylemind_commerce",
+    "volume": "stylemind-task_postgres-data"
+  },
+  "backup_file": "commerce-service\\.seed-data\\db-backups\\2026-11-09T19-27-11-988Z\\stylemind_commerce-before-catalog.dump",
+  "backup_sha256": "d63535d1eb38bacdd1080f278f237f8b73735ab3cae1ed2d3fed5fb7d6dc7f2f",
+  "backup_bytes": 322169,
+  "actual_restore_tested": true,
+  "all_table_fingerprints_equal": true,
+  "transaction_rollback_tested": true,
+  "old_catalog_recovery_tested": true,
+  "payload_sha256": "b0d598175df2fa51cad867ed5755aa6e5b4a9eb479d3ef73a5d3d1d99032a077",
+  "backup_directory": "commerce-service\\.seed-data\\db-backups\\2026-11-09T19-27-11-988Z",
+  "created_at": "2026-11-09T19:28:07.611Z",
+  "live_database_modified": true,
+  "imported_at": "2026-11-09T19:29:16.558Z",
+  "result": {
+    "active_products": 200,
+    "inactive_products": 381,
+    "livostyle_variants": 2705,
+    "orders": 1,
+    "cart_items": 1
+  },
+  "verification": {
+    "commerce_regression": {
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "jvm_test_timezone": "UTC",
+      "command": "mvn -f commerce-service/pom.xml -DargLine=-Duser.timezone=UTC verify"
+    },
+    "http": {
+      "status": "PASS",
+      "products": 200,
+      "variants": 2705,
+      "gallery_links": 18865,
+      "checked_at": "2026-11-09T19:38:08.285Z"
+    },
+    "old_seed_enabled": false
+  },
+  "localization": {
+    "language": "vi",
+    "method": "LOCAL_EDITORIAL_REWRITE",
+    "external_translation_used": false,
+    "products": 200,
+    "http_verified_at": "2026-11-10T12:32:11.235Z",
+    "report": "vietnamese-database-report.json"
+  }
+}
