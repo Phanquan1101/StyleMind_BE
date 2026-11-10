@@ -50,6 +50,37 @@ public class InventoryRepository {
         return result;
     }
 
+    public boolean reserveStock(UUID variantId, int quantity, OffsetDateTime now) {
+        return jdbc.sql("""
+                UPDATE public.variant_inventory SET reserved_quantity=reserved_quantity+:quantity,updated_at=:now
+                WHERE variant_id=:id AND on_hand_quantity-reserved_quantity>=:quantity
+                """).param("id", variantId).param("quantity", quantity).param("now", now).update() == 1;
+    }
+
+    public void releaseReservedStock(UUID variantId, int quantity, OffsetDateTime now) {
+        int changed = jdbc.sql("""
+                UPDATE public.variant_inventory SET reserved_quantity=reserved_quantity-:quantity,updated_at=:now
+                WHERE variant_id=:id AND reserved_quantity>=:quantity
+                """).param("id", variantId).param("quantity", quantity).param("now", now).update();
+        requireInventoryUpdate(changed);
+    }
+
+    public void consumeCheckoutReservation(UUID orderId, UUID variantId, int quantity, OffsetDateTime now) {
+        int changed = jdbc.sql("""
+                UPDATE public.variant_inventory
+                SET on_hand_quantity=on_hand_quantity-:quantity,
+                    reserved_quantity=reserved_quantity-:quantity,updated_at=:now
+                WHERE variant_id=:id AND reserved_quantity>=:quantity AND on_hand_quantity>=:quantity
+                """).param("id", variantId).param("quantity", quantity).param("now", now).update();
+        requireInventoryUpdate(changed);
+        jdbc.sql("""
+                INSERT INTO public.inventory_reservation(reservation_id,order_id,variant_id,quantity,
+                    reservation_status,expires_at,created_at,updated_at)
+                VALUES (:reservation,:order,:variant,:quantity,'CONSUMED',NULL,:now,:now)
+                """).param("reservation", UUID.randomUUID()).param("order", orderId)
+                .param("variant", variantId).param("quantity", quantity).param("now", now).update();
+    }
+
     public boolean allocate(UUID orderId, PaymentMethod method, Map<UUID, Integer> requested, OffsetDateTime now) {
         List<UUID> ids = requested.keySet().stream().sorted().toList();
         Map<UUID, Stock> locked = lockStocks(ids);
@@ -61,11 +92,9 @@ public class InventoryRepository {
         for (UUID variantId : ids) {
             int quantity = requested.get(variantId);
             if (method == PaymentMethod.SEPAY_VIETQR) {
-                jdbc.sql("""
-                        UPDATE public.variant_inventory
-                        SET reserved_quantity=reserved_quantity+:quantity,updated_at=:now
-                        WHERE variant_id=:id
-                        """).param("quantity", quantity).param("now", now).param("id", variantId).update();
+                if (!reserveStock(variantId, quantity, now)) {
+                    throw new IllegalStateException("Locked inventory could not be reserved");
+                }
             } else {
                 jdbc.sql("""
                         UPDATE public.variant_inventory
@@ -111,13 +140,7 @@ public class InventoryRepository {
                 continue;
             }
             if ("ACTIVE".equals(reservation.status())) {
-                int changed = jdbc.sql("""
-                        UPDATE public.variant_inventory
-                        SET reserved_quantity=reserved_quantity-:quantity,updated_at=:now
-                        WHERE variant_id=:variant AND reserved_quantity>=:quantity
-                        """).param("quantity", reservation.quantity()).param("now", now)
-                        .param("variant", reservation.variantId()).update();
-                requireInventoryUpdate(changed);
+                releaseReservedStock(reservation.variantId(), reservation.quantity(), now);
             } else {
                 int changed = jdbc.sql("""
                         UPDATE public.variant_inventory
@@ -129,6 +152,10 @@ public class InventoryRepository {
             }
             setReservationStatus(reservation.reservationId(), reservation.status(), "RELEASED", now);
         }
+        jdbc.sql("""
+                UPDATE public.qr_checkout_item SET reservation_status='RELEASED'
+                WHERE checkout_id=:id AND reservation_status='CONSUMED'
+                """).param("id", orderId).update();
     }
 
     public List<UUID> expiredOrderIds(OffsetDateTime now) {

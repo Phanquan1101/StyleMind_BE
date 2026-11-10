@@ -61,10 +61,13 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderHistoryRepository historyRepository;
     private final CancellationRepository cancellationRepository;
+    private final com.stylemind.commerce.repository.order.CancellationRefundRepository cancellationRefunds;
     private final PaymentEventRepository paymentEventRepository;
     private final InventoryRepository inventory;
     private final IdentityAddressClient identityAddressClient;
     private final ApplicationEventPublisher events;
+    private final com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
+    private final com.fasterxml.jackson.databind.ObjectMapper json;
 
     @Transactional(readOnly = true)
     public OrderResponse recoverCheckout(UUID customerId, String checkoutKey) {
@@ -98,6 +101,56 @@ public class OrderServiceImpl implements OrderService {
             OrderRequestValidator.CheckoutCommand command, CheckoutSelection selection) {
         return createCheckout(CartOwner.customer(customerId), null, command.checkoutKey(), command.paymentMethod(),
                 () -> identityAddressClient.getAddress(command.shippingAddressId(), authorizationHeader), selection);
+    }
+
+    @Transactional
+    public UUID prepareQrCheckout(UUID customerId, String authorizationHeader,
+            OrderRequestValidator.CheckoutCommand command, CheckoutSelection selection) {
+        return prepareQr(CartOwner.customer(customerId), null, command.checkoutKey(), command.paymentMethod(),
+                () -> identityAddressClient.getAddress(command.shippingAddressId(), authorizationHeader), selection);
+    }
+
+    @Transactional
+    public UUID prepareGuestQrCheckout(String guestSessionKey,
+            com.stylemind.commerce.validation.order.GuestCheckoutValidator.CheckoutCommand command, CheckoutSelection selection) {
+        String key = com.stylemind.commerce.security.GuestOrderAccess.requireKey(guestSessionKey);
+        return prepareQr(CartOwner.guest(key), com.stylemind.commerce.security.GuestOrderAccess.digest(key),
+                command.checkoutKey(), command.paymentMethod(), command::address, selection);
+    }
+
+    private UUID prepareQr(CartOwner owner, String guestHash, String checkoutKey,
+            com.stylemind.commerce.enums.PaymentMethod paymentMethod,
+            java.util.function.Supplier<AddressSnapshot> addressSupplier, CheckoutSelection selection) {
+        if (paymentMethod != com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR) {
+            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "VietQR payment is required");
+        }
+        UUID customerId = owner.customerId();
+        qrCheckouts.lockCheckoutKey(customerId, guestHash, checkoutKey);
+        if (checkoutExists(owner, guestHash, checkoutKey)) throw duplicateCheckout();
+        if (!selection.buyNow()) {
+            UUID cartId = findActiveCartId(owner).orElseThrow(this::emptyCart);
+            if (!"ACTIVE".equals(cartRepository.lockStatus(cartId).orElse(null))) throw emptyCart();
+        }
+        List<CartItem> items = selectionItems(owner, selection, true);
+        if (items.isEmpty()) throw emptyCart();
+        AddressSnapshot address = addressSupplier.get();
+        UUID checkoutId = UUID.randomUUID();
+        try {
+            var snapshots = items.stream().map(item -> new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(
+                    item.variantId(), item.quantity(), item.unitPriceVnd(), snapshot(item))).toList();
+            qrCheckouts.reserve(checkoutId, customerId, guestHash, checkoutKey,
+                    items.stream().mapToLong(CartItem::lineTotalVnd).sum(), snapshot(address), snapshots, OffsetDateTime.now());
+            return checkoutId;
+        } catch (DuplicateKeyException exception) {
+            throw duplicateCheckout();
+        }
+    }
+
+    private String snapshot(Object value) {
+        try { return json.writeValueAsString(value); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new IllegalStateException("Unable to store checkout snapshot", exception);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -155,7 +208,12 @@ public class OrderServiceImpl implements OrderService {
     private OrderResponse createCheckout(CartOwner owner, String guestHash, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod,
             java.util.function.Supplier<AddressSnapshot> addressSupplier, CheckoutSelection selection) {
+        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "QR_CHECKOUT_REQUIRED",
+                    "Create a QR checkout before placing a VietQR order");
+        }
         UUID customerId = owner.customerId();
+        qrCheckouts.lockCheckoutKey(customerId, guestHash, checkoutKey);
         if (checkoutExists(owner, guestHash, checkoutKey)) throw duplicateCheckout();
         UUID cartId = null;
         if (selection == null || !selection.buyNow()) {
@@ -324,16 +382,21 @@ public class OrderServiceImpl implements OrderService {
             OrderRequestValidator.CancellationReviewCommand command) {
         CancellationRequest request = cancellationById(requestId).orElseThrow(this::notFound);
         OrderSummary order = summary(orderRepository.findLockedByOrderId(request.orderId()).orElseThrow(this::notFound));
+        if (!cancellationRefunds.isPending(requestId)) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_ALREADY_REVIEWED", "Cancellation request was already reviewed");
+        }
         if (command.requestStatus() == CancellationStatus.APPROVED) {
-            if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT, OrderStatus.PROCESSING).contains(order.orderStatus())) {
+            if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                         "Cancellation is not allowed for this order state");
             }
-            if (order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
-                    || paymentEventRepository.hasAppliedPayment(order.orderId())) {
+            OffsetDateTime now = OffsetDateTime.now();
+            boolean qr = order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR;
+            if ((qr && (!List.of(OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())
+                    || !cancellationRefunds.record(requestId, order.orderId(), now)))
+                    || (!qr && paymentEventRepository.hasAppliedPayment(order.orderId()))) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED", "Payment and refund must be resolved before approving cancellation");
             }
-            OffsetDateTime now = OffsetDateTime.now();
             if (updateStatus(order.orderId(), order.orderStatus(), OrderStatus.CANCELLED, reviewerId,
                     "Cancellation approved", now) != 1) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED",
@@ -411,8 +474,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private boolean checkoutExists(CartOwner owner, String guestHash, String checkoutKey) {
-        return owner.customer() ? findByCheckoutKey(owner.customerId(), checkoutKey).isPresent()
-                : orderRepository.findByGuestSessionHashAndCheckoutKey(guestHash, checkoutKey).isPresent();
+        return qrCheckouts.checkoutKeyExists(owner.customerId(), guestHash, checkoutKey)
+                || (owner.customer() ? findByCheckoutKey(owner.customerId(), checkoutKey).isPresent()
+                : orderRepository.findByGuestSessionHashAndCheckoutKey(guestHash, checkoutKey).isPresent());
     }
 
     private ApiOperationException duplicateCheckout() {
@@ -651,7 +715,7 @@ public class OrderServiceImpl implements OrderService {
     private CancellationRequestResponse cancellationResponse(CancellationRequest request) {
         return new CancellationRequestResponse(request.cancellationRequestId(), request.orderId(),
                 request.requestedByUserId(), request.reason(), request.requestStatus().name(), request.requestedAt(),
-                request.reviewedByUserId(), request.reviewedAt(), request.decisionReason());
+                request.reviewedByUserId(), request.reviewedAt(), request.decisionReason(), cancellationRefunds.status(request.cancellationRequestId()));
     }
 
     private String orderNumber(UUID orderId) {

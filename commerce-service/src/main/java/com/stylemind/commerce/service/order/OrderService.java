@@ -23,6 +23,11 @@ public interface OrderService {
     CheckoutPriceResponse previewSelection(UUID customerId, CheckoutSelection selection);
     OrderResponse checkoutSelection(UUID customerId, String authorizationHeader, OrderRequestValidator.CheckoutCommand command, CheckoutSelection selection);
 
+    UUID prepareQrCheckout(UUID customerId, String authorizationHeader,
+            OrderRequestValidator.CheckoutCommand command, CheckoutSelection selection);
+    UUID prepareGuestQrCheckout(String guestSessionKey,
+            com.stylemind.commerce.validation.order.GuestCheckoutValidator.CheckoutCommand command, CheckoutSelection selection);
+
     OrderResponse checkout(UUID customerId, String authorizationHeader,
             OrderRequestValidator.CheckoutCommand command);
 

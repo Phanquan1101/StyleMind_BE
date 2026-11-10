@@ -11,3 +11,15 @@ Import `order-confirmation.postman_collection.json`, cấu hình `base_url`, `or
 6. Với đơn VietQR đang chờ thanh toán, dùng request **Kiem tra chan huy QR qua trang thai**: phải trả 409 `PAYMENT_RECONCILIATION_REQUIRED`, đơn và tồn kho giữ nguyên. Collection chỉ hỗ trợ thao tác; kết quả phải được đối chiếu trong môi trường test.
 
 Đơn trước V11 có `LEGACY_UNKNOWN` và phải yêu cầu admin duyệt. Migration chỉ được áp dụng sau khi có kế hoạch triển khai, sao lưu và xác nhận của người vận hành.
+# Duyệt hủy VietQR đã thanh toán với Commerce V13
+
+V13 được chủ dự án duyệt ngày 11/11/2026. Tạo phiên QR bằng collection QR Checkout, nhận sự kiện thanh toán hợp lệ để có đơn PAID, rồi dùng mã đơn cho các request dưới đây.
+
+1. Khách gửi yêu cầu hủy và lưu `cancellation_request_id`.
+2. Admin gọi request duyệt yêu cầu hủy. Kết quả `APPROVED` có `refund_status=PENDING_REFUND`.
+3. Khách đọc lại đơn. Đơn có trạng thái CANCELLED và `cancellation_request.refund_status=PENDING_REFUND`. Khoản chờ hoàn lấy số tiền từ Payment đã xác nhận.
+4. Gọi duyệt lần nữa nhận 409. Khách gọi API duyệt nhận 403. Đơn đã SHIPPED nhận 409 khi gửi hoặc duyệt yêu cầu hủy.
+5. Khi thiếu hoặc sai bằng chứng thanh toán, admin nhận 409 `PAYMENT_RECONCILIATION_REQUIRED` và yêu cầu tiếp tục chờ duyệt.
+
+PENDING_REFUND ghi nhận khoản cần hoàn. Việc chuyển khoản và xác nhận hoàn tiền thuộc phần hoàn tiền tiếp theo. Kiểm thử tự động sử dụng PostgreSQL cô lập. Cần rebuild Commerce để Flyway áp dụng V13 trước khi kiểm tra trên môi trường của bạn.
+

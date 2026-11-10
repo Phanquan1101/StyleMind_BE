@@ -1,0 +1,19 @@
+{
+  "info": { "name": "StyleMind - VietQR trước khi tạo đơn", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" },
+    { "key": "addressId", "value": "" },
+    { "key": "variantId", "value": "" },
+    { "key": "checkoutKey", "value": "qr-test-unique-001" },
+    { "key": "checkoutId", "value": "" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+  "item": [
+    { "name": "Chuẩn bị phiên", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/buy-now", "body": { "mode": "raw", "raw": "{\"checkout_key\":\"{{checkoutKey}}\",\"shipping_address_id\":\"{{addressId}}\",\"payment_method\":\"SEPAY_VIETQR\",\"variant_id\":\"{{variantId}}\",\"quantity\":1}" } } },
+    { "name": "Khôi phục phiên", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/recover", "body": { "mode": "raw", "raw": "{\"checkout_key\":\"{{checkoutKey}}\"}" } } },
+    { "name": "Tạo mã VietQR", "request": { "method": "POST", "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/{{checkoutId}}/payment-attempt" } },
+    { "name": "Xem phiên", "request": { "method": "GET", "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/{{checkoutId}}" } },
+    { "name": "Hủy thanh toán", "request": { "method": "POST", "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/{{checkoutId}}/cancel" } }
+  ]
+}

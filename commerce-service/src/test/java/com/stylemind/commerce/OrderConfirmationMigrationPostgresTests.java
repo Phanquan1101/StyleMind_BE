@@ -30,7 +30,7 @@ class OrderConfirmationMigrationPostgresTests {
                 INSERT INTO cancellation_request(cancellation_request_id,order_id,requested_by_user_id,reason,request_status,requested_at)
                 VALUES (?, ?, ?, 'reason', 'PENDING', now())
                 """, request, order, customer);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("11").load().migrate().migrationsExecuted).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT confirmation_state FROM customer_order WHERE order_id=?", String.class, order)).isEqualTo("LEGACY_UNKNOWN");
         assertThatThrownBy(() -> insertPending(jdbc, order, customer)).isInstanceOf(DataIntegrityViolationException.class);
         jdbc.update("UPDATE cancellation_request SET request_status='REJECTED', reviewed_by_user_id=?, reviewed_at=now(), decision_reason='reason' WHERE cancellation_request_id=?", customer, request);
@@ -42,3 +42,4 @@ class OrderConfirmationMigrationPostgresTests {
         jdbc.update("INSERT INTO cancellation_request(cancellation_request_id,order_id,requested_by_user_id,reason,request_status,requested_at) VALUES (?,?,?,'reason','PENDING',now())", UUID.randomUUID(), order, customer);
     }
 }
+

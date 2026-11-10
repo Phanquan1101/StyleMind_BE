@@ -12,10 +12,13 @@ import org.springframework.stereotype.Component;
 public class InventoryExpiryScheduler {
     private final InventoryRepository inventory;
     private final InventoryExpiryTransaction transactions;
+    private final com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
 
-    public InventoryExpiryScheduler(InventoryRepository inventory, InventoryExpiryTransaction transactions) {
+    public InventoryExpiryScheduler(InventoryRepository inventory, InventoryExpiryTransaction transactions,
+            com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts) {
         this.inventory = inventory;
         this.transactions = transactions;
+        this.qrCheckouts = qrCheckouts;
     }
 
     @Scheduled(fixedDelayString = "${stylemind.commerce.inventory.expiry-scan-ms:60000}")
@@ -23,6 +26,9 @@ public class InventoryExpiryScheduler {
         OffsetDateTime now = OffsetDateTime.now();
         for (var orderId : inventory.expiredOrderIds(now)) {
             transactions.expire(orderId, now);
+        }
+        for (var checkoutId : qrCheckouts.expiredCheckoutIds(now)) {
+            qrCheckouts.expire(checkoutId, now);
         }
     }
 }

@@ -16,6 +16,7 @@ public class PaymentEventRepository {
     public PaymentEventRepository(JdbcClient jdbc) { this.jdbc = jdbc; }
     public record Stored(String fingerprint, PaymentEventReceipt receipt) { }
     public record Order(UUID customer, String method, long amount, String status) { }
+    public record Checkout(UUID customer, long amount, String status, String attemptId, String reference, String guestHash) { }
     public void lockEvent(UUID id) {
         jdbc.sql("SELECT pg_advisory_xact_lock(:key)")
                 .param("key", id.getMostSignificantBits() ^ id.getLeastSignificantBits())
@@ -29,6 +30,20 @@ public class PaymentEventRepository {
     public Optional<Order> lockOrder(UUID id) {
         return jdbc.sql("SELECT customer_id,payment_method,accepted_total_vnd,order_status FROM public.customer_order WHERE order_id=:id FOR UPDATE")
                 .param("id", id).query((rs, row) -> new Order(rs.getObject(1, UUID.class), rs.getString(2), rs.getLong(3), rs.getString(4))).optional();
+    }
+    public Optional<Checkout> lockCheckout(UUID id) {
+        return jdbc.sql("""
+                SELECT customer_id,total_vnd,checkout_status,shipping_snapshot->'paymentAttempt'->>'id',
+                       shipping_snapshot->'paymentAttempt'->>'reference',guest_session_hash
+                FROM public.qr_checkout WHERE payment_reference_id=:id FOR UPDATE
+                """).param("id", id).query((rs, row) -> new Checkout(rs.getObject(1, UUID.class), rs.getLong(2),
+                        rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6))).optional();
+    }
+    public void markCheckoutForReconciliation(UUID id, Instant now) {
+        jdbc.sql("""
+                UPDATE public.qr_checkout SET checkout_status='RECONCILIATION_REQUIRED',updated_at=:now
+                WHERE payment_reference_id=:id AND checkout_status IN ('CANCELLED','EXPIRED')
+                """).param("id", id).param("now", Timestamp.from(now)).update();
     }
     public Optional<Boolean> sameAppliedPayment(PaymentConfirmedEvent event) {
         return jdbc.sql("""

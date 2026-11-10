@@ -81,6 +81,8 @@ class BranchCartOrderPostgresIntegrationTests {
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private com.stylemind.commerce.service.order.OrderService orderService;
+    @Autowired private com.stylemind.commerce.service.order.QrCheckoutReservationService qrReservations;
+    @Autowired private com.stylemind.commerce.service.order.PaymentEventService paymentEvents;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private com.stylemind.commerce.client.payment.PaymentClient payment;
@@ -92,6 +94,9 @@ class BranchCartOrderPostgresIntegrationTests {
 
     @BeforeEach
     void reset() {
+        jdbc.update("DELETE FROM public.cancellation_refund_obligation");
+        jdbc.update("DELETE FROM public.qr_checkout_item");
+        jdbc.update("DELETE FROM public.qr_checkout");
         jdbc.execute("DROP TRIGGER IF EXISTS fail_cod_confirmation_test ON public.order_status_history");
         org.mockito.Mockito.reset(payment);
         org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
@@ -144,6 +149,394 @@ class BranchCartOrderPostgresIntegrationTests {
                 INSERT INTO public.variant_inventory(variant_id, on_hand_quantity, reserved_quantity, updated_at)
                 VALUES (?, 100, 0, now()), (?, 100, 0, now())
                 """, variantId, inactiveVariantId);
+    }
+
+    @Test
+    void prepareQrCheckoutUsesServerPriceAndAddressWithoutCreatingOrder() {
+        var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-prepare-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 2);
+        UUID checkout = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", command, selection);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, checkout)).isZero();
+        assertThat(jdbc.queryForObject("SELECT total_vnd FROM qr_checkout WHERE checkout_id=?", Long.class, checkout)).isEqualTo(200000L);
+        assertThat(jdbc.queryForObject("SELECT shipping_snapshot->>'recipientName' FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("Nguyen Van A");
+        assertThat(jdbc.queryForObject("SELECT product_snapshot->>'sku' FROM qr_checkout_item WHERE checkout_id=?", String.class, checkout)).isEqualTo("SKU-A");
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(2);
+        org.mockito.Mockito.verifyNoInteractions(payment);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", command, selection))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+        var cod = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                command.checkoutKey(), ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.COD);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderService.checkoutSelection(CUSTOMER_ID, "Bearer test", cod, selection))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+    }
+
+    @Test
+    void prepareQrCheckoutRejectsInsufficientStockAndCod() {
+        jdbc.update("UPDATE variant_inventory SET on_hand_quantity=0 WHERE variant_id=?", variantId);
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 1);
+        var qr = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-no-stock-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", qr, selection))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+        var cod = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-no-cod-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.COD);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", cod, selection))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM qr_checkout", Integer.class)).isZero();
+        org.mockito.Mockito.verifyNoInteractions(payment);
+    }
+
+    @Test
+    void qrAndCodCannotUseTheSameCheckoutKeyConcurrently() throws Exception {
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 1);
+        var qr = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-cod-race-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);
+        var cod = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-cod-race-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.COD);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = pool.submit(() -> {
+                start.await();
+                try { orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", qr, selection); return true; }
+                catch (com.stylemind.commerce.errors.ApiOperationException conflict) { return false; }
+            });
+            var second = pool.submit(() -> {
+                start.await();
+                try { orderService.checkoutSelection(CUSTOMER_ID, "Bearer test", cod, selection); return true; }
+                catch (com.stylemind.commerce.errors.ApiOperationException conflict) { return false; }
+            });
+            start.countDown();
+            assertThat(first.get(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isNotEqualTo(second.get(20, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        int total = jdbc.queryForObject("SELECT (SELECT count(*) FROM customer_order WHERE checkout_key='qr-cod-race-01') + (SELECT count(*) FROM qr_checkout WHERE checkout_key='qr-cod-race-01')", Integer.class);
+        assertThat(total).isEqualTo(1);
+    }
+
+    @Test
+    void legacyGuestEndpointDoesNotCreateVietQrOrderBeforePayment() throws Exception {
+        String guest = "guest-session-0123456789abcdef0123456789abcdef";
+        mockMvc.perform(post("/api/v1/guest/orders/buy-now").header("X-Guest-Session-Key", guest)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"checkout_key\":\"guest-legacy-qr-01\",\"payment_method\":\"SEPAY_VIETQR\",\"shipping_address\":{\"recipient_name\":\"An\",\"recipient_phone\":\"0987654321\",\"address_line\":\"Ha Noi\"},\"variant_id\":\"" + variantId + "\",\"quantity\":1}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+    }
+
+    @Test
+    void guestQrCheckoutChecksSessionAndCreatesOrderOnlyAfterPayment() throws Exception {
+        String guest = "guest-session-0123456789abcdef0123456789abcdef";
+        var prepared = mockMvc.perform(post("/api/v1/guest/qr-checkouts/buy-now")
+                .header("X-Guest-Session-Key", guest).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"checkout_key\":\"guest-qr-flow-01\",\"payment_method\":\"SEPAY_VIETQR\",\"shipping_address\":{\"recipient_name\":\"An\",\"recipient_phone\":\"0987654321\",\"address_line\":\"Ha Noi\"},\"variant_id\":\"" + variantId + "\",\"quantity\":1}"))
+                .andExpect(status().isCreated()).andReturn();
+        UUID id = UUID.fromString(json(prepared).path("checkoutId").asText()), attemptId = UUID.randomUUID();
+        mockMvc.perform(get("/api/v1/guest/qr-checkouts/{id}", id).header("X-Guest-Session-Key", "other-session-0123456789abcdef0123456789abcdef"))
+                .andExpect(status().isNotFound());
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, id, "SEPAY_VIETQR", 100000,
+                        "SMGUEST", "PENDING", Instant.now().plusSeconds(800), "code", "qr"));
+        mockMvc.perform(post("/api/v1/guest/qr-checkouts/{id}/payment-attempt", id).header("X-Guest-Session-Key", guest))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                id, null, "SEPAY_VIETQR", "SMGUEST", 100000, Instant.now());
+        assertThat(paymentEvents.receive(event, Instant.now()).outcome()).isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+    }
+
+    @Test
+    void legacyOrderEndpointsCannotCreateNewVietQrOrdersBeforePayment() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        var result = postJson("/api/v1/orders", customerToken(), "{\"checkout_key\":\"legacy-qr-block-01\",\"shipping_address_id\":\""
+                + ADDRESS_ID + "\",\"payment_method\":\"SEPAY_VIETQR\"}");
+        assertThat(result.getResponse().getStatus()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+    }
+
+    @Test
+    void paidQrCancellationRecordsRefundAndRestoresStockOnlyOnce() throws Exception {
+        UUID id = paidQrOrder();
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        String requestId = request.path("cancellation_request_id").asText();
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isForbidden());
+        for (int i = 0; i < 2; i++) {
+            var result = mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"));
+            if (i == 0) result.andExpect(status().isOk()).andExpect(jsonPath("$.refund_status").value("PENDING_REFUND"));
+            else result.andExpect(status().isConflict());
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation WHERE order_id=?", Integer.class, id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT amount_vnd FROM cancellation_refund_obligation WHERE order_id=?", Long.class, id)).isEqualTo(100000L);
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+        assertThat(jdbc.queryForObject("SELECT reservation_status FROM qr_checkout_item WHERE checkout_id=?", String.class, id)).isEqualTo("RELEASED");
+        mockMvc.perform(get("/api/v1/orders/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cancellation_request.refund_status").value("PENDING_REFUND"));
+    }
+
+    @Test
+    void paidQrCancellationRequiresEvidenceAndCannotApproveAfterShipping() throws Exception {
+        UUID id = paidQrOrder();
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        jdbc.update("DELETE FROM payment_event_inbox WHERE order_id=?", id);
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_RECONCILIATION_REQUIRED"));
+        jdbc.update("UPDATE customer_order SET order_status='SHIPPED' WHERE order_id=?", id);
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(99);
+    }
+
+    @Test
+    void concurrentPaidQrApprovalCreatesOneRefundObligation() throws Exception {
+        UUID id = paidQrOrder();
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        String requestId = request.path("cancellation_request_id").asText();
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Integer> approve = () -> {
+                start.await();
+                return mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                        .andReturn().getResponse().getStatus();
+            };
+            var first = pool.submit(approve);
+            var second = pool.submit(approve);
+            start.countDown();
+            assertThat(List.of(first.get(15, java.util.concurrent.TimeUnit.SECONDS), second.get(15, java.util.concurrent.TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(200, 409);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+    }
+
+    @Test
+    void paidQrCancellationRollsBackRefundAndInventoryWhenHistoryFails() throws Exception {
+        UUID id = paidQrOrder();
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
+        String requestId = request.path("cancellation_request_id").asText();
+        jdbc.execute("CREATE OR REPLACE FUNCTION public.fail_paid_cancel_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.to_status='CANCELLED' THEN RAISE EXCEPTION 'test-only cancellation failure'; END IF; RETURN NEW; END $$");
+        jdbc.execute("CREATE TRIGGER fail_paid_cancel BEFORE INSERT ON public.order_status_history FOR EACH ROW EXECUTE FUNCTION public.fail_paid_cancel_fn()");
+        try {
+            mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", requestId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                    .andExpect(status().isInternalServerError());
+        } finally {
+            jdbc.execute("DROP TRIGGER fail_paid_cancel ON public.order_status_history");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT request_status FROM cancellation_request WHERE cancellation_request_id=?", String.class, UUID.fromString(requestId))).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(99);
+    }
+
+    private UUID paidQrOrder() throws Exception {
+        var prepared = postJson("/api/v1/qr-checkouts/buy-now", customerToken(),
+                "{\"checkout_key\":\"qr-refund-test\",\"shipping_address_id\":\"" + ADDRESS_ID
+                        + "\",\"payment_method\":\"SEPAY_VIETQR\",\"variant_id\":\"" + variantId + "\",\"quantity\":1}");
+        assertThat(prepared.getResponse().getStatus()).isEqualTo(201);
+        UUID id = UUID.fromString(json(prepared).path("checkoutId").asText());
+        UUID attemptId = UUID.randomUUID();
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, id,
+                        "SEPAY_VIETQR", 100000, "SMREFUND", "PENDING", Instant.now().plusSeconds(800), "code", "qr"));
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/payment-attempt", customerToken(), "{}").getResponse().getStatus()).isEqualTo(200);
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                id, CUSTOMER_ID, "SEPAY_VIETQR", "SMREFUND", 100000, Instant.now());
+        assertThat(paymentEvents.receive(event, Instant.now()).outcome()).isEqualTo("APPLIED");
+        return id;
+    }
+
+    @Test
+    void qrCheckoutApiCreatesPaidOrderOnlyAfterPaymentEvent() throws Exception {
+        var prepared = postJson("/api/v1/qr-checkouts/buy-now", customerToken(),
+                "{\"checkout_key\":\"qr-api-paid-01\",\"shipping_address_id\":\"" + ADDRESS_ID
+                        + "\",\"payment_method\":\"SEPAY_VIETQR\",\"variant_id\":\"" + variantId + "\",\"quantity\":1}");
+        assertThat(prepared.getResponse().getStatus()).isEqualTo(201);
+        UUID id = UUID.fromString(json(prepared).path("checkoutId").asText());
+        UUID attemptId = UUID.randomUUID();
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, id,
+                        "SEPAY_VIETQR", 100000, "SMTEST", "PENDING", Instant.now().plusSeconds(800), "code", "qr"));
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/payment-attempt", customerToken(), "{}").getResponse().getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                id, CUSTOMER_ID, "SEPAY_VIETQR", "SMTEST", 100000, Instant.now());
+        assertThat(paymentEvents.receive(event, Instant.now()).outcome()).isEqualTo("APPLIED");
+        mockMvc.perform(get("/api/v1/qr-checkouts/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ORDER_CREATED"));
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/cancel", customerToken(), "{}").getResponse().getStatus()).isEqualTo(409);
+    }
+
+    @Test
+    void qrCheckoutApiAllowsOwnerToCancelWithoutCreatingAnOrder() throws Exception {
+        var prepared = postJson("/api/v1/qr-checkouts/buy-now", customerToken(),
+                "{\"checkout_key\":\"qr-api-test-01\",\"shipping_address_id\":\"" + ADDRESS_ID
+                        + "\",\"payment_method\":\"SEPAY_VIETQR\",\"variant_id\":\"" + variantId + "\",\"quantity\":1}");
+        assertThat(prepared.getResponse().getStatus()).isEqualTo(201);
+        String id = json(prepared).path("checkoutId").asText();
+        assertThat(id).isNotBlank();
+        mockMvc.perform(get("/api/v1/qr-checkouts/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken())))
+                .andExpect(status().isNotFound());
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest request = invocation.getArgument(0);
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), request.orderId(),
+                    request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", Instant.now().plusSeconds(800), "test", "qr");
+        });
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/payment-attempt", customerToken(), "{}").getResponse().getStatus()).isEqualTo(200);
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/cancel", customerToken(), "{}").getResponse().getStatus()).isEqualTo(200);
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/payment-attempt", customerToken(), "{}").getResponse().getStatus()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+    }
+
+    @Test
+    void lateQrEventRecoversPaymentReferenceAfterResponseWasLost() {
+        UUID checkout = UUID.randomUUID(), attemptId = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        qrReservations.reserve(checkout, CUSTOMER_ID, null, "qr-recover-01", 100000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 1, 100000, "{}")), now);
+        qrReservations.cancel(checkout, CUSTOMER_ID, null, now);
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, checkout,
+                        "SEPAY_VIETQR", 100000, "SMTEST", "SETTLED", now.plusMinutes(5).toInstant(), null, null));
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                checkout, CUSTOMER_ID, "SEPAY_VIETQR", "SMTEST", 100000, now.toInstant());
+        assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("RECONCILIATION_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("RECONCILIATION_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+    }
+
+    @Test
+    void qrPaymentConfirmationCreatesOnePaidOrderFromTrustedSnapshots() {
+        var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "qr-paid-test-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 2);
+        UUID checkout = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", command, selection);
+        var now = java.time.OffsetDateTime.now();
+        UUID attemptId = UUID.randomUUID();
+        var attempt = new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, checkout,
+                "SEPAY_VIETQR", 200000, "SMTEST", "PENDING", now.plusMinutes(10).toInstant(), "code", "qr");
+        assertThat(qrReservations.recordPaymentAttempt(checkout, CUSTOMER_ID, attempt, now)).isTrue();
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                checkout, CUSTOMER_ID, "SEPAY_VIETQR", "SMTEST", 200000, now.toInstant());
+        assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("APPLIED");
+        assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM order_item WHERE order_id=?", Integer.class, checkout)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(98);
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_reservation WHERE order_id=? AND reservation_status='CONSUMED'", Integer.class, checkout)).isEqualTo(1);
+    }
+
+    @Test
+    void qrPaymentAttemptRacingCancellationIsRecordedButNotMadeAvailable() {
+        UUID checkout = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        qrReservations.reserve(checkout, CUSTOMER_ID, null, "qr-attempt-race-01", 100000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 1, 100000, "{}")), now);
+        qrReservations.cancel(checkout, CUSTOMER_ID, null, now);
+        UUID attemptId = UUID.randomUUID();
+        var attempt = new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, checkout,
+                "SEPAY_VIETQR", 100000, "SMTEST", "PENDING", null, null, null);
+        assertThat(qrReservations.recordPaymentAttempt(checkout, CUSTOMER_ID, attempt, now)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT shipping_snapshot->'paymentAttempt'->>'id' FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo(attemptId.toString());
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+    }
+
+    @Test
+    void insufficientQrStockRollsBackEveryReservation() {
+        UUID secondVariant = UUID.randomUUID();
+        UUID product = jdbc.queryForObject("SELECT product_id FROM product_variant WHERE variant_id=?", UUID.class, variantId);
+        jdbc.update("INSERT INTO product_variant(variant_id,product_id,sku,unit_price_vnd,variant_status) VALUES (?,?,'QR-EMPTY',100000,'ACTIVE')", secondVariant, product);
+        jdbc.update("INSERT INTO variant_inventory(variant_id,on_hand_quantity,reserved_quantity,updated_at) VALUES (?,0,0,now())", secondVariant);
+        UUID checkout = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        var items = List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 1, 100000, "{}"),
+                new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(secondVariant, 1, 100000, "{}"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> qrReservations.reserve(checkout, CUSTOMER_ID, null,
+                "qr-no-stock", 200000, "{}", items, now)).isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM qr_checkout WHERE checkout_id=?", Integer.class, checkout)).isZero();
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+    }
+
+    @Test
+    void qrCheckoutReservesWithoutCreatingOrderAndCancelsOnlyForOwner() {
+        UUID checkout = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        qrReservations.reserve(checkout, CUSTOMER_ID, null, "qr-reservation-test", 200000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 2, 100000, "{}")), now);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, checkout)).isZero();
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> qrReservations.cancel(checkout, OTHER_CUSTOMER_ID, null, now))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+        qrReservations.cancel(checkout, CUSTOMER_ID, null, now);
+        qrReservations.cancel(checkout, CUSTOMER_ID, null, now);
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void expiredQrCheckoutReleasesStockOnceAndDoesNotCreateOrder() {
+        UUID checkout = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        qrReservations.reserve(checkout, CUSTOMER_ID, null, "qr-expiry-test", 200000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 2, 100000, "{}")), now);
+        qrReservations.expire(checkout, now.plusMinutes(14));
+        assertThat(qrReservations.expiredCheckoutIds(now.plusMinutes(14))).doesNotContain(checkout);
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isEqualTo(2);
+        assertThat(qrReservations.expiredCheckoutIds(now.plusMinutes(16))).contains(checkout);
+        qrReservations.expire(checkout, now.plusMinutes(16));
+        qrReservations.expire(checkout, now.plusMinutes(16));
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("EXPIRED");
+        assertThat(jdbc.queryForObject("SELECT reservation_status FROM qr_checkout_item WHERE checkout_id=?", String.class, checkout)).isEqualTo("RELEASED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, checkout)).isZero();
+    }
+
+    @Test
+    void qrCancellationRacingExpiryReleasesReservationOnce() throws Exception {
+        UUID checkout = UUID.randomUUID();
+        var now = java.time.OffsetDateTime.now();
+        qrReservations.reserve(checkout, CUSTOMER_ID, null, "qr-expiry-race", 200000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(variantId, 2, 100000, "{}")), now);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var cancel = pool.submit(() -> {
+                start.await();
+                try { qrReservations.cancel(checkout, CUSTOMER_ID, null, now.plusMinutes(16)); }
+                catch (com.stylemind.commerce.errors.ApiOperationException conflict) {
+                    assertThat(conflict.code()).isEqualTo("CHECKOUT_NOT_CANCELLABLE");
+                }
+                return null;
+            });
+            var expire = pool.submit(() -> { start.await(); qrReservations.expire(checkout, now.plusMinutes(16)); return null; });
+            start.countDown();
+            cancel.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            expire.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(jdbc.queryForObject("SELECT reserved_quantity FROM variant_inventory WHERE variant_id=?", Integer.class, variantId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isIn("EXPIRED", "CANCELLED");
     }
 
     @Test
