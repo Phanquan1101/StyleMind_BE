@@ -7,5 +7,6 @@ public record VariantCommand(
         String color,
         String material,
         long unitPriceVnd,
+        int quantity,
         ProductVariantStatus variantStatus) {
 }

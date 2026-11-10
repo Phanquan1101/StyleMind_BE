@@ -54,8 +54,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "stylemind.commerce.inventory.expiry-enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
-@Import(BranchCartOrderPostgresIntegrationTests.TestConfig.class)
-class BranchCartOrderPostgresIntegrationTests {
+@Import(CartOrderPostgresIntegrationTests.TestConfig.class)
+class CartOrderPostgresIntegrationTests {
 
     private static final PostgreSQLContainer<?> POSTGRES = IsolatedPostgres.create("postgres:18.6")
             .withDatabaseName("stylemind_commerce_bco_test")
@@ -102,7 +102,6 @@ class BranchCartOrderPostgresIntegrationTests {
                     request.paymentMethod(), request.acceptedTotalVnd(), "SMTEST", "PENDING", null, null, null);
         });
         jdbc.update("DELETE FROM public.cancellation_request");
-        jdbc.update("DELETE FROM public.inventory_reservation");
         jdbc.update("DELETE FROM public.order_status_history");
         jdbc.update("DELETE FROM public.order_item");
         jdbc.update("DELETE FROM public.order_address_snapshot");
@@ -111,10 +110,8 @@ class BranchCartOrderPostgresIntegrationTests {
         jdbc.update("DELETE FROM public.cart");
         jdbc.update("DELETE FROM public.variant_image");
         jdbc.update("DELETE FROM public.image_asset");
-        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
-        jdbc.update("DELETE FROM public.branch");
         jdbc.update("DELETE FROM public.category");
         jdbc.update("DELETE FROM public.brand");
         UUID categoryId = UUID.randomUUID();
@@ -131,17 +128,13 @@ class BranchCartOrderPostgresIntegrationTests {
                 VALUES (?, ?, ?, 'Linen Shirt', 'ACTIVE')
                 """, productId, categoryId, brandId);
         jdbc.update("""
-                INSERT INTO public.product_variant(variant_id, product_id, sku, color, size, unit_price_vnd, variant_status)
-                VALUES (?, ?, 'SKU-A', 'White', 'M', 100000, 'ACTIVE')
+                INSERT INTO public.product_variant(variant_id, product_id, sku, color, size, unit_price_vnd, quantity, variant_status)
+                VALUES (?, ?, 'SKU-A', 'White', 'M', 100000, 100, 'ACTIVE')
                 """, variantId, productId);
         jdbc.update("""
-                INSERT INTO public.product_variant(variant_id, product_id, sku, unit_price_vnd, variant_status)
-                VALUES (?, ?, 'SKU-X', 90000, 'INACTIVE')
+                INSERT INTO public.product_variant(variant_id, product_id, sku, unit_price_vnd, quantity, variant_status)
+                VALUES (?, ?, 'SKU-X', 90000, 100, 'INACTIVE')
                 """, inactiveVariantId, productId);
-        jdbc.update("""
-                INSERT INTO public.variant_inventory(variant_id, on_hand_quantity, reserved_quantity, updated_at)
-                VALUES (?, 100, 0, now()), (?, 100, 0, now())
-                """, variantId, inactiveVariantId);
     }
 
     @Test
@@ -370,43 +363,6 @@ class BranchCartOrderPostgresIntegrationTests {
                 "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":\"" + owner + "\"}");
         mockMvc.perform(delete("/api/v1/cart/items").header("X-Guest-Session-Key", owner))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
-    }
-
-    @Test
-    void branchCrudRejectsDuplicateCodeHidesInactiveAndRequiresAdmin() throws Exception {
-        assertProblem(postJson("/api/v1/admin/branches", customerToken(), branchBody("HN01", "ACTIVE")),
-                403, "ACCESS_DENIED");
-        JsonNode created = json(postJson("/api/v1/admin/branches", adminToken(), branchBody("HN01", "ACTIVE")));
-        UUID branchId = UUID.fromString(created.path("branch_id").asText());
-        assertProblem(postJson("/api/v1/admin/branches", adminToken(), branchBody("HN01", "ACTIVE")),
-                409, "DUPLICATE_BRANCH_CODE");
-        mockMvc.perform(put("/api/v1/admin/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(branchBody("HN01", "INACTIVE")))
-                .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/v1/admin/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.branch_status").value("INACTIVE"));
-        mockMvc.perform(put("/api/v1/admin/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(branchBody("HN01", "ACTIVE")))
-                .andExpect(status().isOk());
-        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
-                .andExpect(status().isNoContent());
-        mockMvc.perform(delete("/api/v1/admin/branches/{id}", branchId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
-                .andExpect(status().isNoContent());
-        assertThat(jdbc.queryForObject("SELECT branch_status FROM public.branch WHERE branch_id = ?",
-                String.class, branchId)).isEqualTo("INACTIVE");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.branch WHERE branch_id = ?",
-                Integer.class, branchId)).isEqualTo(1);
     }
 
     @Test
@@ -732,7 +688,7 @@ class BranchCartOrderPostgresIntegrationTests {
         } finally { jdbc.execute("DROP TRIGGER fail_guest_address_test ON public.order_address_snapshot"); }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order",Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT cart_status FROM public.cart WHERE guest_session_key=?",String.class,key)).isEqualTo("ACTIVE");
-        assertThat(jdbc.queryForObject("SELECT on_hand_quantity FROM public.variant_inventory WHERE variant_id=?",Integer.class,variantId)).isEqualTo(100);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?",Integer.class,variantId)).isEqualTo(100);
         org.mockito.Mockito.verifyNoInteractions(payment);
         assertThat(guestCheckout(key,"rollback-checkout-key","COD").getResponse().getStatus()).isEqualTo(201);
     }
@@ -766,12 +722,6 @@ class BranchCartOrderPostgresIntegrationTests {
         postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
         return postJson("/api/v1/orders", customerToken(), "{\"checkout_key\":\"" + key
                 + "\",\"shipping_address_id\":\"" + ADDRESS_ID + "\",\"payment_method\":\"COD\"}");
-    }
-
-    private String branchBody(String code, String status) {
-        return """
-                {"branch_code":"%s","name":"Ha Noi","address_line":"1 Main St","contact_phone":null,"branch_status":"%s"}
-                """.formatted(code, status);
     }
 
     private MvcResult postJson(String path, String token, String body) throws Exception {

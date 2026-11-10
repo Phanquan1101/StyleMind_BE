@@ -32,7 +32,7 @@ public class ProductRequestValidator {
     private static final Set<String> PRODUCT_FIELDS = Set.of(
             "category_id", "brand_id", "name", "description", "demographic_segment", "product_status");
     private static final Set<String> VARIANT_FIELDS = Set.of(
-            "sku", "size", "color", "material", "unit_price_vnd", "variant_status");
+            "sku", "size", "color", "material", "unit_price_vnd", "quantity", "variant_status");
     private static final Set<String> LIST_QUERY_FIELDS = Set.of(
             "keyword", "category_id", "min_price_vnd", "max_price_vnd", "demographic_segment", "page", "size");
     private static final Set<String> IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
@@ -64,8 +64,13 @@ public class ProductRequestValidator {
                 || price.longValue() < 0 || price.longValue() > MAX_UNIT_PRICE_VND) {
             throw invalidRequest();
         }
+        JsonNode quantity = body.get("quantity");
+        if (quantity == null || !quantity.isIntegralNumber() || !quantity.canConvertToInt()
+                || quantity.intValue() < 0) {
+            throw invalidRequest();
+        }
         ProductVariantStatus status = enumValue(text(body, "variant_status", false), ProductVariantStatus.class);
-        return new VariantCommand(sku, size, color, material, price.longValue(), status);
+        return new VariantCommand(sku, size, color, material, price.longValue(), quantity.intValue(), status);
     }
 
     public ProductListCriteria listCriteria(HttpServletRequest request) {

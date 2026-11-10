@@ -88,7 +88,8 @@ services:
 
   commerce-service:
     build:
-      context: ./commerce-service
+      context: .
+      dockerfile: ./commerce-service/Dockerfile
     environment:
       SERVER_PORT: "8082"
       STYLEMIND_COMMERCE_DB_URL: ${STYLEMIND_COMMERCE_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_commerce}

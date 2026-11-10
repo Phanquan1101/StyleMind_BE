@@ -53,7 +53,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import com.stylemind.commerce.repository.branch.BranchRepository;
 import com.stylemind.commerce.repository.cart.CartRepository;
 import com.stylemind.commerce.repository.cart.CartItemRepository;
 import com.stylemind.commerce.repository.catalog.BrandRepository;
@@ -89,9 +88,6 @@ class CommerceServiceApplicationTests {
     private com.stylemind.commerce.repository.order.CodOrderConfirmationRepository codOrderConfirmationRepository;
 
     @MockBean
-    private BranchRepository branchRepository;
-
-    @MockBean
     private BrandRepository brandRepository;
 
     @MockBean
@@ -110,7 +106,7 @@ class CommerceServiceApplicationTests {
     private com.stylemind.commerce.repository.product.ImageAssetRepository imageAssetRepository;
 
     @MockBean
-    private com.stylemind.commerce.repository.inventory.InventoryRepository inventoryRepository;
+    private com.stylemind.commerce.service.order.VariantQuantityService quantityService;
 
     @MockBean
     private CartRepository cartRepository;
