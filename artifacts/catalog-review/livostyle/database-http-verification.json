@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "checked_at": "2026-11-10T12:32:11.235Z",
+  "base_url": "http://127.0.0.1:8080/commerce/api/v1",
+  "products": 200,
+  "variants": 2705,
+  "gallery_links": 18865,
+  "brand": "Livostyle Catalog",
+  "old_product_hidden_404": true,
+  "anonymous_admin_denied_401": true,
+  "invalid_uuid_and_page_size_rejected_400": true,
+  "cloudinary_urls_and_rounded_vnd_match": true,
+  "new_available_quantity": 0,
+  "localized_vietnamese": true,
+  "runtime": "Node HTTP requests through running Docker Gateway; not Postman/Newman execution"
+}

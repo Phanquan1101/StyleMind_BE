@@ -1,0 +1,112 @@
+{
+  "result": "FRESH_OR_REPEAT_OFFLINE_PASS",
+  "project": "stylemind-ai-demo-fresh1111",
+  "testedAt": "2026-11-10T17:27:49.354Z",
+  "modes": {
+    "catalogVectors": "RECORDED_REAL_GEMINI",
+    "knowledge": "EXISTING_SYNTHETIC_DEMO_FIXTURE",
+    "generation": "OFFLINE_FIXTURE_ONLY"
+  },
+  "commerce": {
+    "products": 10,
+    "variants": 10,
+    "activeAvailable": 10,
+    "images": [
+      {
+        "productId": "9e213abf-0408-584e-b672-ba5f8af766bc",
+        "status": 200
+      },
+      {
+        "productId": "4956d0a4-4047-5cfc-8597-42427cb69eba",
+        "status": 200
+      },
+      {
+        "productId": "03e897ee-8d1d-5d21-a30d-e8d08a25b6e1",
+        "status": 200
+      },
+      {
+        "productId": "0750c0a1-6535-56d2-8d22-1359bdcc4588",
+        "status": 200
+      },
+      {
+        "productId": "7e2e725b-2e02-5755-9777-ae018a0208f5",
+        "status": 200
+      },
+      {
+        "productId": "387d2bf1-6aca-5451-a39a-87514f2232bf",
+        "status": 200
+      },
+      {
+        "productId": "3dd82042-a9e2-5bfb-be35-2db88c9e4931",
+        "status": 200
+      },
+      {
+        "productId": "08bf2573-6515-5e6c-8c22-6acf4e1933c5",
+        "status": 200
+      },
+      {
+        "productId": "3a9eef41-f434-5df9-9660-7399a822a0f7",
+        "status": 200
+      },
+      {
+        "productId": "004feeaf-fce6-5f83-acb4-88160d84254c",
+        "status": 200
+      }
+    ]
+  },
+  "qdrant": {
+    "candidates": 10,
+    "distinctVectors": 10,
+    "totalPoints": 11,
+    "dimensions": 1536,
+    "distance": "Cosine",
+    "alias": "stylemind_stylist_runtime_gemini_team10",
+    "collection": "stylemind_stylist_catalog_f89049e6d26a4a38875b2077c8f23cdc"
+  },
+  "neo4j": {
+    "artifacts": 1,
+    "entries": 1,
+    "provenance": "stylist-service/scripts/wave2-disposable-gateway-harness.cjs:writeArtifacts"
+  },
+  "migrations": {
+    "commerce": 10,
+    "stylist": 3
+  },
+  "gatewayUrl": "http://127.0.0.1:28080",
+  "localConfigApplied": false,
+  "offlineGenerate": {
+    "mode": "OFFLINE_GEMINI_HTTP_FIXTURE",
+    "sessionId": "4fe9ae60-9e58-4535-8a0e-a6d3c18c63fd",
+    "requestId": "19aa4fe0-36f3-4ea3-8c0e-48a4e7f8c306",
+    "recommendationId": "a660cf61-f45d-45df-ae8b-ca3228ddc68c",
+    "query_embedding": "FIXTURE_ONLY; stored catalog vectors are REAL",
+    "totalVnd": 578000,
+    "items": [
+      {
+        "productId": "4956d0a4-4047-5cfc-8597-42427cb69eba",
+        "variantId": "64b1b82f-f3d6-53cc-ad80-8ce7ddde5b80",
+        "name": "Femella - Áo sơ mi nữ - Mẫu 59893",
+        "price": 249000,
+        "slot": "TOP",
+        "availability": "AVAILABLE"
+      },
+      {
+        "productId": "3a9eef41-f434-5df9-9660-7399a822a0f7",
+        "variantId": "3e650983-ead0-5131-918b-7e36ba93dd03",
+        "name": "Nike - Quần thể thao nữ - Mẫu 43081",
+        "price": 329000,
+        "slot": "BOTTOM",
+        "availability": "AVAILABLE"
+      }
+    ],
+    "fixtureStats": {
+      "countTokens": 0,
+      "documentEmbeddings": 0,
+      "queryEmbeddings": 0,
+      "generations": 0,
+      "rejected": 0
+    },
+    "ownerIsolation": "PASS",
+    "replayNoProviderCall": "PASS"
+  }
+}

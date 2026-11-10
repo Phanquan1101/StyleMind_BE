@@ -19,6 +19,8 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.stylemind.stylist.logging.CorrelationIdFilter;
+import com.stylemind.stylist.service.recommendation.StylingRecommendationService;
+import com.stylemind.stylist.service.retrieval.CandidateRetrievalService;
 import io.swagger.v3.oas.annotations.Hidden;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -38,6 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -58,7 +61,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
+        "spring.flyway.enabled=false",
         "management.health.db.enabled=false",
+        "management.health.neo4j.enabled=false",
+        "spring.neo4j.uri=bolt://127.0.0.1:1",
+        "stylemind.stylist.knowledge.enabled=false",
+        "stylemind.stylist.knowledge.neo4j-uri=bolt://127.0.0.1:1",
+        "stylemind.stylist.knowledge.artifact-id=",
+        "stylemind.stylist.knowledge.artifact-version=",
+        "stylemind.openai.enabled=false",
         "spring.datasource.hikari.initialization-fail-timeout=-1"
 })
 @AutoConfigureMockMvc
@@ -76,6 +87,9 @@ class StylistServiceApplicationTests {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
     @Qualifier("jwtDecoder")
     private JwtDecoder unconfiguredProductionDecoder;
 
@@ -87,6 +101,12 @@ class StylistServiceApplicationTests {
     @Test
     void contextStartsWithoutProductionJwtConfiguration() {
         assertThat(unconfiguredProductionDecoder).isNotNull();
+    }
+
+    @Test
+    void productionComponentScanDoesNotRegisterFixturePipelineBeans() {
+        assertThat(applicationContext.getBeansOfType(StylingRecommendationService.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(CandidateRetrievalService.class)).isEmpty();
     }
 
     @Test

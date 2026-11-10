@@ -68,7 +68,7 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sku\": \"SKU-001\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 199000,\n  \"variant_status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"sku\": \"SKU-001\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 199000,\n  \"quantity\": 20,\n  \"variant_status\": \"ACTIVE\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}/variants"
           }
@@ -80,7 +80,7 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sku\": \"SKU-001-EDIT\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 209000,\n  \"variant_status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"sku\": \"SKU-001-EDIT\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": 209000,\n  \"quantity\": 20,\n  \"variant_status\": \"ACTIVE\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/admin/variants/{{variantId}}"
           }
@@ -92,7 +92,7 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sku\": \"SKU-BAD\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": -1,\n  \"variant_status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"sku\": \"SKU-BAD\",\n  \"size\": \"M\",\n  \"color\": \"White\",\n  \"material\": \"Linen\",\n  \"unit_price_vnd\": -1,\n  \"quantity\": 20,\n  \"variant_status\": \"ACTIVE\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}/variants"
           }

@@ -1,7 +1,6 @@
 package com.stylemind.commerce.service.order;
 
 import com.stylemind.commerce.errors.ApiOperationException;
-import com.stylemind.commerce.repository.inventory.InventoryRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -10,14 +9,14 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Local transaction boundary for a QR checkout and its reserved inventory. */
+/** Local transaction boundary for a QR checkout and its held variant quantities. */
 @Service
 public class QrCheckoutReservationService {
     private final JdbcClient jdbc;
-    private final InventoryRepository inventory;
-    public QrCheckoutReservationService(JdbcClient jdbc, InventoryRepository inventory) {
+    private final VariantQuantityService quantityService;
+    public QrCheckoutReservationService(JdbcClient jdbc, VariantQuantityService quantityService) {
         this.jdbc = jdbc;
-        this.inventory = inventory;
+        this.quantityService = quantityService;
     }
     public record Item(UUID variantId, int quantity, long unitPriceVnd, String productSnapshot) { }
     private record Checkout(UUID customer, String guestHash, String status) { }
@@ -138,7 +137,6 @@ public class QrCheckoutReservationService {
                         product_snapshot->>'material',quantity,unit_price_vnd
                     FROM qr_checkout_item WHERE checkout_id=:id AND variant_id=:variant
                     """).param("item", UUID.randomUUID()).param("id", checkoutId).param("variant", item.variantId()).update();
-            inventory.consumeCheckoutReservation(checkoutId, item.variantId(), item.quantity(), now);
         }
         jdbc.sql("""
                 DELETE FROM cart_item c USING qr_checkout_item q
@@ -191,9 +189,11 @@ public class QrCheckoutReservationService {
                 """).param("id", checkoutId).param("customer", customerId).param("guest", guestHash)
                 .param("key", key).param("total", total).param("shipping", shippingSnapshot)
                 .param("now", now).param("expires", now.plusMinutes(15)).update();
+        var requested = sorted.stream().collect(java.util.stream.Collectors.toMap(Item::variantId, Item::quantity));
+        if (!quantityService.allocate(requested)) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "Requested quantity is unavailable");
+        }
         for (var item : sorted) {
-            if (!inventory.reserveStock(item.variantId(), item.quantity(), now))
-                throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK", "Inventory is unavailable");
             jdbc.sql("""
                     INSERT INTO qr_checkout_item(checkout_id,variant_id,quantity,unit_price_vnd,product_snapshot,reservation_status)
                     VALUES (:checkout,:variant,:quantity,:price,CAST(:snapshot AS jsonb),'ACTIVE')
@@ -224,6 +224,13 @@ public class QrCheckoutReservationService {
                 """).param("now", now).query(UUID.class).list();
     }
 
+    /** The caller restores order quantities while holding the order lock in the same transaction. */
+    @Transactional
+    public void releaseCancelledOrderItems(UUID orderId) {
+        jdbc.sql("UPDATE qr_checkout_item SET reservation_status='RELEASED' WHERE checkout_id=:id AND reservation_status='CONSUMED'")
+                .param("id", orderId).update();
+    }
+
     @Transactional
     public void expire(UUID checkoutId, OffsetDateTime now) {
         boolean eligible = jdbc.sql("""
@@ -236,9 +243,7 @@ public class QrCheckoutReservationService {
     private void release(UUID checkoutId, String status, OffsetDateTime now) {
         var items = jdbc.sql("SELECT variant_id,quantity FROM qr_checkout_item WHERE checkout_id=:id AND reservation_status='ACTIVE' ORDER BY variant_id FOR UPDATE")
                 .param("id", checkoutId).query((rs, row) -> new Reservation(rs.getObject(1, UUID.class), rs.getInt(2))).list();
-        for (var item : items) {
-            inventory.releaseReservedStock(item.variantId(), item.quantity(), now);
-        }
+        quantityService.restore(items.stream().collect(java.util.stream.Collectors.toMap(Reservation::variantId, Reservation::quantity)));
         jdbc.sql("UPDATE qr_checkout_item SET reservation_status='RELEASED' WHERE checkout_id=:id AND reservation_status='ACTIVE'")
                 .param("id", checkoutId).update();
         jdbc.sql("UPDATE qr_checkout SET checkout_status=:status,updated_at=:now WHERE checkout_id=:id")

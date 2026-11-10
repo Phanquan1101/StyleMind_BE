@@ -3,6 +3,8 @@ name: stylemind
 services:
   postgres:
     image: postgres:18
+    ports:
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: ${STYLEMIND_POSTGRES_ADMIN_USERNAME:?Set STYLEMIND_POSTGRES_ADMIN_USERNAME in .env}
@@ -88,7 +90,8 @@ services:
 
   commerce-service:
     build:
-      context: ./commerce-service
+      context: .
+      dockerfile: ./commerce-service/Dockerfile
     environment:
       SERVER_PORT: "8082"
       STYLEMIND_COMMERCE_DB_URL: ${STYLEMIND_COMMERCE_DB_URL:-jdbc:postgresql://postgres:5432/stylemind_commerce}
@@ -176,10 +179,56 @@ services:
       STYLEMIND_STYLIST_DB_PASSWORD: ${STYLEMIND_STYLIST_DB_PASSWORD:?Set STYLEMIND_STYLIST_DB_PASSWORD in .env}
       STYLEMIND_JWT_JWK_SET_URI: ${STYLEMIND_JWT_JWK_SET_URI:-}
       STYLEMIND_JWT_JWS_ALGORITHM: ${STYLEMIND_JWT_JWS_ALGORITHM:-}
+      STYLEMIND_COMMERCE_BASE_URL: ${STYLEMIND_COMMERCE_BASE_URL:-http://commerce-service:8082}
       STYLEMIND_OPENAPI_SERVER_URL: /stylist
+      STYLEMIND_AI_PROVIDER: ${STYLEMIND_AI_PROVIDER:-gemini}
+      STYLEMIND_GEMINI_API_KEY: ${STYLEMIND_GEMINI_API_KEY:-}
+      STYLEMIND_GEMINI_GENERATION_MODEL: ${STYLEMIND_GEMINI_GENERATION_MODEL:-gemini-3.5-flash-lite}
+      STYLEMIND_GEMINI_LIVE_CALLS_ENABLED: ${STYLEMIND_GEMINI_LIVE_CALLS_ENABLED:-false}
+      STYLEMIND_GEMINI_METER_PROXY_HOST: ${STYLEMIND_GEMINI_METER_PROXY_HOST:-}
+      STYLEMIND_GEMINI_METER_PROXY_PORT: ${STYLEMIND_GEMINI_METER_PROXY_PORT:-0}
+      STYLEMIND_STYLIST_QDRANT_URL: ${STYLEMIND_STYLIST_QDRANT_URL:-http://qdrant:6333}
+      STYLEMIND_STYLIST_QDRANT_API_KEY: ${STYLEMIND_STYLIST_QDRANT_API_KEY:-}
+      STYLEMIND_STYLIST_QDRANT_COLLECTION_ALIAS: ${STYLEMIND_STYLIST_QDRANT_COLLECTION_ALIAS:-stylemind_stylist_runtime_gemini_local}
+      STYLEMIND_STYLIST_CATALOG_POLICY_FILE: /run/stylemind/catalog-policy.json
+      STYLEMIND_STYLIST_CATALOG_IMPORT_ENABLED: ${STYLEMIND_STYLIST_CATALOG_IMPORT_ENABLED:-false}
+      STYLEMIND_STYLIST_TEXT_TEMPLATE_REVISION: ${STYLEMIND_STYLIST_TEXT_TEMPLATE_REVISION:-catalog-v1}
+      STYLEMIND_STYLIST_NEO4J_ENABLED: ${STYLEMIND_STYLIST_NEO4J_ENABLED:-false}
+      STYLEMIND_STYLIST_NEO4J_URI: bolt://neo4j:7687
+      STYLEMIND_STYLIST_NEO4J_USERNAME: neo4j
+      STYLEMIND_STYLIST_NEO4J_PASSWORD: ${STYLEMIND_STYLIST_NEO4J_PASSWORD:?Set STYLEMIND_STYLIST_NEO4J_PASSWORD in .env}
+      STYLEMIND_STYLIST_KNOWLEDGE_ARTIFACT_ID: ${STYLEMIND_STYLIST_KNOWLEDGE_ARTIFACT_ID:-}
+      STYLEMIND_STYLIST_KNOWLEDGE_ARTIFACT_VERSION: ${STYLEMIND_STYLIST_KNOWLEDGE_ARTIFACT_VERSION:-}
+      STYLEMIND_STYLIST_KNOWLEDGE_IMPORT_FILE: /run/stylemind/knowledge-artifact.json
+    volumes:
+      - ${STYLEMIND_STYLIST_RUNTIME_CONFIG_DIR:-./stylist-service/local-runtime}:/run/stylemind:ro
     depends_on:
       postgres:
         condition: service_healthy
+      qdrant:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    ports:
+      - "127.0.0.1:6333:6333"
+
+  neo4j:
+    image: neo4j:5.26-community
+    ports:
+      - "127.0.0.1:7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${STYLEMIND_STYLIST_NEO4J_PASSWORD:?Set STYLEMIND_STYLIST_NEO4J_PASSWORD in .env}
+      NEO4J_server_http_enabled: "false"
+      NEO4J_server_bolt_advertised__address: neo4j:7687
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH##*/}\" 'RETURN 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
   notification-service:
     build:

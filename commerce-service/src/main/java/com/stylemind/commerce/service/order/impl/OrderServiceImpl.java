@@ -30,7 +30,7 @@ import com.stylemind.commerce.repository.order.OrderHistoryRepository;
 import com.stylemind.commerce.repository.order.OrderItemRepository;
 import com.stylemind.commerce.repository.order.OrderRepository;
 import com.stylemind.commerce.repository.order.PaymentEventRepository;
-import com.stylemind.commerce.repository.inventory.InventoryRepository;
+import com.stylemind.commerce.service.order.VariantQuantityService;
 import com.stylemind.commerce.service.order.IdentityAddressClient;
 import com.stylemind.commerce.service.order.OrderService;
 import com.stylemind.commerce.validation.order.OrderRequestValidator;
@@ -63,7 +63,7 @@ public class OrderServiceImpl implements OrderService {
     private final CancellationRepository cancellationRepository;
     private final com.stylemind.commerce.repository.order.CancellationRefundRepository cancellationRefunds;
     private final PaymentEventRepository paymentEventRepository;
-    private final InventoryRepository inventory;
+    private final VariantQuantityService quantityService;
     private final IdentityAddressClient identityAddressClient;
     private final ApplicationEventPublisher events;
     private final com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
@@ -240,7 +240,7 @@ public class OrderServiceImpl implements OrderService {
                     paymentMethod, total, now);
             Map<UUID, Integer> requested = items.stream().collect(Collectors.toMap(
                     CartItem::variantId, CartItem::quantity));
-            if (!inventory.allocate(orderId, paymentMethod, requested, now)) {
+            if (!quantityService.allocate(requested)) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "INSUFFICIENT_STOCK",
                         "One or more cart quantities exceed available stock");
             }
@@ -305,7 +305,8 @@ public class OrderServiceImpl implements OrderService {
                     "Order status changed concurrently");
         }
         if (command.orderStatus() == OrderStatus.CANCELLED) {
-            inventory.releaseForCancellation(orderId, now);
+            quantityService.restoreCancelledOrder(orderId);
+            qrCheckouts.releaseCancelledOrderItems(orderId);
         }
         return response(detail(findSummary(orderId).orElseThrow()));
     }
@@ -346,7 +347,8 @@ public class OrderServiceImpl implements OrderService {
         if (updateStatus(orderId, current, OrderStatus.CANCELLED, customerId, reason, now) != 1) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED", "Order status changed concurrently");
         }
-        inventory.releaseForCancellation(orderId, now);
+        quantityService.restoreCancelledOrder(orderId);
+        qrCheckouts.releaseCancelledOrderItems(orderId);
         cancellationRepository.findLockedByOrderIdAndRequestStatus(orderId, CancellationStatus.PENDING.name())
                 .ifPresent(request -> {
                     request.setRequestStatus(CancellationStatus.APPROVED.name());
@@ -402,7 +404,8 @@ public class OrderServiceImpl implements OrderService {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED",
                         "Order status changed concurrently");
             }
-            inventory.releaseForCancellation(order.orderId(), now);
+            quantityService.restoreCancelledOrder(order.orderId());
+            qrCheckouts.releaseCancelledOrderItems(order.orderId());
         }
         if (reviewCancellation(requestId, command.requestStatus(), reviewerId,
                 command.decisionReason(), OffsetDateTime.now()) != 1) {

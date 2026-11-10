@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETE",
+  "products": 200,
+  "expected_images": 1337,
+  "uploaded_images": 1337,
+  "failures": [],
+  "source_sha256": "9d27decf94277f45685a4ffbd62869e0bbd2de982444516b141fdd40017f6cf3",
+  "uploaded_bytes": 294047229,
+  "database_touched": false,
+  "visual_matching_verified": false,
+  "updated_at": "2026-11-09T17:06:53.185Z"
+}

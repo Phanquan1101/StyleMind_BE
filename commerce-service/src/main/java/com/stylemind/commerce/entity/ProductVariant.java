@@ -19,5 +19,6 @@ public class ProductVariant {
     @Column(columnDefinition = "text") private String color;
     @Column(columnDefinition = "text") private String material;
     @Column(name = "unit_price_vnd", nullable = false) private long unitPriceVnd;
+    @Column(nullable = false) private int quantity;
     @Column(name = "variant_status", nullable = false, columnDefinition = "text") private String variantStatus;
 }

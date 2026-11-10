@@ -1,0 +1,32 @@
+sequenceDiagram
+    actor Customer
+    participant Gateway
+    participant Stylist as Stylist API and services
+    participant PG as Disposable PostgreSQL
+    participant Qdrant
+    participant Commerce as Commerce HTTP contract fixture
+    participant Neo4j
+    participant Gemini as Gemini Developer API
+
+    Customer->>Gateway: Create session
+    Gateway->>Stylist: POST session
+    Stylist->>PG: Persist session
+    Customer->>Gateway: Submit needs and constraints
+    Gateway->>Stylist: POST request
+    Stylist->>PG: Persist request as RECEIVED
+    Customer->>Gateway: Generate with empty body
+    Gateway->>Stylist: POST generate
+    Stylist->>PG: Claim generation; enforce owner and lifecycle
+    Stylist->>Gemini: Embed query (1536 dimensions)
+    Stylist->>Qdrant: Retrieve synthetic catalog candidates
+    Stylist->>Commerce: Hydrate candidate product/variant data
+    Stylist->>Neo4j: Read reviewed synthetic styling facts
+    Stylist->>Stylist: P02 filter, budget, TOP+BOTTOM, whitelist
+    Stylist->>Gemini: Count tokens and structured generation
+    Gemini-->>Stylist: Structured response
+    Stylist->>Stylist: Parse, validate aliases and hard rules
+    Stylist->>Commerce: Final current price/status recheck
+    Stylist->>PG: Atomically persist SUCCEEDED + recommendation + 2 items
+    Customer->>Gateway: Read list/detail or replay generation
+    Gateway->>Stylist: GET or repeated POST generate
+    Stylist->>PG: Read persisted result; terminal replay makes no provider call

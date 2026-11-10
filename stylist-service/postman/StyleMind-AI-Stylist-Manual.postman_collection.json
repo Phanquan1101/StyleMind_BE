@@ -1,0 +1,219 @@
+{
+  "info": {
+    "_postman_id": "2c41f066-124d-4c83-8cdf-397f12456ad8",
+    "name": "StyleMind AI Stylist — Manual End-to-End",
+    "description": "Manual, one-request-at-a-time Gateway walkthrough for the existing Stylist AI flow. Uses Customer A for the owned flow and Customer B for isolation checks. Do not use Collection Runner. Generation is guarded by allowProviderCall=false and may call the configured model if enabled. No credentials or API keys are included.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayBaseUrl", "value": "http://localhost:8080" },
+    { "key": "customerAToken", "value": "" },
+    { "key": "customerBToken", "value": "" },
+    { "key": "allowProviderCall", "value": "false" },
+    { "key": "sessionId", "value": "" },
+    { "key": "requestId", "value": "" },
+    { "key": "recommendationId", "value": "" },
+    { "key": "initialGenerationResponse", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Luồng chính (Customer A)",
+      "item": [
+        {
+          "name": "1. Tạo Stylist session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Manual AI test — Customer A\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Tạo vùng hội thoại thuộc Customer A. Response phải trả session_id; script tự lưu vào environment."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('session được tạo', function () { pm.response.to.have.status(201); var b = pm.response.json(); pm.expect(b.session_id).to.be.a('string'); pm.environment.set('sessionId', b.session_id); });",
+            "pm.test('response không cache', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "2. Gửi nhu cầu và tiêu chí (chưa chạy AI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Tôi cần một bộ đồ nữ để đi làm, phong cách tối giản, màu trung tính và thoải mái.\",\n  \"occasion\": \"đi làm\",\n  \"intended_use\": \"Đi làm văn phòng\",\n  \"style_context\": \"Tối giản, màu trung tính, dễ vận động.\",\n  \"general_weather_context\": \"Thời tiết nóng, phù hợp đi lại trong thành phố.\",\n  \"max_budget_vnd\": 1500000,\n  \"budget_is_hard\": true,\n  \"constraints\": []\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Khách nhập nhu cầu, dịp, phong cách, thời tiết và ngân sách. Khách không chọn sẵn TOP/BOTTOM hay sản phẩm. Intake chỉ lưu request; chưa gọi model. Có thể sửa ngân sách theo dữ liệu catalog local đang có."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('request được lưu ở RECEIVED, generation chưa bắt đầu', function () { pm.response.to.have.status(201); var b = pm.response.json(); pm.expect(b.request_id).to.be.a('string'); pm.expect(b.session_id).to.eql(pm.environment.get('sessionId')); pm.expect(b.request_status).to.eql('RECEIVED'); pm.expect(b.generation_started).to.eql(false); pm.environment.set('requestId', b.request_id); });",
+            "pm.test('intake không cache dữ liệu cá nhân', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "3. Đọc lại request trước khi Generate",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Xác nhận request và constraint đã lưu đúng, đồng thời vẫn RECEIVED. Endpoint GET này không chạy AI."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('đọc đúng request chưa Generate', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(b.request_id).to.eql(pm.environment.get('requestId')); pm.expect(b.session_id).to.eql(pm.environment.get('sessionId')); pm.expect(b.request_status).to.eql('RECEIVED'); pm.expect(b.generation_started).to.eql(false); pm.expect(b.max_budget_vnd).to.eql(1500000); pm.expect(b.budget_is_hard).to.eql(true); pm.expect(b.constraints).to.be.an('array'); });",
+            "pm.test('response không cache', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "4. Đọc session message history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/messages?limit=20",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Kiểm tra API lịch sử session. Request tạo từ bước 2 không mặc định trở thành chat message; API này chỉ đọc những message thực sự đã được lưu."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('history trả page hợp lệ', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(b.items).to.be.an('array'); pm.expect(b).to.have.property('next_cursor'); });",
+            "pm.test('response không cache', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "5. Safety check — từ chối field model do client truyền",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"model\": \"client-must-not-select-model\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Không mở quyền chọn model/provider ở client. Strict converter phải từ chối body thừa trước khi chạm provider; dự kiến 400 INVALID_REQUEST. Chạy trước request Generate thật."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('field ngoài contract bị từ chối', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().code).to.eql('INVALID_REQUEST'); });",
+            "pm.test('response không cache', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "6. Generate đúng một lần (có thể gọi AI provider)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Chỉ gửi sau khi bạn xác nhận runtime/provider, catalog/index/knowledge và ngân sách call. Body bắt buộc là {}. Guard allowProviderCall mặc định false để tránh bấm nhầm. Gửi đúng một lần; nếu lỗi thì dừng, không retry cùng request."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "if (pm.environment.get('allowProviderCall') !== 'true') {",
+              "  console.warn('Generate is blocked. Set allowProviderCall=true only after confirming the runtime mode and approved call budget.');",
+              "  pm.execution.skipRequest();",
+              "}"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('generation trả terminal result', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(b.request_status).to.be.oneOf(['SUCCEEDED', 'NO_RESULT']); pm.expect(b.request_id).to.eql(pm.environment.get('requestId')); pm.expect(b.limitations).to.be.an('array'); pm.environment.set('initialGenerationResponse', JSON.stringify(b)); pm.environment.set('firstGenerationStatus', b.request_status); if (b.request_status === 'SUCCEEDED') { pm.expect(b.recommendations).to.be.an('array').and.to.have.length.within(1, 3); var ids = []; b.recommendations.forEach(function (r) { ids.push(r.recommendation_id); pm.expect(r.explanation).to.be.a('string').and.not.empty; pm.expect(r.styling_tips).to.be.a('string').and.not.empty; pm.expect(r.generated_at).to.be.a('string'); pm.expect(r.items).to.have.length(2); var ordered = r.items.slice().sort(function (a, z) { return a.display_order - z.display_order; }); pm.expect(ordered.map(function (i) { return i.slot_name; })).to.eql(['TOP', 'BOTTOM']); ordered.forEach(function (i) { pm.expect(i.source_type).to.eql('SHOP_VARIANT'); pm.expect(i.shop_variant_id).to.be.a('string'); pm.expect(i.selection_reason).to.be.a('string').and.not.empty; pm.expect(i.display_order).to.be.a('number'); }); }); pm.environment.set('recommendationIds', JSON.stringify(ids)); pm.environment.set('recommendationId', ids[0]); } else { pm.expect(b.recommendations).to.eql([]); pm.environment.unset('recommendationId'); pm.environment.set('recommendationIds', '[]'); } });",
+              "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "7. Đọc kết quả đã lưu theo request",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/recommendations",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Đọc persistence đã ghi, không khởi chạy generation. API GET và generation dùng DTO hơi khác nhau: GET có thể có wardrobe_item_id; phép so sánh chỉ kiểm tra các trường bất biến chung theo contract."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('read-back khớp dữ liệu Generate bất biến', function () { pm.response.to.have.status(200); var b = pm.response.json(); var first = JSON.parse(pm.environment.get('initialGenerationResponse') || 'null'); pm.expect(first, 'run request 6 first').to.not.equal(null); pm.expect(b.request_id).to.eql(first.request_id); pm.expect(b.request_status).to.eql(first.request_status); pm.expect(b.recommendations).to.be.an('array'); function common(r) { return { recommendation_id: r.recommendation_id, explanation: r.explanation, styling_tips: r.styling_tips, generated_at: r.generated_at, items: r.items.map(function (i) { return { source_type: i.source_type, shop_variant_id: i.shop_variant_id, slot_name: i.slot_name, selection_reason: i.selection_reason, display_order: i.display_order }; }) }; } pm.expect(b.recommendations.map(common)).to.eql(first.recommendations.map(common)); if (b.request_status === 'SUCCEEDED') { b.recommendations.forEach(function (r) { r.items.forEach(function (i) { pm.expect(i.wardrobe_item_id === null || typeof i.wardrobe_item_id === 'undefined').to.eql(true); }); }); } });",
+            "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "8. Đọc chi tiết recommendation (chỉ khi SUCCEEDED)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/recommendations/{{recommendationId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Chỉ chạy nếu bước Generate trả SUCCEEDED. Detail hydrate giá/trạng thái hiện tại từ Commerce; không phải snapshot lịch sử."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('detail trả đúng recommendation và dữ liệu Commerce hiện tại', function () { pm.response.to.have.status(200); var b = pm.response.json(); var first = JSON.parse(pm.environment.get('initialGenerationResponse') || 'null'); pm.expect(first).not.to.equal(null); var expected = first.recommendations.find(function (r) { return r.recommendation_id === pm.environment.get('recommendationId'); }); pm.expect(expected, 'recommendation id exists in Generate response').not.to.equal(undefined); pm.expect(b.recommendation_id).to.eql(expected.recommendation_id); pm.expect(b.request_id).to.eql(first.request_id); pm.expect(b.explanation).to.eql(expected.explanation); pm.expect(b.styling_tips).to.eql(expected.styling_tips); pm.expect(b.generated_at).to.eql(expected.generated_at); pm.expect(b.price_semantics).to.eql('CURRENT_COMMERCE_DATA_NOT_HISTORICAL'); pm.expect(b.items).to.have.length(2); var ordered = b.items.slice().sort(function (a, z) { return a.display_order - z.display_order; }); pm.expect(ordered.map(function (i) { return i.slot_name; })).to.eql(['TOP', 'BOTTOM']); ordered.forEach(function (i, n) { var source = expected.items.find(function (x) { return x.shop_variant_id === i.shop_variant_id; }); pm.expect(source).not.to.equal(undefined); pm.expect(i.source_type).to.eql(source.source_type); pm.expect(i.selection_reason).to.eql(source.selection_reason); pm.expect(i.display_order).to.eql(source.display_order); pm.expect(i.current_availability).to.be.a('string'); }); });",
+            "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "9. Replay terminal Generate (không tạo kết quả mới)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] },
+            "description": "Chỉ chạy sau khi bước 6 đã trả SUCCEEDED hoặc NO_RESULT. Terminal replay phải trả kết quả đã lưu. Test so sánh IDs, nội dung, timestamp và item order; Postman tự nó không đo số provider calls, điều đó chỉ được chứng minh bởi harness/integration evidence."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "var first = pm.environment.get('initialGenerationResponse');",
+              "var status = pm.environment.get('firstGenerationStatus');",
+              "if (!first || !['SUCCEEDED', 'NO_RESULT'].includes(status)) { console.warn('Replay requires a terminal result captured from request 6.'); pm.execution.skipRequest(); }"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('replay trả đúng terminal result đã lưu', function () { pm.response.to.have.status(200); var b = pm.response.json(); var first = JSON.parse(pm.environment.get('initialGenerationResponse')); pm.expect(b.request_id).to.eql(first.request_id); pm.expect(b.request_status).to.eql(first.request_status); pm.expect(b.limitations).to.eql(first.limitations); function common(r) { return { recommendation_id: r.recommendation_id, explanation: r.explanation, styling_tips: r.styling_tips, generated_at: r.generated_at, items: r.items.map(function (i) { return { source_type: i.source_type, shop_variant_id: i.shop_variant_id, slot_name: i.slot_name, selection_reason: i.selection_reason, display_order: i.display_order }; }) }; } pm.expect(b.recommendations.map(common)).to.eql(first.recommendations.map(common)); });",
+              "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Kiểm tra quyền sở hữu (Customer B)",
+      "item": [
+        {
+          "name": "10. B không đọc được request của A",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/recommendations",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerBToken}}", "type": "string" }] },
+            "description": "Dùng access token của tài khoản B khác A. Hệ thống che request thiếu/không thuộc người gọi bằng 404."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('foreign request bị che bằng 404', function () { pm.response.to.have.status(404); pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'); });",
+            "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        },
+        {
+          "name": "11. B không đọc được detail recommendation của A (chỉ khi A có kết quả)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/recommendations/{{recommendationId}}",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerBToken}}", "type": "string" }] },
+            "description": "Chỉ chạy nếu bước Generate của A trả SUCCEEDED và recommendationId đã được tự lưu. B phải nhận 404 dù có UUID hợp lệ."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('foreign recommendation bị che bằng 404', function () { pm.response.to.have.status(404); pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'); });",
+            "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'); });"
+          ] } }]
+        }
+      ]
+    }
+  ]
+}

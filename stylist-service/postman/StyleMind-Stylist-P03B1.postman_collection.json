@@ -1,0 +1,140 @@
+{
+  "info": {
+    "_postman_id": "6c442aea-1b26-4d47-a5e1-374c20b1824b",
+    "name": "StyleMind Stylist — P03-B1 Request Intake",
+    "description": "Stores owner-scoped styling requests as RECEIVED. No generation, owned context, provider or LLM is invoked. Requires the existing Gateway and a Stylist runtime backed by a disposable database with V1 and V2 applied.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayBaseUrl", "value": "http://localhost:8080" },
+    { "key": "customerAToken", "value": "" },
+    { "key": "customerBToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "requestId", "value": "" },
+    { "key": "sourceMessageId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create a session as Customer A",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"P03-B1 Postman request\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('session created', function () { pm.response.to.have.status(201); });",
+        "pm.test('session id stored', function () { var body = pm.response.json(); pm.expect(body.session_id).to.be.a('string'); pm.environment.set('sessionId', body.session_id); });"
+      ] } }]
+    },
+    {
+      "name": "2. Submit a request as Customer A (no generation)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"message\": \"Tôi cần một bộ đi làm gọn gàng.\",\n  \"occasion\": \"đi làm\",\n  \"style_context\": \"tối giản\",\n  \"max_budget_vnd\": 850000,\n  \"budget_is_hard\": true,\n  \"constraints\": [\n    {\n      \"constraint_kind\": \"EXCLUDE_COLOR\",\n      \"text_value\": \"RED\",\n      \"is_hard\": true\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('request stored only', function () { pm.response.to.have.status(201); var body = pm.response.json(); pm.expect(body.request_status).to.eql('RECEIVED'); pm.expect(body.generation_started).to.eql(false); pm.environment.set('requestId', body.request_id); pm.environment.set('sourceMessageId', body.source_message_id); });",
+        "pm.test('no-store and resource Location', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); pm.expect(pm.response.headers.get('Location')).to.include('/requests/'); });"
+      ] } }]
+    },
+    {
+      "name": "3. Reference the USER message without copying it",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"source_message_id\": \"{{sourceMessageId}}\",\n  \"style_context\": \"minimal\",\n  \"constraints\": []\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('existing USER message is referenced', function () { pm.response.to.have.status(201); var body = pm.response.json(); pm.expect(body.source_message_id).to.eql(pm.environment.get('sourceMessageId')); pm.expect(body.request_status).to.eql('RECEIVED'); pm.expect(body.generation_started).to.eql(false); });"
+      ] } }]
+    },
+    {
+      "name": "4. Read Customer A's request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('request belongs to A and remains RECEIVED', function () { pm.response.to.have.status(200); var body = pm.response.json(); pm.expect(body.request_id).to.eql(pm.environment.get('requestId')); pm.expect(body.request_status).to.eql('RECEIVED'); pm.expect(body.generation_started).to.eql(false); pm.expect(body.constraints).to.have.length(1); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "5. Customer B cannot read Customer A's request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerBToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('foreign request is concealed as not found', function () { pm.response.to.have.status(404); pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "6. Admin cannot read Customer A's request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Admin remains self-only', function () { pm.response.to.have.status(404); pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'); });"
+      ] } }]
+    },
+    {
+      "name": "7. Reject GET body on encoded request route",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/%72equests/{{requestId}}",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('encoded MVC route uses the GET body policy', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().code).to.eql('INVALID_REQUEST'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "8. Reject a Unicode-whitespace-only message",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"message\": \"\\u00a0\\u202f\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Unicode blank message is rejected', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().code).to.eql('INVALID_REQUEST'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "9. Reject NUL in weather context safely",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"message\": \"NUL safety check\",\n  \"occasion\": \"work\",\n  \"general_weather_context\": \"hot\\u0000today\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('NUL is rejected as invalid input, not a server failure', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().code).to.eql('INVALID_REQUEST'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # StyleMind Backend
 
+AI Stylist work starts at [the EP-07 planning index](docs/planning/stylist/README.md). Owner Prompt 08 (2026-10-29) approves exactly TOP+BOTTOM for P02 and the partial P03-A session/history slice; see the [P03-A handover](docs/planning/stylist/EP-07_P03A_SESSION_HISTORY_REPORT.md). P03, US-07.01 and EP-07 remain incomplete. Run `node scripts/verify-stylist-planning.cjs` before an EP-07 slice and read `stylist-service/AGENTS.md`.
+
 For service boundaries, code-layer responsibilities and the current folder tree of all six services plus API Gateway, see [Service Architecture and Folder Layout](docs/architecture/SERVICE_ARCHITECTURE_AND_LAYOUT.md).
 
 Six independent Spring Boot services form the backend. Client-facing requests use the API Gateway at `http://localhost:8080`. The Gateway forwards currently implemented public Identity routes without changing their contracts; Identity calls Notification internally through Spring Cloud OpenFeign. Identity has Flyway migrations V1–V3 and implements EP-02 Register, Login, Refresh/Logout, Forgot Password, Profile, Address, and Manage Users flows. Other business APIs remain outside this scope.

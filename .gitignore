@@ -1,4 +1,5 @@
 target/
+stylist-service/local-runtime/
 *.class
 *.log
 .idea/

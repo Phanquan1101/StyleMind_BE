@@ -1,0 +1,155 @@
+{
+  "info": {
+    "_postman_id": "ff4c6e87-1556-48b9-90c3-94e87c845fed",
+    "name": "StyleMind Stylist — Wave 2 Generation and Recommendations",
+    "description": "Gateway collection for P03-B1 intake, Wave 2 generation, owner-scoped recommendation reads, and negative checks. Requires real local services and approved runtime catalog/provider configuration for a successful generation. No token or secret is embedded.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayBaseUrl", "value": "http://localhost:8080" },
+    { "key": "customerAToken", "value": "" },
+    { "key": "customerBToken", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "requestId", "value": "" },
+    { "key": "recommendationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create session as Customer A",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Wave 2 Postman run\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('session created', function () { pm.response.to.have.status(201); });",
+        "pm.test('session id stored', function () { var b = pm.response.json(); pm.expect(b.session_id).to.be.a('string'); pm.environment.set('sessionId', b.session_id); });"
+      ] } }]
+    },
+    {
+      "name": "2. Intake request as Customer A (must remain RECEIVED)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"message\": \"Tôi cần một bộ đi làm gọn gàng, màu trung tính.\",\n  \"occasion\": \"đi làm\",\n  \"style_context\": \"tối giản\",\n  \"max_budget_vnd\": 850000,\n  \"budget_is_hard\": true,\n  \"constraints\": []\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('intake stores only', function () { pm.response.to.have.status(201); var b = pm.response.json(); pm.expect(b.request_status).to.eql('RECEIVED'); pm.expect(b.generation_started).to.eql(false); pm.environment.set('requestId', b.request_id); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "3. Generate recommendations (one attempt)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('generation returned a terminal success/no-result response', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(['SUCCEEDED','NO_RESULT']).to.include(b.request_status); pm.expect(b).to.have.property('limitations'); if (b.request_status === 'SUCCEEDED') { pm.expect(b.recommendations.length).to.be.within(1,3); pm.environment.set('recommendationId', b.recommendations[0].recommendation_id); } else { pm.expect(b.recommendations).to.eql([]); } });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "4. Read request and stored recommendations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/recommendations",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('owner can read persisted status', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(b.request_id).to.eql(pm.environment.get('requestId')); pm.expect(['SUCCEEDED','NO_RESULT','FAILED','PROCESSING','RECEIVED']).to.include(b.request_status); pm.expect(b.recommendations).to.be.an('array'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "5. Read recommendation detail (run after SUCCEEDED)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/recommendations/{{recommendationId}}",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('detail shows stored explanation and current Commerce semantics', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(b.recommendation_id).to.eql(pm.environment.get('recommendationId')); pm.expect(b.price_semantics).to.eql('CURRENT_COMMERCE_DATA_NOT_HISTORICAL'); pm.expect(b.items).to.have.length(2); pm.expect(b.items.map(function (i) { return i.slot_name; })).to.eql(['TOP','BOTTOM']); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "6. Customer B cannot read Customer A request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/recommendations",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerBToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('foreign request is concealed as 404', function () { pm.response.to.have.status(404); pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "7. Reject extra generate fields",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"model\": \"caller-controlled\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('unknown generation input is rejected before provider work', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().code).to.eql('INVALID_REQUEST'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "8. Replay terminal generation without another model call",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{requestId}}/generate",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('terminal response replays stored result', function () { pm.response.to.have.status(200); var b = pm.response.json(); pm.expect(['SUCCEEDED','NO_RESULT']).to.include(b.request_status); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "9. Intake 2,000 Vietnamese code points for token-budget regression",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"message\": \"{{longVietnameseMessage}}\",\n  \"occasion\": \"đi làm\",\n  \"constraints\": []\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/requests",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('the documented Unicode code-point limit is accepted at intake', function () { pm.response.to.have.status(201); var b = pm.response.json(); pm.expect(b.request_status).to.eql('RECEIVED'); pm.expect(b.generation_started).to.eql(false); pm.environment.set('budgetRequestId', b.request_id); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    },
+    {
+      "name": "10. Reject over-budget assembled input before chat generation",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/requests/{{budgetRequestId}}/generate",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerAToken}}", "type": "string" }] }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('provider token preflight returns bounded input error', function () { pm.response.to.have.status(413); pm.expect(pm.response.json().code).to.eql('GENERATION_INPUT_TOO_LARGE'); });",
+        "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+      ] } }]
+    }
+  ]
+}

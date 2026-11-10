@@ -23,7 +23,7 @@ class QrCheckoutMigrationPostgresTests {
         var jdbc = new JdbcTemplate(source);
         UUID order = UUID.randomUUID(), owner = UUID.randomUUID();
         jdbc.update("INSERT INTO customer_order(order_id,order_number,customer_id,checkout_key,order_status,payment_method,accepted_total_vnd,placed_at) VALUES (?,'LEGACY',?,'legacy-key','PLACED','COD',10000,now())", order, owner);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("12").load().migrate().migrationsExecuted).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, order)).isEqualTo("PLACED");
         insert(jdbc, owner, "new-key");
         assertThatThrownBy(() -> insert(jdbc, owner, "new-key")).isInstanceOf(DataIntegrityViolationException.class);

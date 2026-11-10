@@ -1,0 +1,211 @@
+{
+    "status":  "FILTERED_SOURCE_DATA_NOT_AN_APPLICATION_SEED",
+    "selection":  "Source Clothing taxonomy descendants, excluding explicit male/child titles; original variants retained, including out-of-stock variants. Unisex retained for review.",
+    "source_sha256":  "A061EE0B9EDEBB6CCACA4369FCF82CE496E40F5000C25E578FEE5F212C91FD22",
+    "selected_products":  2273,
+    "selected_variants":  17256,
+    "selected_in_stock_variants":  12660,
+    "excluded_products":  665,
+    "selected_duplicate_title_groups":  38,
+    "gender_age_wording_review_count":  6,
+    "category_counts":  [
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Dresses",
+                                "count":  671
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outfit Sets",
+                                "count":  224
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops",
+                                "count":  180
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Sweaters",
+                                "count":  151
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e One-Pieces",
+                                "count":  149
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Blouses",
+                                "count":  101
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Tank Tops",
+                                "count":  82
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Cover Ups",
+                                "count":  78
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Shorts \u003e Short Trousers",
+                                "count":  63
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Hoodies",
+                                "count":  50
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets",
+                                "count":  47
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Trousers",
+                                "count":  47
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e T-Shirts",
+                                "count":  42
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Skirts",
+                                "count":  40
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Sweatshirts",
+                                "count":  40
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Cardigans",
+                                "count":  32
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Shorts",
+                                "count":  27
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Classic Bikinis",
+                                "count":  27
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Bodysuits",
+                                "count":  26
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Shorts \u003e Denim Shorts",
+                                "count":  26
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Leggings",
+                                "count":  23
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Shirts",
+                                "count":  19
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Pajamas",
+                                "count":  18
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Nightgowns",
+                                "count":  14
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Track Pants",
+                                "count":  13
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e One-Piece Swimsuits",
+                                "count":  8
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Socks \u003e Crew Socks",
+                                "count":  8
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Sweatpants",
+                                "count":  7
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Skorts",
+                                "count":  7
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Vests",
+                                "count":  6
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Sports Bras",
+                                "count":  6
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swim Boxers",
+                                "count":  5
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Lingerie \u003e Shapewear \u003e Bodysuits",
+                                "count":  5
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Sport Jackets",
+                                "count":  5
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing",
+                                "count":  4
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swimwear Tops",
+                                "count":  4
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Overcoats",
+                                "count":  3
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Ponchos",
+                                "count":  3
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Robes",
+                                "count":  2
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swim Dresses",
+                                "count":  2
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Trucker Jackets",
+                                "count":  2
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Windbreakers",
+                                "count":  1
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Socks \u003e Knee Socks",
+                                "count":  1
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Leggings",
+                                "count":  1
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Cargo Pants",
+                                "count":  1
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Traditional \u0026 Ceremonial Clothing \u003e Kimonos",
+                                "count":  1
+                            },
+                            {
+                                "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Tunics",
+                                "count":  1
+                            }
+                        ],
+    "limitations":  [
+                        "No visual image/product/color matching performed.",
+                        "Remote image URLs were not fetched or checked for availability.",
+                        "Vendor is preserved as source information, not assumed to be a brand.",
+                        "No USD to VND conversion or inventory quantities invented.",
+                        "in_stock is not a stock quantity.",
+                        "Same titles are flagged for review, not automatically merged.",
+                        "Scope uses source taxonomy; category accuracy and gender have not been visually verified.",
+                        "No application data, seed, schema or database was changed."
+                    ]
+}

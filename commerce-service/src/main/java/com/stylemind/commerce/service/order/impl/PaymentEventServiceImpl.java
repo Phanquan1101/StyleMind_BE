@@ -5,7 +5,6 @@ import com.stylemind.commerce.dto.order.PaymentConfirmedEvent;
 import com.stylemind.commerce.dto.order.PaymentEventReceipt;
 import com.stylemind.commerce.errors.ApiOperationException;
 import com.stylemind.commerce.repository.order.PaymentEventRepository;
-import com.stylemind.commerce.repository.inventory.InventoryRepository;
 import com.stylemind.commerce.service.order.PaymentEventService;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -20,13 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentEventServiceImpl implements PaymentEventService {
     private final PaymentEventRepository repository;
     private final ObjectMapper mapper;
-    private final InventoryRepository inventory;
     private final com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
     private final com.stylemind.commerce.client.payment.PaymentClient paymentClient;
     public PaymentEventServiceImpl(PaymentEventRepository repository, ObjectMapper mapper,
-            InventoryRepository inventory, com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts,
+            com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts,
             com.stylemind.commerce.client.payment.PaymentClient paymentClient) {
-        this.repository = repository; this.mapper = mapper; this.inventory = inventory;
+        this.repository = repository; this.mapper = mapper;
         this.qrCheckouts = qrCheckouts; this.paymentClient = paymentClient;
     }
     @Transactional
@@ -95,7 +93,6 @@ public class PaymentEventServiceImpl implements PaymentEventService {
             } else if (!"PENDING_PAYMENT".equals(order.get().status())) {
                 reason = "ORDER_NOT_PAYABLE";
             } else {
-                inventory.consumeSepay(event.order_id(), OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
                 repository.paid(event, now);
                 outcome = "APPLIED"; reason = "PAYMENT_CONFIRMED";
             }

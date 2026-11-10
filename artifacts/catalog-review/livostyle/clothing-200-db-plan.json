@@ -1,0 +1,11 @@
+{
+  "products": 200,
+  "variants": 2705,
+  "image_assets": 1337,
+  "variant_images": 18865,
+  "brand": "Livostyle Catalog",
+  "inventory_on_hand_per_new_variant": 0,
+  "image_association": "SHARED_PRODUCT_GALLERY_NOT_COLOR_SPECIFIC",
+  "source_sha256": "32855c7cadd5c80e86f175d01cfe74b4230623b8a9097e91ef359396bc824a1c",
+  "database_touched": false
+}

@@ -1,0 +1,2 @@
+category_id,category_name,slug,category_status,observed_product_count,proposed_slot,mapping_status,review_status,evidence_or_reason,ambiguity
+,,,NOT_OBSERVED,NOT_OBSERVED,NEEDS_REVIEW,NOT_OBSERVED,NEEDS_REVIEW,"Gateway/product GET returned curl exit 28 and HTTP 000. The existing Commerce container has seed enabled and was not started. No category rows were observed; this is a sentinel, not a Commerce category record.","No category IDs, names, slugs, or product counts were verified; no TOP/BOTTOM mapping can be proposed."

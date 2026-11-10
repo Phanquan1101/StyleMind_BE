@@ -1,0 +1,109 @@
+{
+  "verified_at": "2026-11-09T19:38:35.9000081+07:00",
+  "status": "CATALOG_AND_JAR_PREPARED_NO_LIVE_EXECUTION",
+  "commerce_demo": {
+    "postgres_port": 56624,
+    "database": "stylemind_commerce_semantic10",
+    "container": "stylemind-semantic10-20261109-193059-pg",
+    "distinct_product_ids": 10,
+    "jar": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\commerce-service\\target\\semantic-demo-20261109-193059\\commerce-service-semantic10-20261109-193059.jar",
+    "active_variants": 10,
+    "base_url": "http://127.0.0.1:18093",
+    "pid": 25128,
+    "products": 10
+  },
+  "previous_commerce_preserved": {
+    "api_products": 4,
+    "base_url": "http://127.0.0.1:18083",
+    "read_only_diagnosis": {
+      "variants": 2120,
+      "INACTIVE": 377,
+      "ACTIVE": 4
+    }
+  },
+  "stylist": {
+    "generation_model": "gemini-3.5-flash-lite",
+    "catalog_import_enabled": "false",
+    "provider": "gemini",
+    "port": 18085,
+    "old_pid": 34564,
+    "jar_sha256": "F55D67EC4E95BED325B19CCADBA816B606253EA24BE1DCAA868E3BD93B99A0E9",
+    "mock_enabled": "false",
+    "safe_command_line": "\"C:\\Program Files\\Java\\jdk-21\\bin\\java.exe\" -Djavax.net.ssl.trustStore=C:\\Users\\FPTSHOP\\AppData\\Local\\Temp\\stylemind-live-meter-20261109-183331\\meter-live-truststore.p12 -Djavax.net.ssl.trustStorePassword=[REDACTED] -Djavax.net.ssl.trustStoreType=PKCS12 -jar C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\stylist-service\\target\\semantic-demo-20261109-193059\\stylist-service-semantic10-20261109-193059.jar --spring.config.additional-location=file:///C:/Users/FPTSHOP/Desktop/StyleMind_BE/stylist-service/target/semantic-demo-20261109-193059/stylist-semantic10.properties --stylemind.ai.provider=gemini --stylemind.gemini.live-calls-enabled=false --stylemind.gemini.mock.enabled=false --stylemind.stylist.catalog.import-enabled=false",
+    "allowlist_count": 10,
+    "commerce_target": "http://127.0.0.1:18093",
+    "ddl_auto": "validate",
+    "profile": "default",
+    "direct_health": "UP",
+    "live_calls_enabled": "false",
+    "flyway_enabled": "false",
+    "gateway_health": "UP",
+    "jar": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\stylist-service\\target\\semantic-demo-20261109-193059\\stylist-service-semantic10-20261109-193059.jar",
+    "new_pid": 10028
+  },
+  "stylist_database": {
+    "unchanged": true,
+    "row_counts_after": [
+      "BEGIN",
+      "sessions|24",
+      "requests|24",
+      "recommendations|14",
+      "items|28",
+      "COMMIT"
+    ],
+    "row_counts_before": [
+      "BEGIN",
+      "sessions|24",
+      "requests|24",
+      "recommendations|14",
+      "items|28",
+      "COMMIT"
+    ],
+    "url": "jdbc:postgresql://127.0.0.1:55544/stylemind_stylist"
+  },
+  "qdrant": {
+    "import_executed": false,
+    "new_alias_exists": false,
+    "old_point_count": 17,
+    "old_aliases": [
+      {
+        "alias_name": "stylemind_stylist_runtime_gemini_local",
+        "collection_name": "stylemind_stylist_catalog_3faa327f8d8d4581b91e0c576390e8c4"
+      }
+    ],
+    "url": "http://127.0.0.1:55546"
+  },
+  "gemini_meter": {
+    "ready": true,
+    "calls": {
+      "metadata": 0,
+      "embedding": 18,
+      "tokenCount": 33,
+      "generation": 9,
+      "blocked": 3
+    },
+    "limits": {
+      "embedding": 20,
+      "tokenCount": 35,
+      "generation": 9
+    },
+    "profile": "EP07_OWNER_LIVE_CHROME_20261109",
+    "upstreamTimeoutMs": 30000,
+    "stoppedOn429": false
+  },
+  "verification": {
+    "importer_tests": "3 passed, 0 failures/errors/skipped; includes rejection of multiple variants from one product",
+    "stylist_versioned_build": "SUCCESS",
+    "commerce_versioned_build": "SUCCESS",
+    "stylist_standard_jar_build": "SUCCESS",
+    "embedding": "NOT RUN",
+    "generation": "NOT RUN",
+    "image_gets": "10/10 HTTP 200; JPEG decoded format verified"
+  },
+  "git": {
+    "planning_fingerprints_changed": false,
+    "commit_or_push": false,
+    "head": "96cdc04edef6208178f7ff9a298c24f535bfcc03",
+    "branch": "feature/ep-07-ai-stylist"
+  }
+}
