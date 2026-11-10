@@ -20,6 +20,7 @@ fs.mkdirSync(runtime, { recursive: true });
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const save = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const shaCanonicalText = bytes => sha(Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8'));
 const vectorSha = vector => { const bytes = Buffer.alloc(vector.length * 4); vector.forEach((n, i) => bytes.writeFloatLE(n, i * 4)); return sha(bytes); };
 const stateFile = path.join(runtime, 'state.json');
 const secret = () => crypto.randomBytes(24).toString('base64url');
@@ -105,9 +106,9 @@ async function build(service) {
 }
 function validateBundle() {
   const bundle = read(path.join(dataDir, 'bundle.json'));
-  for (const [file, expected] of Object.entries(bundle.files)) assert.equal(sha(fs.readFileSync(path.join(dataDir, file))), expected, 'Bundle checksum mismatch: ' + file);
+  for (const [file, expected] of Object.entries(bundle.files)) assert.equal(shaCanonicalText(fs.readFileSync(path.join(dataDir, file))), expected, 'Bundle checksum mismatch: ' + file);
   const provenanceFile = path.join(root, bundle.embedding_provenance);
-  assert.equal(sha(fs.readFileSync(provenanceFile)), bundle.embedding_provenance_sha256, 'REAL embedding provenance changed');
+  assert.equal(shaCanonicalText(fs.readFileSync(provenanceFile)), bundle.embedding_provenance_sha256, 'REAL embedding provenance changed');
   const provenance = read(provenanceFile);
   const archive = read(path.join(dataDir, 'qdrant-points.json'));
   const candidates = archive.points.filter(p => p.payload.record_type === 'CATALOG_CANDIDATE');

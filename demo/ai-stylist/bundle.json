@@ -2,7 +2,7 @@
   "version": 1,
   "scope": "PRIVATE_STYLEMIND_TEAM_LOCAL_DEMO",
   "embedding_provenance": "reports/gemini-10-product-demo/real10-embedding-verification.json",
-  "embedding_provenance_sha256": "aa1870efd6eb73f0b2765c277b72bb24e00f4a3f9a678e2bacc112892a2de70c",
+  "embedding_provenance_sha256": "cbd0982323b86ea3047ec9f9b247b7b824fa4ca8f366beafb0536a590df4dd94",
   "provider": "gemini",
   "model": "gemini-embedding-001",
   "dimensions": 1536,
@@ -18,8 +18,8 @@
   "files": {
     "qdrant-points.json": "c12c013217495d534fc7d374b76baeda93ba6393980ceca73a7ae2256745161e",
     "commerce-manifest.json": "2b9e58d1b251b2e766d4650653330e8f00e9c7acb635d04d5c38cf5ce714d33e",
-    "commerce-seed.sql": "9d28d20fe5713808b9630b80d88fddb9b00063d6f87764cc5771c8cb45570c92",
-    "catalog-policy.json": "6beb42b35bb9a95ea16896814267015300745d0aa158b87d7e53c4dc4b5c0c99",
+    "commerce-seed.sql": "aaee18ce63be71b8f4baa32e9d885d9b3db0ce601a9bbc4ebefe665e8771db6f",
+    "catalog-policy.json": "0771c004d96d9f1d7710a8ec6ff0d5b6bf1dd51e0d2dbeb4cbc2c00e358d51ad",
     "knowledge-artifact.json": "072bc96f9ac75c09e0b8c3e220e622d821f48fcf52c7da0e13290b02976ac381"
   },
   "vector_hashes": {

@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'demo', 'ai-stylist');
 const read = name => JSON.parse(fs.readFileSync(path.join(root, name), 'utf8').replace(/^\uFEFF/, ''));
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const shaCanonicalText = bytes => sha(Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8'));
 const vectorSha = vector => { const bytes = Buffer.alloc(vector.length * 4); vector.forEach((n, i) => bytes.writeFloatLE(n, i * 4)); return sha(bytes); };
 
 async function main() {
@@ -51,14 +52,14 @@ async function main() {
   write('bundle.json', {
     version: 1, scope: 'PRIVATE_STYLEMIND_TEAM_LOCAL_DEMO',
     embedding_provenance: 'reports/gemini-10-product-demo/real10-embedding-verification.json',
-    embedding_provenance_sha256: sha(fs.readFileSync(path.join(root, 'reports/gemini-10-product-demo/real10-embedding-verification.json'))),
+    embedding_provenance_sha256: shaCanonicalText(fs.readFileSync(path.join(root, 'reports/gemini-10-product-demo/real10-embedding-verification.json'))),
     provider: 'gemini', model: 'gemini-embedding-001', dimensions: 1536, distance: 'Cosine',
     product_count: 10, top_count: 5, bottom_count: 5, distinct_vectors: 10,
     knowledge_kind: 'EXISTING_SYNTHETIC_DEMO_FIXTURE',
     knowledge_source: 'stylist-service/scripts/wave2-disposable-gateway-harness.cjs:writeArtifacts',
     knowledge_review_note: 'Original synthetic-fixture-only metadata preserved. No claim of human-reviewed fashion knowledge.',
     distribution_note: 'Owner-authorized private team demo only; no grant of public redistribution rights for underlying catalog/images.',
-    files: Object.fromEntries(files.map(name => [name, sha(fs.readFileSync(path.join(output, name)))])),
+    files: Object.fromEntries(files.map(name => [name, shaCanonicalText(fs.readFileSync(path.join(output, name)))])),
     vector_hashes: Object.fromEntries(candidates.map(p => [p.id, vectorSha(p.vector)]))
   });
   console.log('EXPORTED: 10 recorded REAL Gemini vectors, 5 TOP + 5 BOTTOM, no provider calls');
