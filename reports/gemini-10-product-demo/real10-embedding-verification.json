@@ -1,0 +1,99 @@
+{
+  "status": "REAL_EMBEDDINGS_PASS",
+  "verified_at": "2026-11-09T20:18:19.860763+07:00",
+  "alias": "stylemind_stylist_runtime_gemini_demo10_20261109",
+  "physical_collection": "stylemind_stylist_catalog_f89049e6d26a4a38875b2077c8f23cdc",
+  "all_points": 11,
+  "catalog_vectors": 10,
+  "manifest_points": 1,
+  "top": 5,
+  "bottom": 5,
+  "dimensions": 1536,
+  "distance": "Cosine",
+  "unique_catalog_vectors": 10,
+  "matching_old_fixture_vectors": 0,
+  "model": "gemini-embedding-001",
+  "provider": "Google Gemini Developer API",
+  "http_200_embedding_attempts": 10,
+  "http_200_countTokens_attempts": 10,
+  "history_prefix_preserved": true,
+  "vectors": [
+    {
+      "product_id": "3a9eef41-f434-5df9-9660-7399a822a0f7",
+      "variant_id": "3e650983-ead0-5131-918b-7e36ba93dd03",
+      "slot": "BOTTOM",
+      "vector_sha256": "ac71deb781898bb1a23373f3cec4c05eea74667703b1359160edb0f8eb100f89",
+      "l2_norm": 0.9999999979499414
+    },
+    {
+      "product_id": "4956d0a4-4047-5cfc-8597-42427cb69eba",
+      "variant_id": "64b1b82f-f3d6-53cc-ad80-8ce7ddde5b80",
+      "slot": "TOP",
+      "vector_sha256": "d32d1c7fc3f9e860b40628923f6d7f50477a4f13694c5aecd5c66b0846e65e36",
+      "l2_norm": 1.0000000089227754
+    },
+    {
+      "product_id": "004feeaf-fce6-5f83-acb4-88160d84254c",
+      "variant_id": "7682dcc7-79d1-54a2-a1b9-4a3f25948544",
+      "slot": "BOTTOM",
+      "vector_sha256": "5851fab800e7154fc3eb6f440e534c6411b687f1827ac10c15fb156a28cb236d",
+      "l2_norm": 0.9999999952575055
+    },
+    {
+      "product_id": "387d2bf1-6aca-5451-a39a-87514f2232bf",
+      "variant_id": "7ae03113-91cf-5cd5-aa03-8b3938623969",
+      "slot": "BOTTOM",
+      "vector_sha256": "82d517690c1c31d49c65db0f9a9d900459b43fd27af76699ebc03a1a41128c39",
+      "l2_norm": 1.000000006523333
+    },
+    {
+      "product_id": "03e897ee-8d1d-5d21-a30d-e8d08a25b6e1",
+      "variant_id": "885e73e1-039f-53ec-bb20-70dbc1c87631",
+      "slot": "TOP",
+      "vector_sha256": "bd8bef34e5b03b0ed39ddc4c6dd76405e4ee6ba1c71efd449e71733652bf93ce",
+      "l2_norm": 1.0000000055008627
+    },
+    {
+      "product_id": "08bf2573-6515-5e6c-8c22-6acf4e1933c5",
+      "variant_id": "99b31e05-ba2d-5072-9c40-bd9b189e0e71",
+      "slot": "BOTTOM",
+      "vector_sha256": "761bfb4ef872e56656e76231629eee5e2b7262c33c4ece71b6389c8b90f4b14b",
+      "l2_norm": 0.9999999962448332
+    },
+    {
+      "product_id": "0750c0a1-6535-56d2-8d22-1359bdcc4588",
+      "variant_id": "b4c62fa7-071e-5113-9415-4c551cde42e4",
+      "slot": "TOP",
+      "vector_sha256": "0534e337885e98879664d28f7c19261fc0759fd84deb537c69f8563dd2a8dcb3",
+      "l2_norm": 0.9999999970184313
+    },
+    {
+      "product_id": "7e2e725b-2e02-5755-9777-ae018a0208f5",
+      "variant_id": "b6f5262b-8c38-57ac-903f-ce2f47e9e989",
+      "slot": "TOP",
+      "vector_sha256": "7ebd7e369a6b055bc70ee3c99e8621ea3d54c531f35e83757b38f457c1361202",
+      "l2_norm": 0.9999999976903969
+    },
+    {
+      "product_id": "3dd82042-a9e2-5bfb-be35-2db88c9e4931",
+      "variant_id": "bc0ccf46-436e-5e51-8e30-872403241b0d",
+      "slot": "BOTTOM",
+      "vector_sha256": "3f0a3c9e5f32a322b5278541051079fc055b7b9b8e8617b27c19e599fb61c39b",
+      "l2_norm": 1.0000000040771093
+    },
+    {
+      "product_id": "9e213abf-0408-584e-b672-ba5f8af766bc",
+      "variant_id": "fdf90a15-0f39-53ff-8a42-a3d1c5c1ebdb",
+      "slot": "TOP",
+      "vector_sha256": "c2bef9f5424e0897ab961136c608192b288240a1a08505c90b25b9a939888554",
+      "l2_norm": 1.0000000050780804
+    }
+  ],
+  "meter_after_import": {
+    "metadata": 0,
+    "embedding": 28,
+    "tokenCount": 43,
+    "generation": 9,
+    "blocked": 3
+  }
+}

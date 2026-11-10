@@ -1,8 +1,13 @@
 # Current Business Rules
 
+**Owner persistence decision, 2026-10-28:** Use Spring Data JPA/Hibernate for forthcoming Stylist persistence, superseding previous JDBC instructions. Retain Controller -> Service interface/impl -> Repository. Schema/API/P03 implementation are not approved by this framework decision. Do not refactor other services.
+
+**Latest EP-07 owner decision, 2026-10-29 (Prompt 08):** Current Stylist product slots are exactly one women’s TOP and one women’s BOTTOM per outfit. ONE_PIECE, SHOES, ACCESSORY and other slots are excluded. P03-A session/history API and exact two-table V1 are approved for implementation/testing only. This decision supersedes older EP-07 slot and P03 API/schema approval statements below within this scope; all remaining business behavior remains TBD unless separately approved.
+
+
 This is the concise owner-approved Identity rule set for current implementation work. The approvals were stated in the project owner's Register, Login and Forgot Password instructions, including the separate explicit V3/session-policy approval; no new DEC identifier is created here. The local code, migrations and [Identity audit](../qa/identity-audit/20261008T1144-0700/IDENTITY_RELEASE_READINESS_AUDIT.md) are implementation/test evidence, not the source of owner approval. Unknown behavior stays TBD as listed in [open implementation decisions](OPEN_IMPLEMENTATION_DECISIONS.md).
 
-## Register and email verification — US-02.01
+## Register and email verification â€” US-02.01
 
 **CONFIRMED owner rules:**
 
@@ -17,7 +22,7 @@ This is the concise owner-approved Identity rule set for current implementation 
 
 The rule values above are supported by the owner's Register approval and the observed V2 schema, source and audit tests. Current details are documented in [Identity README](../../identity-service/README.md), [V2](../../identity-service/src/main/resources/db/migration/V2__create_email_verification_challenge.sql) and the audit.
 
-## Login — US-02.02
+## Login â€” US-02.02
 
 **CONFIRMED owner rules:**
 
@@ -30,7 +35,7 @@ The rule values above are supported by the owner's Register approval and the obs
 
 These are explicit Login-contract approval rules; current Identity implementation and local tests corroborate them. Other resource servers have not been updated to the same issuer/audience/role-authority validation contract.
 
-## Refresh and Logout — US-02.03
+## Refresh and Logout â€” US-02.03
 
 **CONFIRMED owner rules:**
 
@@ -40,7 +45,7 @@ These are explicit Login-contract approval rules; current Identity implementatio
 
 The behavior is stated in the owner-approved Login/Refresh task history and evidenced by the current source/audit. Do not expand US-02.03 during unrelated stories.
 
-## Forgot Password — US-02.04
+## Forgot Password â€” US-02.04
 
 **CONFIRMED owner rules:**
 
@@ -53,7 +58,7 @@ The behavior is stated in the owner-approved Login/Refresh task history and evid
 
 V3 was explicitly approved, and the owner separately approved the reset transaction/session policy. See [V3](../../identity-service/src/main/resources/db/migration/V3__create_password_reset_challenge.sql), [Identity README](../../identity-service/README.md), and the audit. Do not edit V1/V2 or change this lifecycle.
 
-## Manage Profile — US-02.05
+## Manage Profile â€” US-02.05
 
 **CONFIRMED owner rules:**
 
@@ -62,15 +67,15 @@ V3 was explicitly approved, and the owner separately approved the reset transact
 - `GET /me/style-profile` returns `style_profile: null` when absent. A present profile includes all five nullable scalar fields and all three arrays; arrays are stably sorted and reads do not write.
 - `PUT /me/style-profile` is full replacement and requires all eight fields. The five scalars may be null; each collection is required and non-null, and `[]` clears it. Unknown properties and duplicate canonical values are invalid. Empty scalars/collections may create an empty parent row. The scalar and all three collections update in one transaction.
 - A valid JWT whose subject account no longer exists receives `404 RESOURCE_NOT_FOUND`. No profile request changes ACCOUNT or ACCOUNT_ROLE. Writes lock the owner account first; concurrent writes serialize and the last serialized writer wins. Failed writes roll the aggregate back.
-- `display_name` is Unicode-trimmed, 1–100 Unicode code points after trim, and rejects control characters. It preserves Vietnamese and other remaining characters.
+- `display_name` is Unicode-trimmed, 1â€“100 Unicode code points after trim, and rejects control characters. It preserves Vietnamese and other remaining characters.
 - `fit_preference`, `style_codes`, and `color_codes` use trimmed syntax `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`; code values canonicalize with `Locale.ROOT` uppercase. No finite vocabulary is used. Code collections allow up to 50 non-null unique canonical values.
-- `height_cm` is a nullable exact JSON decimal from 50 through 250 cm inclusive, with at most one fractional digit. No float conversion or rounding is allowed. The three nullable size labels are Unicode-trimmed free-form values of 1–32 code points and reject controls; no size-system enum is added.
+- `height_cm` is a nullable exact JSON decimal from 50 through 250 cm inclusive, with at most one fractional digit. No float conversion or rounding is allowed. The three nullable size labels are Unicode-trimmed free-form values of 1â€“32 code points and reject controls; no size-system enum is added.
 - `brand_ids` accepts up to 50 unique, hyphenated UUIDs (hex case-insensitive), and persists them as logical Commerce references. Identity does not call Commerce or verify existence/active status. A syntactically valid UUID is not evidence that a brand exists or is active.
 - The implementation uses existing V1 tables only: `account`, `user_profile`, `style_profile`, `profile_style`, `profile_color`, and `profile_brand`. No migration, column, FK, table or business API is added.
 
 This approval is scoped to US-02.05. Historical `OPEN-*` entries retain their original archival meaning; this rule set does not globally close or rewrite unrelated questions. See the [US-02.05 implementation report](../qa/identity-profile/US-02.05_IMPLEMENTATION_REPORT.md) for local verification evidence when complete.
 
-## Manage Addresses — US-02.06
+## Manage Addresses â€” US-02.06
 
 **CONFIRMED owner rules from the US-02.06 implementation instruction:**
 
@@ -81,16 +86,16 @@ This approval is scoped to US-02.05. Historical `OPEN-*` entries retain their or
 - Lookup uses a pinned local projection of the Vietnam administrative dataset; no runtime network lookup, map/geocoding, address rewriting or automatic code remapping. Do not send email/SMS/OTP, verify phone ownership, call Commerce/Order, add deduplication/idempotency, soft deletion, history or audit data. Identical POST content may create separate addresses.
 - Address responses expose only address response fields, include nullable values, and use `Cache-Control: no-store`. Do not log address/phone values or secrets. The exact implementation contract and local verification state are in [the US-02.06 contract](../planning/identity/US-02.06_MANAGE_ADDRESSES_CONTRACT.md) and [implementation report](../qa/identity-address/US-02.06_IMPLEMENTATION_REPORT.md). These rules are scoped to this story and do not close unrelated `OPEN-*` decisions.
 
-## Manage Users — US-02.07
+## Manage Users â€” US-02.07
 
 **CONFIRMED owner rules from the explicit US-02.07 approval:**
 
 - Manage Users consists only of `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/{account_id}/status`, and `PUT /api/v1/admin/users/{account_id}/roles`, backed by Identity `account` and `account_role`; no migration or cross-service read is added.
 - Every route requires a valid JWT with `ROLE_ADMIN` and a live actor account that still exists, is `ACTIVE`, verified, and currently has `ADMIN` in the database. This live-state check is scoped only to these routes.
 - Listing supports status/role/email filters and bounded stable pagination. Responses expose safe account fields and the complete role set, never password hash, session/token hash, challenge or profile/address data.
-- Admin status writes only support `ACTIVE` ↔ `SUSPENDED`; no other lifecycle state or verification timestamp can be changed. Reactivation requires an already verified account. Suspension does not delete data or revoke sessions.
+- Admin status writes only support `ACTIVE` â†” `SUSPENDED`; no other lifecycle state or verification timestamp can be changed. Reactivation requires an already verified account. Suspension does not delete data or revoke sessions.
 - Role replacement is a nonempty complete set of `CUSTOMER` and/or `ADMIN`; both may coexist. No public role assignment or role hierarchy is added.
-- Actual changes to the caller’s own status/roles are rejected; no-op self requests are allowed without writes. Suspending or removing the role from the last qualifying Admin is prevented. Writes serialize across Identity instances before rechecking actor/target state and applying the guard.
+- Actual changes to the callerâ€™s own status/roles are rejected; no-op self requests are allowed without writes. Suspending or removing the role from the last qualifying Admin is prevented. Writes serialize across Identity instances before rechecking actor/target state and applying the guard.
 - Status/role changes do not revoke refresh sessions. Login/Refresh continue to check current database state/roles; old access JWTs remain valid until `exp`, while Manage Users rechecks its actor live.
 - First Admin provisioning is operator-controlled only. This task does not provision an Admin in persistent local data.
 
@@ -135,3 +140,19 @@ The owner explicitly chose to remove only the new guest checkout while keeping t
 ## Guest checkout restored — 2026-11-02
 
 The owner explicitly requested restoring guest checkout after the temporary removal. The guest contract and simplified phone rule are active again; Identity remains unchanged. Guest order creation, owner-scoped detail and payment recovery use the existing guest cart credential and direct delivery snapshots. New credential-authenticated internal Payment snapshots permit explicit null customer_id, while omitted/malformed owners remain invalid. Payment JPA/mapper and all existing COD/SePay guards remain. The owner confirmed Commerce V9 guest checkout has already run; its SQL remains unchanged. The conflicting, unexecuted image/inventory migration is renumbered V10 with unchanged SQL. No persistent database mutation is authorized by this restoration. See [restoration report](../qa/GUEST_CHECKOUT_RESTORATION_REPORT.md).
+
+**Owner correction 2026-10-28 (historical):** P02 is authorized, and owned differs from saved. Its slot rules were superseded by the 2026-10-29 Prompt 08 correction at the top of this document: TOP+BOTTOM only. P03-A is separately approved; remaining context/provider/live gates remain open.
+
+## EP-07 Wave 2 owner rules — 2026-11-05
+
+The owner approved model IDs `text-embedding-3-small` (1536 dimensions) and `gpt-5.4-mini-2026-03-17`, a scoped generation operation and owner-scoped recommendation read APIs, and exactly two recommendation/item tables plus request lifecycle in Stylist V3. The business rule remains WOMEN shop variants, exactly one TOP and one BOTTOM. Intake remains `RECEIVED` and never auto-generates. Generation has one attempt per request, bounded 30-second deadline, strict provider schema, final Commerce recheck and atomic persistence. No owned input, Identity profile lookup, catalog-event producer, or cross-service DB access is added. See the [Wave 2 contract](../planning/stylist/EP-07_WAVE_2_CONTRACT.md).
+
+The authorized provider smoke is capped at $2 only when a valid key, synthetic inputs, conservative cost bound and restart-safe ignored reservation journal are available. No call or spend is inferred from adapter tests. The implementation report records that smoke was not run.
+
+## EP-07 Gemini local/test owner supplement — 2026-11-06
+
+The owner’s latest prompt supersedes the selected-model and paid-OpenAI-smoke clauses above only for the current local/test verification: use Gemini Developer API `gemini-2.5-flash` for structured generation and `gemini-embedding-001` at 1536 dimensions, with a **USD 0** spend limit. Preserve the older OpenAI implementation and its report as historical evidence. Never switch to a paid model, enable billing, use a trial credit, or silently fall back.
+
+No provider call is allowed by default. `STYLEMIND_AI_PROVIDER` must be explicitly `gemini`, and `STYLEMIND_GEMINI_LIVE_CALLS_ENABLED` must be explicitly enabled after confirming the exact key’s project is Free Tier and the chosen model has quota. A key’s existence, HTTP 200, public Free Tier pricing, or test fixture does not establish this. The current local process had no `STYLEMIND_GEMINI_API_KEY`; the chat-pasted key was not used. Keep replacement keys only in a local secret store and rotate the exposed key. Only synthetic request/catalog/knowledge data may be sent. No live provider/Gateway smoke was run; it remains BLOCKED until the project-tier, quota and local-key checks pass.
+
+Adapters keep the approved request pipeline, public APIs, V1–V3 schema, WOMEN TOP+BOTTOM rules, price/Commerce recheck, and ownership unchanged. Gemini vectors are isolated by provider/model/dimension/configuration metadata and a separate Qdrant alias. Offline tests and disposable Qdrant/PostgreSQL runs do not complete R95/R99/P08 or EP-07.

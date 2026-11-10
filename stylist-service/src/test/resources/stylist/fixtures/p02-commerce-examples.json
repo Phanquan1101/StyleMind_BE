@@ -1,0 +1,51 @@
+{
+  "classification": "SYNTHETIC_TEST_ONLY",
+  "fixture_mapping": {
+    "classification": "SYNTHETIC_TEST_ONLY",
+    "category_to_slot": {
+      "SYNTHETIC_TOP_CATEGORY": "TOP",
+      "SYNTHETIC_BOTTOM_CATEGORY": "BOTTOM"
+    },
+    "style_codes": ["SYNTHETIC_MINIMAL"],
+    "color_codes": ["SYNTHETIC_BLACK", "SYNTHETIC_RED"]
+  },
+  "examples": [
+    {
+      "classification": "SYNTHETIC_TEST_ONLY",
+      "name": "Shop-only exact hard budget TOP + BOTTOM",
+      "budget_vnd": 600000,
+      "hard_budget": true,
+      "items": [
+        {"variant_id": 1, "category_key": "SYNTHETIC_TOP_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 250000, "holding": "NONE", "source_type": "SHOP_VARIANT", "purchasable": true, "anchor": false},
+        {"variant_id": 2, "category_key": "SYNTHETIC_BOTTOM_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 350000, "holding": "NONE", "source_type": "SHOP_VARIANT", "purchasable": true, "anchor": false}
+      ],
+      "expected_outfits": [
+        {"variant_ids": [1, 2], "additional_cost_vnd": 600000}
+      ]
+    },
+    {
+      "classification": "SYNTHETIC_TEST_ONLY",
+      "name": "Synthetic owned TOP anchor plus shop BOTTOM",
+      "budget_vnd": 350000,
+      "hard_budget": true,
+      "items": [
+        {"variant_id": 10, "category_key": "SYNTHETIC_TOP_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 900000, "holding": "OWNED", "source_type": "OWNED_WARDROBE", "wardrobe_item_id": 501, "purchasable": false, "anchor": true},
+        {"variant_id": 11, "category_key": "SYNTHETIC_BOTTOM_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 350000, "holding": "NONE", "source_type": "SHOP_VARIANT", "purchasable": true, "anchor": false}
+      ],
+      "expected_outfits": [
+        {"variant_ids": [10, 11], "additional_cost_vnd": 350000}
+      ]
+    },
+    {
+      "classification": "SYNTHETIC_TEST_ONLY",
+      "name": "Saved TOP is still charged and no outfit fits hard budget",
+      "budget_vnd": 350000,
+      "hard_budget": true,
+      "items": [
+        {"variant_id": 21, "category_key": "SYNTHETIC_TOP_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 250000, "holding": "SAVED", "source_type": "SHOP_VARIANT", "purchasable": true, "anchor": false},
+        {"variant_id": 22, "category_key": "SYNTHETIC_BOTTOM_CATEGORY", "color_code": "SYNTHETIC_BLACK", "style_codes": ["SYNTHETIC_MINIMAL"], "price_vnd": 350000, "holding": "NONE", "source_type": "SHOP_VARIANT", "purchasable": true, "anchor": false}
+      ],
+      "expected_outfits": []
+    }
+  ]
+}

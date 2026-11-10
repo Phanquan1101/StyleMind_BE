@@ -1,0 +1,120 @@
+# EP-07 — Accelerated Delivery 1 implementation report
+
+**Date:** 2026-11-05
+**Branch:** `feature/ep-07-ai-stylist`
+**HEAD:** `c9f20d1d1fc1779eca735b3de3ac9f1745b43985` (unchanged)
+**Status:** the approved P03-B1 follow-up findings and this internal fixture pipeline slice are implemented and verified. P03, P04, P07, US-07.01, US-07.02 and EP-07 remain **PARTIAL / INCOMPLETE**.
+
+This report records the scoped owner authorization in the [execution manifest](EP-07_EXECUTION_MANIFEST.json). Existing staged, unstaged and untracked changes were preserved. No pull, reset, clean, checkout, staging, commit or push was performed.
+
+## What is implemented
+
+### P03-B1 follow-up
+
+The four approved findings are addressed without changing the two request APIs, response DTOs, `RECEIVED`, `generation_started=false`, or V1/V2:
+
+| Finding | Resolution and evidence |
+|---|---|
+| F-01 — encoded routes bypassed GET-body policy | The filter uses Spring MVC's `PathPatternRequestMatcher` and the configured MVC parser. Embedded Tomcat regression tests send the canonical route and both encoded aliases. All receive `400 INVALID_REQUEST` before service access; bodyless GETs still work. Negative JWT/role, A/B owner isolation, no-store and unchanged-row assertions are included. |
+| F-02 — Unicode whitespace-only text | Boundary trimming recognizes both `Character.isWhitespace` and `Character.isSpaceChar`. NBSP/narrow-NBSP-only values fail; surrounding Unicode whitespace is trimmed. Existing code-point limits, including emoji counting, are preserved. |
+| F-03 — NUL in weather context | NUL is rejected before persistence. An embedded HTTP request against disposable PostgreSQL returns `400`, not `500`, and leaves message/request/constraint tables unchanged. Multiline weather text remains accepted. |
+| F-04 — rollback/concurrency evidence | The service transaction itself is exercised with failures after message/request writes and during constraint flush. PostgreSQL confirms rollback of all three tables. Concurrency tests prove two valid intakes create distinct requests, closed-session-first rejects without writes, and intake-first serializes a waiting close transaction. No production fault hook or Close Session API was added. |
+
+Detailed reproduction, test mechanics, and prior focused counts remain in the [P03-B1 follow-up report](EP-07_P03B1_FOLLOW_UP_REPORT.md). The final full suite below reran these regressions.
+
+### Commerce consumer and internal recommendation use case
+
+The Stylist service now has a scoped OpenFeign consumer and a non-public `StylingRecommendationService` implementation. It has no controller, recommendation persistence, new migration, or state transition.
+
+The consumer targets the current Commerce source operations:
+
+- `POST /api/v1/variants/batch-lookup` — public read; returns active eligible variants and omits missing/inactive IDs.
+- `GET /api/v1/products/{productId}` — public product detail; inactive product/category/brand is hidden by Commerce as not found.
+
+Neither endpoint requires a bearer or internal service token. The separate internal lookup endpoint is not used. Stylist joins by IDs, validates product/variant/category relationships and response shape, rejects malformed or fractional VND prices, and does not log response bodies. Requests are bounded to 40 variant IDs. Connect/read timeouts are finite; redirects and automatic retries are disabled. `available_quantity` is tolerated in the response DTO and deliberately ignored in eligibility, ranking and budget rules.
+
+Commerce batch and product detail are separate reads, not a snapshot. The use case therefore reads current Commerce data for bounded retrieval candidates and reads selected variants again before returning a result. The consumer does not claim atomic freshness across those calls. Missing/inactive products or variants are excluded; protocol errors and dependency outages return typed safe failures rather than treating old fixture/index data as current.
+
+The internal use case performs this flow:
+
+1. Read the styling request by trusted customer ID and request ID, require `RECEIVED`, then resolve its referenced USER message and stored constraints. A missing or foreign request fails before any remote call.
+2. End the short read-only database transaction before retrieval and Commerce calls. The entry point suspends any ambient transaction.
+3. Search the existing retrieval port separately for `TOP` and `BOTTOM`, with its bounded limit. Accept only the six approved P04.1 seed fixtures, their WOMEN demographic, source/hash/provenance and the reviewed fixture-only `ao`/`quan` category mapping. Unknown, unreviewed, non-WOMEN or cross-slot results fail closed.
+4. Hydrate candidates from current Commerce, apply the existing P02 engine, and preserve exact integer VND, inclusive hard budget, hard exclusions, one TOP plus one BOTTOM, deterministic ranking and diversity. No stock rule, owned anchor, inferred preference, taxonomy expansion or explanation generated by an LLM is added.
+5. Hydrate only selected variants again, recheck current status/category/demographic and hard exclusions, recalculate total cost with overflow checks, and discard any outfit that no longer qualifies.
+6. Return an internal DTO. No recommendation/message is saved and request status remains `RECEIVED`.
+
+The HTTP Commerce integration test uses an embedded contract fixture shaped from the current Commerce DTOs and the actual Feign client. It is consumer contract evidence, not a running Commerce service or live catalog integration. The test also verifies timeout, connection failure, malformed/duplicate/unrequested/mismatched IDs, bad price, changed data, error statuses, redirect rejection and absence of auth headers.
+
+Only the disposable pipeline integration test supplies a test-only Qdrant retrieval bean and the existing fake embedding. No live retrieval bean is configured for production use; invoking the internal use case without one returns a dependency-unavailable error. That gap is deliberate until a runtime retrieval adapter and data/index lifecycle are separately approved.
+
+## Verification
+
+Docker Desktop Linux Engine was available at version `28.5.2`. Final command:
+
+```text
+mvn -B -ntp -f stylist-service/pom.xml verify
+```
+
+**BUILD SUCCESS — 143 tests, 0 failures, 0 errors, 0 skipped.** The Surefire XML totals independently match Maven. Suite counts:
+
+| Area | Tests |
+|---|---:|
+| P02 outfit engine | 52 |
+| Retrieval, Commerce consumer/pipeline, seed and Qdrant adapters | 40 |
+| P03-B1 session/request PostgreSQL and embedded-HTTP integration | 32 |
+| Request parser and Unicode validation | 6 |
+| Application/security/OpenAPI regression | 13 |
+| **Total** | **143** |
+
+The 40 retrieval/consumer tests include 11 full pipeline integration cases and 2 real Qdrant Testcontainers integration cases. Full results are in `stylist-service/target/surefire-reports/` (ignored local build output).
+
+Disposable resources used by the full run:
+
+- PostgreSQL `postgres:18-alpine` (reported server `18.6`) for the pipeline and existing request/session integration tests; random host ports were allocated by Testcontainers. V1/V2 were applied only to disposable test databases.
+- Qdrant `qdrant/qdrant:v1.20.0` on random mapped ports for the pipeline and existing adapter integration tests; each test used its own collection and the collection owner deleted it.
+- Testcontainers/Ryuk cleanup completed. A post-run Docker inventory found no remaining container labeled `org.testcontainers=true`. No shared Compose, persistent database, existing volume, shared Qdrant, Commerce runtime, provider, LLM or paid service was used.
+
+Additional checks:
+
+| Check | Result |
+|---|---|
+| `git diff --check` | PASS (one Git LF-to-CRLF advisory for `StylistServiceApplication.java`) |
+| `git diff --cached --check` | PASS |
+| Postman JSON structural parse | Both existing collections and environments parse; P03-A has 4 requests, P03-B1 has 9 requests; both are v2.1 collections with placeholder-only environments. |
+| Postman/Newman HTTP runtime through Gateway | NOT RUN. Embedded HTTP tests are not Gateway E2E. No pipeline HTTP endpoint exists, so none was added for Postman. |
+
+## Planning guard and source drift
+
+Both `node scripts/verify-stylist-planning.cjs` and `node scripts/verify-stylist-planning.cjs --phase P03` exit `1`. The guard reports committed Commerce range drift in `commerce-service/pom.xml`, `CommerceServiceApplication.java`, and six Commerce Postman artifacts, plus fingerprint drift in Commerce `ProductController.java`, `VariantResponse.java`, `ProductVariantRepository.java` and the intentionally changed Stylist `pom.xml` and `application.properties`.
+
+The Commerce DTO/source was reviewed for this consumer and the current public read behavior is recorded in [dependency contracts](EP-07_DEPENDENCY_CONTRACTS.md). Commerce itself was not modified. The source range spans more Commerce changes than this consumer contract review; therefore `reviewed_head` and all source fingerprints remain unchanged. The planning guard warning is retained rather than hidden.
+
+## Changed for this slice
+
+- `stylist-service/pom.xml` — Spring Cloud OpenFeign dependency management and client dependency.
+- `stylist-service/src/main/java/com/stylemind/stylist/StylistServiceApplication.java` — enable the scoped Commerce Feign client package.
+- `stylist-service/src/main/resources/application.properties` — trusted Commerce base URL and finite timeout defaults.
+- `stylist-service/src/main/java/com/stylemind/stylist/errors/ErrorCode.java` — dependency unavailable/protocol error codes.
+- `stylist-service/src/main/java/com/stylemind/stylist/client/commerce/CommerceCatalogContracts.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/client/commerce/CommerceCatalogFeignClient.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/client/commerce/CommerceFeignConfiguration.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/client/commerce/CommerceCatalogClient.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/dto/recommendation/InternalRecommendationResult.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/service/recommendation/StylingRecommendationService.java`
+- `stylist-service/src/main/java/com/stylemind/stylist/service/impl/recommendation/StylingRecommendationServiceImpl.java`
+- `stylist-service/src/test/java/com/stylemind/stylist/retrieval/InternalRecommendationPipelineIntegrationTests.java`
+- `docs/planning/stylist/EP-07_DEPENDENCY_CONTRACTS.md`, `EP-07_IMPLEMENTATION_PLAN.md`, and `EP-07_EXECUTION_MANIFEST.json` — observed Commerce contract, scoped authorization and evidence.
+
+The repository already contained other staged, unstaged and untracked work before this slice; this list is the slice-specific work, not a claim that these are the only dirty paths. No files in Commerce, Identity, Wardrobe, Payment or Notification were changed by this slice.
+
+## Decision gate for Wave 2
+
+| Decision | Current state | Concrete decision still required / effect if unresolved |
+|---|---|---|
+| Provider, generation model and embedding model | **TBD / NOT APPROVED.** Current tests use only a deterministic fake embedding; no provider call occurred. | Approve one provider/model, structured-output contract, timeout/token/cost caps and fallback policy. Until then no AI-generated reason/tip or live embedding. |
+| Data allowed to leave StyleMind | **TBD / NOT APPROVED.** This slice sends no user/catalog content to an external provider. | Approve exact request/profile/catalog fields, redaction, retention and user-consent rules. Without this, keep provider calls disabled. |
+| Recommendation schema, API and lifecycle | **TBD / NOT APPROVED.** This slice returns an internal DTO only; no public generation route, recommendation tables, saves, assistant messages or state transition. | Approve response contract, persistence/provenance, idempotency, generation states, retry/cancel and final-save transaction rules before adding API/schema. |
+| Reviewed knowledge inputs | **TBD / NOT APPROVED.** No knowledge ingestion or Neo4j use. | Approve reviewer authority, source/licensing, version/provenance, revocation and persistence scope. Until then, do not treat fixture evidence as live fashion guidance. |
+
+No backlog status was changed. R93–R102, P03/P04/P07, US-07.01/US-07.02 and EP-07 are not reported DONE. This slice does not prove full-catalog quality, live Commerce availability, semantic retrieval quality, production deployment readiness or end-to-end Gateway behavior.

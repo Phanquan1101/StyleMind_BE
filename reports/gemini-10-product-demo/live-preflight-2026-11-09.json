@@ -1,0 +1,51 @@
+{
+  "observed_at": "2026-11-09T20:14:38.5164900+07:00",
+  "api_key_matches_visible_ai_studio_key": true,
+  "project_id": "gen-lang-client-0205239496",
+  "key_created": "2026-11-07",
+  "billing_tier": "Free tier",
+  "billing_action_visible": "Set up billing",
+  "source": "Authenticated Chrome AI Studio API Keys and Rate Limit pages",
+  "quota_display_scope": "Peak usage over last 28 days; UI notes up to 15 minutes reporting delay",
+  "embedding_quota": {
+    "tpm": 30000,
+    "displayed_peak_rpd": 10,
+    "rpm": 100,
+    "rpd": 1000
+  },
+  "generation_quota": {
+    "model": "gemini-3.5-flash-lite",
+    "tpm": 250000,
+    "displayed_peak_rpd": 5,
+    "rpm": 15,
+    "rpd": 500
+  },
+  "meter_before": {
+    "embedding": 18,
+    "generation": 9,
+    "tokenCount": 33
+  },
+  "call_plan": {
+    "total": {
+      "embedding": 11,
+      "generation": 1,
+      "tokenCount": 12
+    },
+    "browser_generation": {
+      "embedding": 1,
+      "generation": 1,
+      "tokenCount": 2
+    },
+    "retry": 0,
+    "import": {
+      "embedding": 10,
+      "generation": 0,
+      "tokenCount": 10
+    }
+  },
+  "approved_cumulative_caps": {
+    "embedding": 29,
+    "generation": 10,
+    "tokenCount": 45
+  }
+}

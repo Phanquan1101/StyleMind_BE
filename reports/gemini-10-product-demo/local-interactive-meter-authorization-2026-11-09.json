@@ -1,0 +1,37 @@
+{
+  "approved_at": "2026-11-09T21:15:59.9606426+07:00",
+  "owner_request": "Allow many additional local tests, including unlimited local meter attempts",
+  "scope": "LOCAL_INTERACTIVE_TEST_PROCESS_ONLY",
+  "profile": "EP07_OWNER_LOCAL_INTERACTIVE_20261108",
+  "limits": {
+    "embedding": null,
+    "tokenCount": null,
+    "generation": null
+  },
+  "calls_before": {
+    "metadata": 0,
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 4
+  },
+  "calls_after": {
+    "metadata": 0,
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 4
+  },
+  "old_events_preserved": 47,
+  "history_prefix_identical": true,
+  "meter_port": 63283,
+  "meter_pid": 27968,
+  "google_free_tier_only": true,
+  "billing_enabled_by_agent": false,
+  "stop_on_real_google_429": true,
+  "provider_retry_enabled": false,
+  "stylist_health": "UP",
+  "gateway_health": "UP",
+  "agent_generate_requests_sent": 0,
+  "verified_at": "2026-11-09T21:16:49.8532674+07:00"
+}

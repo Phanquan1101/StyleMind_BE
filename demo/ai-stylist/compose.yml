@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: demo_admin
+      POSTGRES_PASSWORD: ${DEMO_POSTGRES_PASSWORD:?Run bootstrap first}
+      DEMO_COMMERCE_PASSWORD: ${DEMO_COMMERCE_PASSWORD:?Run bootstrap first}
+      DEMO_STYLIST_PASSWORD: ${DEMO_STYLIST_PASSWORD:?Run bootstrap first}
+    ports:
+      - "127.0.0.1:${DEMO_POSTGRES_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./init.sql:/docker-entrypoint-initdb.d/00-demo.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_admin -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    ports:
+      - "127.0.0.1:${DEMO_QDRANT_PORT}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${DEMO_NEO4J_PASSWORD:?Run bootstrap first}
+      NEO4J_server_http_enabled: "false"
+      NEO4J_server_memory_heap_initial__size: 128m
+      NEO4J_server_memory_heap_max__size: 256m
+      NEO4J_server_memory_pagecache_size: 128m
+    ports:
+      - "127.0.0.1:${DEMO_NEO4J_PORT}:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "export NEO4J_PASSWORD=\"$${NEO4J_AUTH#*/}\"; cypher-shell -u neo4j 'RETURN 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 8s
+      retries: 40
+      start_period: 20s
+volumes:
+  postgres-data:
+  qdrant-data:
+  neo4j-data:
+  neo4j-logs:
