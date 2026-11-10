@@ -33,9 +33,13 @@ public class VariantQuantityServiceImpl implements VariantQuantityService {
     }
     @Override public void restoreCancelledOrder(UUID orderId) {
         Map<UUID, Integer> quantities = orderItems.findLockedByOrderId(orderId).stream().collect(java.util.stream.Collectors.toMap(i -> i.getVariantId(), i -> i.getQuantity(), Integer::sum));
+        restore(quantities);
+    }
+    @Override public void restore(Map<UUID, Integer> quantities) {
+        if (quantities.isEmpty()) return;
         List<ProductVariant> locked = variants.findLockedByVariantIdIn(quantities.keySet());
         if (locked.size() != quantities.size()) throw new IllegalStateException("Order variant no longer exists");
-        locked.forEach(v -> v.setQuantity(v.getQuantity() + quantities.get(v.getVariantId()))); variants.saveAllAndFlush(locked);
+        locked.forEach(v -> v.setQuantity(Math.addExact(v.getQuantity(), quantities.get(v.getVariantId())))); variants.saveAllAndFlush(locked);
     }
     @Override public List<UUID> expiredPendingSepayOrderIds(OffsetDateTime now) { return orders.findExpiredPendingSepayOrderIds(now.minusMinutes(15), PageRequest.of(0, 100)); }
     @Override public Optional<LockedOrder> lockOrder(UUID orderId) { return orders.findLockedByOrderId(orderId).map(o -> new LockedOrder(o.getPaymentMethod(), o.getOrderStatus())); }

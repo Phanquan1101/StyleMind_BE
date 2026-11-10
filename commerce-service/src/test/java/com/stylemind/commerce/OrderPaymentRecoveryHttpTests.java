@@ -97,7 +97,7 @@ class OrderPaymentRecoveryHttpTests {
     private String path() { return "/api/v1/orders/" + order + "/payment-attempt"; }
     private OrderResponse order(String method, String state) {
         return new OrderResponse(order, "ORDER-TEST", owner, "checkout-test", state, method, 125000,
-                null, null, null, List.of(), List.of(), null);
+                null, null, null, List.of(), List.of(), null, "UNCONFIRMED");
     }
     private Jwt jwt(String value, UUID subject, String role) {
         return Jwt.withTokenValue(value).header("alg", "RS256").subject(subject.toString())

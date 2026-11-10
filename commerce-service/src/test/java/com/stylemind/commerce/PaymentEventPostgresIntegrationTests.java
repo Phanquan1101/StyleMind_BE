@@ -36,9 +36,68 @@ class PaymentEventPostgresIntegrationTests {
     static final String PATH = "/internal/v1/payment-events";
     @BeforeEach void reset() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_event_test ON public.payment_event_inbox");
+        jdbc.update("DELETE FROM public.qr_checkout_item");
+        jdbc.update("DELETE FROM public.qr_checkout");
         jdbc.update("DELETE FROM public.payment_event_inbox");
         jdbc.update("DELETE FROM public.order_status_history");
         jdbc.update("DELETE FROM public.customer_order");
+    }
+    @Test void latePaymentForCancelledQrCheckoutIsRecordedForReconciliationWithoutOrder() {
+        UUID owner = UUID.randomUUID(), checkout = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO public.qr_checkout(checkout_id,customer_id,checkout_key,checkout_status,total_vnd,
+                    shipping_snapshot,payment_reference_id,created_at,expires_at,updated_at)
+                VALUES (?,?,?,'CANCELLED',125000,'{}'::jsonb,?,now(),now()+interval '15 minutes',now())
+                """, checkout, owner, "late-payment", checkout);
+        var incoming = event(checkout, owner);
+        storeQrAttempt(checkout, incoming);
+        var receipt = send(incoming);
+        assertThat(receipt.getStatusCode().value()).isEqualTo(200);
+        assertThat(receipt.getBody().path("outcome").asText()).isEqualTo("RECONCILIATION_REQUIRED");
+        assertThat(send(incoming).getBody()).isEqualTo(receipt.getBody());
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout))
+                .isEqualTo("RECONCILIATION_REQUIRED");
+        assertThat(count("payment_event_inbox")).isEqualTo(1);
+        assertThat(count("customer_order")).isZero();
+    }
+    @Test void lateQrPaymentWithWrongOwnerDoesNotChangeCheckout() {
+        UUID owner = UUID.randomUUID(), checkout = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO public.qr_checkout(checkout_id,customer_id,checkout_key,checkout_status,total_vnd,
+                    shipping_snapshot,payment_reference_id,created_at,expires_at,updated_at)
+                VALUES (?,?,?,'EXPIRED',125000,'{}'::jsonb,?,now(),now()+interval '15 minutes',now())
+                """, checkout, owner, "wrong-owner", checkout);
+        var incoming = event(checkout, UUID.randomUUID());
+        storeQrAttempt(checkout, incoming);
+        var receipt = send(incoming);
+        assertThat(receipt.getBody().path("reason").asText()).isEqualTo("OWNER_MISMATCH");
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("EXPIRED");
+        assertThat(count("customer_order")).isZero();
+    }
+    @Test void activeQrCheckoutDoesNotAcknowledgePaymentBeforeOrderCreationIsAvailable() {
+        UUID owner = UUID.randomUUID(), checkout = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO public.qr_checkout(checkout_id,customer_id,checkout_key,checkout_status,total_vnd,
+                    shipping_snapshot,payment_reference_id,created_at,expires_at,updated_at)
+                VALUES (?,?,?,'AWAITING_PAYMENT',125000,'{}'::jsonb,?,now(),now()+interval '15 minutes',now())
+                """, checkout, owner, "pending-payment", checkout);
+        assertThat(send(event(checkout, owner)).getStatusCode().value()).isEqualTo(503);
+        assertThat(count("payment_event_inbox")).isZero();
+        assertThat(count("customer_order")).isZero();
+    }
+    @Test void cancelledQrPaymentWithWrongAttemptRequiresReconciliationWithoutChangingCheckout() {
+        UUID owner = UUID.randomUUID(), checkout = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO qr_checkout(checkout_id,customer_id,checkout_key,checkout_status,total_vnd,
+                    shipping_snapshot,payment_reference_id,created_at,expires_at,updated_at)
+                VALUES (?,?,?,'CANCELLED',125000,'{}'::jsonb,?,now(),now()+interval '15 minutes',now())
+                """, checkout, owner, "wrong-reference", checkout);
+        var incoming = event(checkout, owner);
+        storeQrAttempt(checkout, incoming);
+        incoming.put("payment_attempt_id", UUID.randomUUID());
+        assertThat(send(incoming).getBody().path("reason").asText()).isEqualTo("PAYMENT_REFERENCE_MISMATCH");
+        assertThat(jdbc.queryForObject("SELECT checkout_status FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("CANCELLED");
+        assertThat(count("customer_order")).isZero();
     }
     @Test void appliesSepayOnceAndReturnsSameDurableAcknowledgement() {
         UUID owner = UUID.randomUUID(), order = order(owner, "PENDING_PAYMENT", "SEPAY_VIETQR");
@@ -247,6 +306,10 @@ class PaymentEventPostgresIntegrationTests {
                 "payment_attempt_id", UUID.randomUUID(), "order_id", order, "customer_id", owner,
                 "payment_method", "SEPAY_VIETQR", "payment_reference", "SMTEST", "amount_vnd", 125000,
                 "confirmed_at", "2026-10-26T00:00:00.123456789Z"));
+    }
+    private void storeQrAttempt(UUID checkout, Map<String, Object> event) {
+        jdbc.update("UPDATE qr_checkout SET shipping_snapshot=jsonb_build_object('paymentAttempt', jsonb_build_object('id', ?::text, 'reference', ?::text)) WHERE checkout_id=?",
+                event.get("payment_attempt_id").toString(), event.get("payment_reference"), checkout);
     }
     private ResponseEntity<JsonNode> send(Map<String, Object> event) {
         var headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);

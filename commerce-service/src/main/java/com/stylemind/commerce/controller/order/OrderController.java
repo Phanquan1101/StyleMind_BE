@@ -93,6 +93,12 @@ public class OrderController {
                 + created.cancellationRequestId())).body(created);
     }
 
+    @PostMapping(path = "/api/v1/orders/{orderId}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public OrderResponse cancelOrder(Authentication authentication, @PathVariable String orderId, @RequestBody JsonNode body) {
+        return service.cancelOrder(requireSubject(authentication), validator.pathId(orderId), validator.cancellationReason(body));
+    }
+
     @GetMapping(path = "/api/v1/admin/orders", produces = MediaType.APPLICATION_JSON_VALUE)
     public OrderListResponse adminList(Authentication authentication, HttpServletRequest request) {
         return service.list(requireSubject(authentication), true, validator.list(request));
@@ -101,6 +107,11 @@ public class OrderController {
     @GetMapping(path = "/api/v1/admin/orders/{orderId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public OrderResponse adminGet(Authentication authentication, @PathVariable String orderId) {
         return service.get(requireSubject(authentication), true, validator.pathId(orderId));
+    }
+
+    @PostMapping(path = "/api/v1/admin/orders/{orderId}/confirm", produces = MediaType.APPLICATION_JSON_VALUE)
+    public OrderResponse confirmOrder(Authentication authentication, @PathVariable String orderId) {
+        return service.confirmOrder(requireSubject(authentication), validator.pathId(orderId));
     }
 
     @PutMapping(path = "/api/v1/admin/orders/{orderId}/status", consumes = MediaType.APPLICATION_JSON_VALUE,

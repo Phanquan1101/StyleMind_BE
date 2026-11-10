@@ -1,0 +1,21 @@
+{
+  "info": {
+    "name": "StyleMind - Direct order cancellation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/commerce" },
+    { "key": "customerToken", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "reason", "value": "Khong con nhu cau" }
+  ],
+  "item": [{
+    "name": "Hủy đơn chưa xử lý",
+    "request": {
+      "method": "POST",
+      "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+      "body": { "mode": "raw", "raw": "{\"reason\":\"{{reason}}\"}" },
+      "url": "{{baseUrl}}/api/v1/orders/{{orderId}}/cancel"
+    }
+  }]
+}

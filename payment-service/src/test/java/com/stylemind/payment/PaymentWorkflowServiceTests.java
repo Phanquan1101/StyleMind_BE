@@ -89,6 +89,30 @@ class PaymentWorkflowServiceTests {
     }
 
     @Test
+    void codCollectionRequiresDeliveredCommerceOrder() {
+        PaymentAttemptRepository repository = org.mockito.Mockito.mock(PaymentAttemptRepository.class);
+        PaymentOutboxService outbox = org.mockito.Mockito.mock(PaymentOutboxService.class);
+        CommerceOrderClient commerce = org.mockito.Mockito.mock(CommerceOrderClient.class);
+        PaymentAttemptService service = attemptService(repository, outbox, commerce);
+        PaymentAttemptSnapshot attempt = snapshot("COD", "PENDING", null, 120_000);
+        when(repository.findByIdForUpdate(ATTEMPT_ID)).thenReturn(Optional.of(attempt));
+        for (String status : java.util.List.of("PLACED", "PROCESSING", "SHIPPED", "CANCELLED")) {
+            when(commerce.getPaymentSnapshot(ORDER_ID)).thenReturn(orderSnapshot(PaymentMethod.COD, 120_000, status));
+            assertThatThrownBy(() -> service.confirmCodCollection(
+                    new ConfirmCodCollectionRequest(ATTEMPT_ID, 120_000L, "COD-001", NOW), ADMIN_ID, NOW))
+                    .isInstanceOf(PaymentApiException.class)
+                    .hasMessage("COD collection requires a delivered order");
+        }
+        when(commerce.getPaymentSnapshot(ORDER_ID)).thenThrow(new PaymentApiException(
+                org.springframework.http.HttpStatus.BAD_GATEWAY, "COMMERCE_ORDER_LOOKUP_FAILED", "Unavailable"));
+        assertThatThrownBy(() -> service.confirmCodCollection(
+                new ConfirmCodCollectionRequest(ATTEMPT_ID, 120_000L, "COD-001", NOW), ADMIN_ID, NOW))
+                .isInstanceOf(PaymentApiException.class);
+        verify(repository, never()).insertManualCodTransaction(any(), org.mockito.ArgumentMatchers.anyLong(), any(), any(), any());
+        verify(outbox, never()).recordPaymentConfirmed(any(), org.mockito.ArgumentMatchers.anyLong(), any());
+    }
+
+    @Test
     void confirmCodCollectionRecordsOnceAndEmitsOutbox() {
         PaymentAttemptRepository repository = org.mockito.Mockito.mock(PaymentAttemptRepository.class);
         PaymentOutboxService outbox = org.mockito.Mockito.mock(PaymentOutboxService.class);
@@ -96,6 +120,7 @@ class PaymentWorkflowServiceTests {
         PaymentAttemptService service = attemptService(repository, outbox, commerce);
         PaymentAttemptSnapshot attempt = snapshot("COD", "PENDING", null, 120_000);
         when(repository.findByIdForUpdate(ATTEMPT_ID)).thenReturn(Optional.of(attempt));
+        when(commerce.getPaymentSnapshot(ORDER_ID)).thenReturn(orderSnapshot(PaymentMethod.COD, 120_000, "COMPLETED"));
         when(repository.insertManualCodTransaction(attempt, 120_000, "COD-001", ADMIN_ID, NOW)).thenReturn(true);
 
         var response = service.confirmCodCollection(

@@ -470,6 +470,13 @@ class PaymentRuntimePostgresIntegrationTests {
     }
     @TestConfiguration(proxyBeanMethods = false)
     static class JwtConfig {
+        @Bean @Primary com.stylemind.payment.client.CommerceOrderClient deliveredOrderFixture(JdbcTemplate jdbc) {
+            return orderId -> jdbc.queryForObject("SELECT customer_id, payment_method, expected_amount_vnd FROM public.payment_attempt WHERE order_id=? LIMIT 1",
+                    (rs, row) -> new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(orderId,
+                            rs.getObject("customer_id", UUID.class),
+                            com.stylemind.payment.model.PaymentMethod.valueOf(rs.getString("payment_method")),
+                            rs.getLong("expected_amount_vnd"), "COMPLETED"), orderId);
+        }
         @Bean @Primary JwtDecoder testDecoder() throws Exception {
             return NimbusJwtDecoder.withPublicKey(SIGNING_KEY.toRSAPublicKey()).build();
         }

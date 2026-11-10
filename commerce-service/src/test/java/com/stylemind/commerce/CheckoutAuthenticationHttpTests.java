@@ -33,6 +33,21 @@ class CheckoutAuthenticationHttpTests {
     @MockitoBean JwtDecoder decoder;
     private static final String KEY = "existing-guest-cart-0001";
 
+    @Test void guestSessionCannotCreateOrdersOrNewQrCheckouts() throws Exception {
+        for (String path : List.of("/api/v1/guest/orders", "/api/v1/guest/orders/selected", "/api/v1/guest/orders/buy-now",
+                "/api/v1/guest/qr-checkouts/selected", "/api/v1/guest/qr-checkouts/buy-now")) {
+            mvc.perform(post(path).header("X-Guest-Session-Key", KEY).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        var jwt = new Jwt("test-token", Instant.now().minusSeconds(1), Instant.now().plusSeconds(300),
+                Map.of("alg", "RS256"), Map.of("sub", UUID.randomUUID().toString(), "roles", List.of("CUSTOMER")));
+        when(decoder.decode("test-token")).thenReturn(jwt);
+        mvc.perform(post("/api/v1/guest/orders").header("X-Guest-Session-Key", KEY)
+                .header("Authorization", "Bearer test-token").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(orders);
+    }
+
     @Test void guestCheckoutRoutesRequireGuestCredential() throws Exception {
         String id = UUID.randomUUID().toString();
         mvc.perform(get("/api/v1/guest/checkout/prices")).andExpect(status().isUnauthorized());
@@ -47,7 +62,7 @@ class CheckoutAuthenticationHttpTests {
     @Test void invalidGuestBodyAndUnexpectedRecoveryBodyFailBeforeServiceCalls() throws Exception {
         mvc.perform(post("/api/v1/guest/orders").header("X-Guest-Session-Key",KEY)
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest()).andExpect(header().string("Cache-Control","no-store"));
+                .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/guest/orders/"+UUID.randomUUID()+"/payment-attempt")
                 .header("X-Guest-Session-Key",KEY).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());

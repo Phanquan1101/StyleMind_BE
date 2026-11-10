@@ -98,6 +98,16 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
                         HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Payment attempt was not found"));
 
         validateCollectionAttempt(request, attempt);
+        var order = commerceOrderClient.getPaymentSnapshot(attempt.orderId());
+        if (order == null || !attempt.orderId().equals(order.orderId())
+                || order.paymentMethod() != PaymentMethod.COD
+                || order.acceptedTotalVnd() != attempt.expectedAmountVnd()
+                || !java.util.Objects.equals(order.customerId(), attempt.customerId())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "COD_ORDER_MISMATCH", "COD order does not match the payment attempt");
+        }
+        if (!"COMPLETED".equals(order.orderStatus())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "COD_DELIVERY_REQUIRED", "COD collection requires a delivered order");
+        }
         Instant collectedAt = request.collectedAt() == null ? now : request.collectedAt();
         if (collectedAt.isAfter(now)) {
             throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Collection cannot be recorded in the future");

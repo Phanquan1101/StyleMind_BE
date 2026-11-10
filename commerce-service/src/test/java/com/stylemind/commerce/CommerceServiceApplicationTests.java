@@ -85,6 +85,12 @@ class CommerceServiceApplicationTests {
     private com.stylemind.commerce.repository.order.PaymentEventRepository paymentEventRepository;
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.stylemind.commerce.repository.order.CancellationRefundRepository cancellationRefundRepository;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
     private com.stylemind.commerce.repository.order.CodOrderConfirmationRepository codOrderConfirmationRepository;
 
     @MockBean
