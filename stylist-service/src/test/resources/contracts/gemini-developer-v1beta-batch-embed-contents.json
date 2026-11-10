@@ -1,0 +1,20 @@
+{
+  "endpoint": "/v1beta/models/gemini-embedding-001:batchEmbedContents",
+  "source": "Google Gen AI Java SDK v1.79.0 MLDV converter wire shape; synchronous Gemini Developer API batchEmbedContents",
+  "body": {
+    "requests": [
+      {
+        "model": "models/gemini-embedding-001",
+        "content": {
+          "parts": [
+            {
+              "text": "synthetic retrieval query"
+            }
+          ]
+        },
+        "taskType": "RETRIEVAL_QUERY",
+        "outputDimensionality": 1536
+      }
+    ]
+  }
+}

@@ -13,5 +13,6 @@ public record CancellationRequestResponse(
         @JsonProperty("requested_at") OffsetDateTime requestedAt,
         @JsonProperty("reviewed_by_user_id") UUID reviewedByUserId,
         @JsonProperty("reviewed_at") OffsetDateTime reviewedAt,
-        @JsonProperty("decision_reason") String decisionReason) {
+        @JsonProperty("decision_reason") String decisionReason,
+        @JsonProperty("refund_status") String refundStatus) {
 }

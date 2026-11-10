@@ -5,13 +5,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, UUID> {
     List<ProductVariant> findByProductIdInOrderByProductIdAscSkuAscVariantIdAsc(Collection<UUID> productIds);
     List<ProductVariant> findByVariantIdInOrderByVariantIdAsc(Collection<UUID> variantIds);
     boolean existsByProductIdAndVariantStatus(UUID productId, String variantStatus);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from ProductVariant v where v.variantId in :ids order by v.variantId")
+    List<ProductVariant> findLockedByVariantIdIn(@Param("ids") Collection<UUID> ids);
 
     /** Rows for the internal batch lookup; purchasable mirrors the cart rule (variant, product, category, brand active). */
     @Query(value = """

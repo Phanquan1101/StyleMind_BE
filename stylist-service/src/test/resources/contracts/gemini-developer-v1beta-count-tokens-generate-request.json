@@ -1,0 +1,41 @@
+{
+  "api": "Gemini Developer API",
+  "apiVersion": "v1beta",
+  "source": "googleapis/googleapis generative_service.proto CountTokensRequest and GenerateContentRequest, v1beta",
+  "model": "gemini-3.5-flash-lite",
+  "countTokensEnvelope": "generateContentRequest",
+  "generateContentRequestFields": [
+    "model",
+    "systemInstruction",
+    "contents",
+    "generationConfig"
+  ],
+  "generationConfigFields": [
+    "candidateCount",
+    "maxOutputTokens",
+    "thinkingConfig",
+    "responseFormat"
+  ],
+  "responseFormatMimeType": "APPLICATION_JSON",
+  "responseSchemaTypeCase": "LOWERCASE_JSON_SCHEMA",
+  "responseSchemaSupportedFields": [
+    "type",
+    "properties",
+    "items",
+    "enum",
+    "required",
+    "minItems",
+    "maxItems",
+    "additionalProperties"
+  ],
+  "mutuallyExclusiveCountTokensFields": [
+    "contents",
+    "generateContentRequest"
+  ],
+  "notes": [
+    "CountTokensRequest accepts either contents or generateContentRequest, not both.",
+    "generateContentRequest carries systemInstruction and contents for the model input.",
+    "The live-verified gemini-3.5-flash-lite pipeline uses the generateContentRequest countTokens envelope so preflight carries the same system instruction, user contents, thinking level, and structured response format as generation.",
+    "This selected model path uses responseFormat.text with APPLICATION_JSON and a constrained JSON schema; it does not use the legacy responseMimeType/responseSchema layout."
+  ]
+}

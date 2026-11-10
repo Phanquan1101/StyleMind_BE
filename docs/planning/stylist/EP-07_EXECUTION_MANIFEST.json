@@ -1,0 +1,1049 @@
+{
+  "schema_version": 1,
+  "epic": "EP-07",
+  "revision_date": "2026-11-07",
+  "authorization_scope": "SCOPED_IMPLEMENTATION",
+  "owner_scope_supplements": [
+    {
+      "approved_at": "2026-11-05",
+      "source": "Owner-provided attachment in this chat: STYLEMIND — ACCELERATED DELIVERY 1 IMPLEMENT THE INTERNAL RECOMMENDATION PIPELINE",
+      "prior_approved_slices": {
+        "P03-A": "Approved limited session creation/history read slice with exact two-table V1; remains a partial slice, not completion of P03 or US-07.01.",
+        "P03-B1": "Approved shop/manual request intake/read-back with exact two-table V2 and RECEIVED only; remains a partial slice, not completion of P03 or US-07.01."
+      },
+      "accelerated_delivery_1": {
+        "status": "APPROVED_SCOPED_IMPLEMENTATION",
+        "scope": [
+          "Close the approved P03-B1 follow-up findings with regression evidence.",
+          "Implement a Stylist Feign consumer for the actual public Commerce product detail and active variant batch lookup contracts.",
+          "Connect owner-scoped request/manual context to bounded P04.1 fixture retrieval, the existing P02 engine, and final current-Commerce recheck in a non-public internal use case.",
+          "Verify with disposable PostgreSQL/Qdrant and an HTTP Commerce contract fixture; update one consolidated report and slice evidence."
+        ],
+        "out_of_scope": [
+          "Public recommendation/generation API or recommendation persistence/new migration",
+          "Full-catalog or live production category, color, style, material, or demographic mapping",
+          "Owned context, Wardrobe/Identity integration, provider/LLM/real embedding, Neo4j, catalog events, P04.3",
+          "Persistent database, shared Compose/Qdrant, Commerce source changes, workbook edits, commit or push"
+        ],
+        "status_policy": "P03, P04, P07, US-07.01, US-07.02, and EP-07 stay PARTIAL/INCOMPLETE unless their full approved backlog scope is implemented and verified.",
+        "execution_evidence": {
+          "verified_at": "2026-11-05",
+          "branch": "feature/ep-07-ai-stylist",
+          "head": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+          "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+          "result": "BUILD SUCCESS; 143 tests, 0 failures, 0 errors, 0 skipped. Surefire XML agrees.",
+          "coverage": "52 P02 engine; 40 retrieval/Commerce consumer/pipeline/seed/Qdrant; 32 PostgreSQL/embedded-HTTP request/session; 6 parser; 13 application/security/OpenAPI.",
+          "environment": "Docker Linux Engine 28.5.2; PostgreSQL 18.6 and Qdrant qdrant/qdrant:v1.20.0 via disposable Testcontainers on random mapped ports. V1/V2 applied only to disposable PostgreSQL. Test-owned Qdrant collections and Testcontainers resources cleaned; no persistent DB, shared Compose/Qdrant, live Commerce, provider or LLM.",
+          "postman": "Existing P03-A and P03-B1 collection/environment JSON structurally parsed; collections have 4 and 9 requests. Newman/Gateway runtime was not run; no pipeline HTTP API was created.",
+          "planning_guard": "Standard and --phase P03 guards exit 1 for Commerce committed-range/source drift and changed Stylist pom.xml/application.properties fingerprints. No reviewed_head or fingerprints were refreshed.",
+          "evidence_artifacts": [
+            "docs/planning/stylist/EP-07_ACCELERATED_DELIVERY_1_REPORT.md",
+            "docs/planning/stylist/EP-07_P03B1_FOLLOW_UP_REPORT.md",
+            "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.retrieval.InternalRecommendationPipelineIntegrationTests.xml",
+            "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.retrieval.QdrantCandidateRetrievalIntegrationTests.xml"
+          ],
+          "scope_note": "P03-B1 follow-up and internal fixture-only recommendation pipeline verified. No public generation API, recommendation persistence, new migration, live category mapping, owned context, provider/LLM, Neo4j, catalog events, P04.3, persistent DB, commit or push. P03/P04/P07, US-07.01/US-07.02 and EP-07 remain PARTIAL/INCOMPLETE."
+        }
+      }
+    },
+    {
+      "approved_at": "2026-11-05",
+      "source": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "accelerated_delivery_2": {
+        "status": "APPROVED_SCOPED_IMPLEMENTATION",
+        "scope": [
+          "Implement owner-scoped generation and recommendation read APIs while preserving P03-B1 intake as RECEIVED with generation_started=false.",
+          "Add Stylist V3 with exactly the request lifecycle check and wardrobe_recommendation/recommendation_item tables; apply only on disposable Testcontainers PostgreSQL.",
+          "Implement the approved OpenAI embedding and strict structured generation adapters, runtime Qdrant index, reviewed catalog policy/import, fixed-query reviewed Neo4j adapter/import, and generation orchestration/final Commerce check.",
+          "Add tests, Postman collection/environment/run guide, Wave 2 contract/report, implementation-plan/manifest, and sequence/class responsibility documentation."
+        ],
+        "approved_models": {
+          "embedding": "text-embedding-3-small, 1536 dimensions",
+          "generation": "gpt-5.4-mini-2026-03-17, native Structured Outputs"
+        },
+        "provider_smoke_limits": {
+          "enabled_by_default": false,
+          "maximum_total_usd": 2,
+          "customer_input": "Synthetic query composed by the team only",
+          "catalog_and_knowledge": "Synthetic reviewed-shaped data only for smoke",
+          "maximum_input_tokens": 6000,
+          "maximum_output_tokens": 2000,
+          "llm_calls_per_attempt": 1,
+          "automatic_retry_or_fallback": false,
+          "reservation_required": true,
+          "unknown_delivery_keeps_reservation": true,
+          "execution": "NOT_EXECUTED: API key was absent; no provider key value was read and no paid call was made."
+        },
+        "out_of_scope": [
+          "Owned-Wardrobe context, Identity profile consumer, cross-service database access or changes to another service",
+          "Commerce catalog event producer/consumer synchronization (R99/P08)",
+          "Persistent database migration, shared Compose/Qdrant/Neo4j, or production deployment",
+          "Automatic assistant-message history, provider retry/fallback, tools/browsing, image/body analysis, or training",
+          "P09/P10, all of EP-07, or a semantic fashion-quality acceptance claim"
+        ],
+        "status_policy": "P03, P04, P05, P06 and P07 remain PARTIAL; R95/R99 and EP-07 remain incomplete. Provider smoke and Gateway/Newman runtime evidence are not inferred from tests.",
+        "execution_evidence": {
+          "verified_at": "2026-11-05",
+          "branch": "feature/ep-07-ai-stylist",
+          "head_at_start": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+          "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+          "result": "BUILD SUCCESS; 154 tests, 0 failures, 0 errors, 0 skipped. Surefire XML total: 18 suites, 154 tests.",
+          "test_counts": {
+            "P02_engine_unit": 52,
+            "retrieval_policy_pipeline_and_store_tests": 43,
+            "session_request_api_transaction_and_parser_tests": 42,
+            "generation_orchestration_tests": 2,
+            "application_security_openapi_tests": 13,
+            "openai_adapter_local_http_contract_tests": 2
+          },
+          "environment": "Docker Linux Engine 28.5.2; disposable Testcontainers PostgreSQL 18.6 (postgres:18-alpine), Qdrant v1.20.0 (qdrant/qdrant:v1.20.0), and Neo4j 5.26 (neo4j:5.26) with random mapped ports. V3 ran only on disposable PostgreSQL. Testcontainers/Ryuk owned cleanup. No Compose, persistent database, shared Qdrant, live Commerce, live Gateway or provider was accessed.",
+          "postman": "Collection and placeholder environment JSON structurally validated after creation. Postman/Newman through Gateway was not run.",
+          "provider": "No external OpenAI call. Local HTTP contract fixture verifies actual configured client request shape, model identifiers, dimensions, native strict schema and no retry; it is not provider availability or billing evidence.",
+          "planning_guard": "Both `node scripts/verify-stylist-planning.cjs` and `node scripts/verify-stylist-planning.cjs --phase P07` exit 1: 21 sources, 21 documents, 105 links, 10 JSON examples, 15 Mermaid blocks. Existing committed-range Commerce drift (8 files), Stylist source-fingerprint drift (`pom.xml`, `application.properties`, `SecurityConfiguration.java`) and Commerce fingerprint drift (`ProductController`, `VariantResponse`, `ProductVariantRepository`) remain. No fingerprint or reviewed_head was updated; Commerce files were not edited.",
+          "scope_note": "Only the owner-approved Wave 2 implementation scope. No persistent migration, other service, shared Compose, provider smoke, live cross-service/Gateway acceptance, commit or push."
+        }
+      }
+    },
+    {
+      "approved_at": "2026-11-06",
+      "source": "Owner-provided attachment in this chat: STYLEMIND — GEMINI FREE-TIER ADAPTERS AND BOUNDED LIVE VERIFICATION.",
+      "gemini_free_tier_adapters": {
+        "status": "APPROVED_SCOPED_IMPLEMENTATION",
+        "budget_usd": 0,
+        "models": {
+          "generation": "gemini-2.5-flash",
+          "embedding": "gemini-embedding-001",
+          "embedding_dimensions": 1536
+        },
+        "scope": [
+          "Add explicitly selected Gemini Developer API embedding and structured-generation adapters behind existing Stylist ports.",
+          "Keep current APIs, DTOs, request lifecycle, WOMEN TOP+BOTTOM policy, Commerce final check and V1-V3 unchanged.",
+          "Use synthetic fixtures and disposable PostgreSQL/Qdrant/Neo4j resources only; keep live calls disabled until project tier/model/quota are verified."
+        ],
+        "out_of_scope": [
+          "OpenAI live calls, paid-tier/trial/billing enablement, provider fallback/retry, other model IDs, Vertex AI or auxiliary tools.",
+          "Persistent database, shared Compose/store, Commerce live catalog/import, Identity/Wardrobe data, other services or production deployment.",
+          "R95, R99, P08 or EP-07 completion."
+        ],
+        "status_policy": "Offline and disposable verification may pass while Gemini live smoke and Gemini Gateway pipeline remain BLOCKED; do not infer provider access, quota, cost, live persistence/replay or EP-07 completion from fixtures."
+      }
+    }
+  ],
+  "git": {
+    "work_branch": "feature/ep-07-ai-stylist",
+    "reviewed_remote_dev": "a2a650747246d931ff9fa058a0d3027b263f3d15",
+    "reviewed_head": "e6cbaee0ab289e32b1e1f564db9f20a425a5e607",
+    "preserved_staged_stash": "2bec4b283b098739eee67494c2248010381b9361"
+  },
+  "workbook": {
+    "path": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_Task.xlsx",
+    "sha256": "1f9657c9e6df2992572e86338cb4c985c21451ed4fcca08d338fb00c6b7cde73",
+    "sheet": "Backlog",
+    "verified_read_only_on": "2026-10-27"
+  },
+  "tasks": [
+    {
+      "row": 93,
+      "us": "US-07.01",
+      "task": "DB: Apply Stylist session/message/request, constraint and request-item migrations.",
+      "type": "Database"
+    },
+    {
+      "row": 94,
+      "us": "US-07.01",
+      "task": "BE: Create styling request and conversation-history APIs with owner validation.",
+      "type": "Backend"
+    },
+    {
+      "row": 95,
+      "us": "US-07.01",
+      "task": "BE: Read customer preferences and permitted wardrobe items from their owning services.",
+      "type": "Integration"
+    },
+    {
+      "row": 96,
+      "us": "US-07.01",
+      "task": "BE: Test invalid context, conversation ownership and unavailable context services.",
+      "type": "Testing"
+    },
+    {
+      "row": 97,
+      "us": "US-07.02",
+      "task": "DB: Apply recommendation/item migrations with owned or shop-variant provenance.",
+      "type": "Database"
+    },
+    {
+      "row": 98,
+      "us": "US-07.02",
+      "task": "BE: Connect existing Qdrant/Neo4j retrieval to valid catalog and approved knowledge inputs.",
+      "type": "Integration"
+    },
+    {
+      "row": 99,
+      "us": "US-07.02",
+      "task": "BE: Update catalog projections from change events and handle duplicate or stale events.",
+      "type": "Integration"
+    },
+    {
+      "row": 100,
+      "us": "US-07.02",
+      "task": "BE: Generate outfits with reasons and styling tips using the selected AI provider.",
+      "type": "Backend"
+    },
+    {
+      "row": 101,
+      "us": "US-07.02",
+      "task": "BE: Recheck shop variants, prices and hard constraints before saving recommendations.",
+      "type": "Backend"
+    },
+    {
+      "row": 102,
+      "us": "US-07.02",
+      "task": "BE: Test fake variants, wrong prices, hard-budget violations and unavailable AI results.",
+      "type": "Testing"
+    }
+  ],
+  "approvals": {
+    "rules": {
+      "group": "outfit_rules_and_source_scope",
+      "status": "APPROVED",
+      "description": "Prompt 08 product scope: women shop TOP and BOTTOM only; every outfit has exactly one of each. All other slots, including ONE_PIECE, SHOES and ACCESSORY, are excluded. This approval covers only the P02 pure engine and synthetic fixtures.",
+      "owner_evidence": "Owner-provided Prompt 08 attachment pasted in this chat on 2026-10-29, titled “STYLEMIND — EP-07 AI STYLIST PROMPT 08 — CORRECT P02 PRODUCT SCOPE + IMPLEMENT P03-A”. It explicitly approves exactly TOP+BOTTOM product scope, P02 correction, and the limited P03-A session/history slice.",
+      "approved_scope": "P02 TOP+BOTTOM correction in pure Java engine, synthetic fixtures/tests, and P02 documentation/manifest only. No live category mapping, API/schema, provider, or other-service behavior.",
+      "recorded_at": "2026-10-29",
+      "additional_approved_scope": "Wave 2 keeps the approved WOMEN shop-only scope, exactly one TOP and one BOTTOM, exact VND hard rules, no owned input and no cross-service DB access. Generation may explain only evidence-supported facts; it cannot alter a complete backend outfit.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "api": {
+      "group": "api_context_security",
+      "status": "APPROVED",
+      "description": "P03-A only: create session and owner-scoped message-history read APIs as specified in Prompt 08; no request admission, generation or other P03 routes.",
+      "owner_evidence": "Owner-provided Prompt 08 attachment pasted in this chat on 2026-10-29, titled “STYLEMIND — EP-07 AI STYLIST PROMPT 08 — CORRECT P02 PRODUCT SCOPE + IMPLEMENT P03-A”. It explicitly approves exactly TOP+BOTTOM product scope, P02 correction, and the limited P03-A session/history slice.",
+      "approved_scope": "Implement POST /api/v1/stylist/sessions and GET /api/v1/stylist/sessions/{session_id}/messages, including the exact validation, JWT self-only ownership, response and error contract in Prompt 08. No broader P03/US-07.01 completion.",
+      "recorded_at": "2026-10-29",
+      "additional_approved_scope": "Wave 2 additionally authorizes POST /api/v1/stylist/requests/{requestId}/generate with exact {} body, plus owner-scoped GET request recommendations and GET recommendation detail. Existing intake stays RECEIVED and never auto-generates. Direct DTO success, Problem Details errors, no-store and the specified status/error map remain.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "schema": {
+      "group": "schema_lifecycle",
+      "status": "APPROVED",
+      "description": "P03-A Flyway V1 only: stylist_session and stylist_message, exact fields/constraints/indexes in Prompt 08; no request/recommendation/other tables.",
+      "owner_evidence": "Owner-provided Prompt 08 attachment pasted in this chat on 2026-10-29, titled “STYLEMIND — EP-07 AI STYLIST PROMPT 08 — CORRECT P02 PRODUCT SCOPE + IMPLEMENT P03-A”. It explicitly approves exactly TOP+BOTTOM product scope, P02 correction, and the limited P03-A session/history slice.",
+      "approved_scope": "Add the source migration and JPA persistence for exactly the two P03-A tables. Disposable integration-test databases are permitted; no persistent database migration, repair, clean or reset is authorized.",
+      "recorded_at": "2026-10-29",
+      "additional_approved_scope": "Wave 2 additionally authorizes V3 only: request lifecycle CHECK plus exactly wardrobe_recommendation and recommendation_item, with local FKs/invariants described in EP-07_WAVE_2_CONTRACT.md. V1/V2 are immutable. Apply V3 only to disposable Testcontainers PostgreSQL.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "p03b1_intake": {
+      "group": "p03b1_request_intake",
+      "status": "APPROVED",
+      "description": "Narrow owner approval for P03-B1 shop/manual request intake and read-back only.",
+      "owner_evidence": "Owner approval in this chat on 2026-11-04: “Tôi duyệt triển khai đúng P03-B1 theo contract proposal hiện có”. The owner specified RECEIVED only, V2 with exactly styling_request and styling_constraint, Spring Data JPA layering, validation, A/B authorization, transaction, disposable integration tests, P02/P03-A regression and Postman. The owner excluded owned context, provider/LLM, P04.3, other services, persistent DB, commit and push.",
+      "approved_scope": "Implement only the contract in docs/planning/stylist/EP-07_P03B_CONTRACT_PROPOSAL.md §§2–5 and §8. V2 is source-only and may run only against disposable Testcontainers databases. No generation or additional tables/columns.",
+      "recorded_at": "2026-11-04"
+    },
+    "embedding": {
+      "group": "ai_data_budget",
+      "status": "APPROVED",
+      "description": "P04.1 deterministic fake embedding only; production model, data use and paid-call caps remain unapproved",
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-02, titled “EP-07 — P04.1 IMPLEMENT DISPOSABLE QDRANT RETRIEVAL POC”. It explicitly authorizes a deterministic fake 128-dimensional embedding for this disposable POC and does not approve a paid or live embedding provider.",
+      "approved_scope": "P04.1 FAKE_TEST_ONLY deterministic 128-dimensional vectors for SOURCE_SEED fixture tests. No real embedding model/provider, external embedding API, paid call, production data use or semantic-quality claim is approved.",
+      "recorded_at": "2026-11-02",
+      "additional_approved_scope": "Additional Wave 2 approval: implement text-embedding-3-small with 1536 dimensions in the Stylist runtime adapter and isolated runtime collection. This does not expand the earlier P04.1 fake 128-dimensional fixture approval into a live catalog approval or authorize a paid call except the bounded smoke.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "generation": {
+      "group": "ai_data_budget",
+      "status": "APPROVED",
+      "description": "Selected generation model, structured schema, privacy, token/time/money limits and synthetic benchmark",
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "approved_scope": "Exact selected model gpt-5.4-mini-2026-03-17 with native strict structured output. One model call per attempt, no retry/fallback, 6000 input-token and 2000 output-token caps, provider smoke total cap USD 2 with conservative reservation accounting; calls disabled by default. Smoke only with synthetic data and a valid key/cap. No actual smoke was executed in this run.",
+      "recorded_at": "2026-11-05",
+      "additional_approved_scope": "Exact selected model gpt-5.4-mini-2026-03-17 with native strict structured output. One model call per attempt, no retry/fallback, 6000 input-token and 2000 output-token caps, provider smoke total cap USD 2 with conservative reservation accounting; calls disabled by default. Smoke only with synthetic data and a valid key/cap. No actual smoke was executed in this run.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "qdrant": {
+      "group": "producer_events_knowledge",
+      "status": "APPROVED",
+      "description": "P04.1 disposable Qdrant Testcontainers image only; shared/runtime deployment and live import remain unapproved",
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-02, titled “EP-07 — P04.1 IMPLEMENT DISPOSABLE QDRANT RETRIEVAL POC”. It explicitly authorizes Qdrant in a separate test environment for the fixture-only retrieval POC and forbids changing shared Compose or production deployment.",
+      "approved_scope": "P04.1 disposable Testcontainers Qdrant v1.20.0 with a random mapped port, no persistent volume, and a uniquely named test collection deleted by its owner test. No shared Compose, team Qdrant, production deployment, Commerce database/runtime or live import is approved.",
+      "recorded_at": "2026-11-02",
+      "additional_approved_scope": "Additional Wave 2 approval: implement the Stylist runtime Qdrant adapter/index with 1536-dimensional cosine collection separated from P04.1 fixture collection, trusted scoped configuration, and disposable integration tests. Shared/persistent Qdrant deployment remains outside scope.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "neo4j": {
+      "group": "producer_events_knowledge",
+      "status": "APPROVED",
+      "description": "Isolated Neo4j deployment, driver/server compatibility",
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "approved_scope": "Additional Wave 2 approval: implement fixed parameterized Neo4j reads and scoped disposable integration tests for reviewed-only evidence; graph health/protocol errors remain dependency failures. No shared graph or schema access.",
+      "recorded_at": "2026-11-05",
+      "additional_approved_scope": "Additional Wave 2 approval: implement fixed parameterized Neo4j reads and scoped disposable integration tests for reviewed-only evidence; graph health/protocol errors remain dependency failures. No shared graph or schema access.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "knowledge": {
+      "group": "producer_events_knowledge",
+      "status": "APPROVED",
+      "description": "Reviewed rule authority, ingestion/provenance and explicit two-table knowledge scope if persisted",
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "approved_scope": "Additional Wave 2 approval: implement controlled import of artifacts that already carry explicit source, reviewer, approval state and version/revocation evidence. No Admin CRUD/crawler and no SQL knowledge tables; test artifacts do not count as human approval.",
+      "recorded_at": "2026-11-05",
+      "additional_approved_scope": "Additional Wave 2 approval: implement controlled import of artifacts that already carry explicit source, reviewer, approval state and version/revocation evidence. No Admin CRUD/crawler and no SQL knowledge tables; test artifacts do not count as human approval.",
+      "additional_owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "additional_recorded_at": "2026-11-05"
+    },
+    "catalog_events": {
+      "group": "producer_events_knowledge",
+      "status": "NOT_APPROVED",
+      "description": "Commerce catalog event producer, snapshot/version/transport/durable projection contract; not PaymentConfirmed",
+      "owner_evidence": null,
+      "approved_scope": null,
+      "recorded_at": null
+    },
+    "owned_context": {
+      "group": "producer_events_knowledge",
+      "status": "NOT_APPROVED",
+      "description": "Trusted owned-versus-saved status/access for Commerce-linked wardrobe items; current Outfit API does not establish it; live contract remains pending",
+      "owner_evidence": null,
+      "approved_scope": null,
+      "recorded_at": null
+    },
+    "live_run": {
+      "group": "ai_data_budget",
+      "status": "NOT_APPROVED",
+      "description": "Named disposable live integration environment, approved provider usage and cleanup bounds",
+      "owner_evidence": null,
+      "approved_scope": null,
+      "recorded_at": null
+    }
+  },
+  "implementation_policy": {
+    "persistence": "Spring Data JPA/Hibernate selected 2026-10-28. Prompt 08 authorized P03-A; owner approval on 2026-11-04 separately authorizes only P03-B1 request intake/read-back and its two-table V2. Do not refactor other services or migrate persistent databases.",
+    "success_response": "Direct DTO for approved Stylist P03-A and P03-B1 endpoints; no global ApiResponse change approved",
+    "target_sources": [
+      "OWNED_WARDROBE",
+      "SHOP_VARIANT"
+    ],
+    "live_wardrobe_capability": "Saved shop variant outfits; source has no owned-versus-saved per-item flag. Every wardrobe item is shop-linked per owner correction.",
+    "generation_model": "Owner-approved implementation model: gpt-5.4-mini-2026-03-17 with native strict JSON Schema. Provider calls default off; no paid smoke without valid key and restart-safe bounded reservation.",
+    "embedding_model": "Owner-approved Wave 2 implementation model: text-embedding-3-small, 1536 dimensions. P04.1 fake 128-dimensional fixture remains separate.",
+    "gateway_client_prefix": "/stylist",
+    "no_automatic_provider_calls": true,
+    "no_cross_service_database_access": true,
+    "business_catalog_scope": "Women shop-linked TOP and BOTTOM only; exactly one per outfit. ONE_PIECE, SHOES, ACCESSORY and other slots are out of scope. Live Commerce category mapping remains unapproved.",
+    "runtime_provenance": "All items require Commerce variantId; Holding NONE/SAVED/OWNED; only confirmed owned anchors have additional cost zero; persistence representation deferred.",
+    "wave_2_schema": "V3 recommendation/item tables and request lifecycle only; V1/V2 immutable; apply only to disposable PostgreSQL Testcontainers.",
+    "wave_2_status": "P05/P06/P07 PARTIAL; no owned context, Identity profile consumer, catalog events, persistent migration, provider smoke or Gateway/Newman live evidence."
+  },
+  "required_documents": [
+    "docs/planning/stylist/README.md",
+    "docs/planning/stylist/EP-07_IMPLEMENTATION_PLAN.md",
+    "docs/planning/stylist/EP-07_PHASE_A_CONTRACT_MEMO.md",
+    "docs/planning/stylist/EP-07_DEPENDENCY_CONTRACTS.md",
+    "docs/planning/stylist/EP-07_FLOWS.md",
+    "docs/planning/stylist/EP-07_TECHNICAL_DESIGN.md",
+    "docs/planning/stylist/EP-07_VERIFICATION_MATRIX.md",
+    "docs/planning/stylist/EP-07_REVIEW_2026-10-27.md",
+    "docs/planning/stylist/EP-07_BUSINESS_CORRECTION_2026-10-28.md",
+    "docs/planning/stylist/EP-07_P02_IMPLEMENTATION_REPORT.md",
+    "docs/planning/stylist/EP-07_P03_DECISION_MEMO.md",
+    "docs/planning/stylist/EP-07_P03A_SESSION_HISTORY_REPORT.md",
+    "docs/planning/stylist/EP-07_ACCELERATED_DELIVERY_1_REPORT.md",
+    "stylist-service/postman/StyleMind-Stylist-P03A.postman_collection.json",
+    "stylist-service/postman/StyleMind-Stylist-P03A.postman_environment.json",
+    "stylist-service/postman/P03A_RUN_GUIDE.md",
+    "docs/planning/stylist/EP-07_WAVE_2_CONTRACT.md",
+    "docs/planning/stylist/EP-07_WAVE_2_IMPLEMENTATION_REPORT.md",
+    "stylist-service/postman/StyleMind-Stylist-Wave2.postman_collection.json",
+    "stylist-service/postman/StyleMind-Stylist-Wave2.postman_environment.json",
+    "stylist-service/postman/WAVE2_RUN_GUIDE.md",
+    "docs/planning/stylist/EP-07_WAVE_2_COMPLETION_REPORT.md"
+  ],
+  "source_fingerprints": [
+    {
+      "path": "database/six-service-model/05_stylist.mmd",
+      "sha256": "30f86e62294d80bdc8155b6eb570b6805149650c0906900d4f12d48af6f8bc09"
+    },
+    {
+      "path": "database/six-service-model/04_wardrobe_community.mmd",
+      "sha256": "ba652f0a9e7f481b20808ba84746f2dcb27f9818932f1cbe36fe267a76c35005"
+    },
+    {
+      "path": "database/six-service-model/02_commerce.mmd",
+      "sha256": "b692d5ec14f40b774e121a59fdb58a8956904c4769baaf0e92ed21008efd778d"
+    },
+    {
+      "path": "stylist-service/pom.xml",
+      "sha256": "dc96bb21d09f562fdf6635730b6f37749bf2503d52e1c07c78a00dd166cd2745"
+    },
+    {
+      "path": "stylist-service/src/main/resources/application.properties",
+      "sha256": "2840de6b813dce8ea11cbdd50445842037c75af29e8ff170899553de98516f88"
+    },
+    {
+      "path": "stylist-service/src/main/java/com/stylemind/stylist/security/JwtDecoderConfiguration.java",
+      "sha256": "78739e6185d02a9d42a234de9fc34d09123f8d723e57bf0e7c3caa2dc4d8c1d1"
+    },
+    {
+      "path": "stylist-service/src/main/java/com/stylemind/stylist/security/SecurityConfiguration.java",
+      "sha256": "9152e4447108d8a924d55e35f591cf53f0adaa98382d9ab2defb1d97296ef224"
+    },
+    {
+      "path": "api-gateway/src/main/resources/application.properties",
+      "sha256": "3f10058642a35a82220aca670233e0289e4913ce3e19e458db7e1e40497e07e5"
+    },
+    {
+      "path": "identity-service/src/main/java/com/stylemind/identity/dto/profile/StyleProfileResponse.java",
+      "sha256": "c9ed2151a9cb678205a26bf2a460e90d5f5571461eaa7c3c4774ddb501a4f925"
+    },
+    {
+      "path": "identity-service/src/main/resources/db/migration/V4__add_weight_to_style_profile.sql",
+      "sha256": "e5cb46dfa27c9fc87bda17e8edacdbe8944d57a8a26ddcb5f42777ad751387dd"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/controller/product/ProductController.java",
+      "sha256": "ee336041d6de7a62d1cc4adb69790123c4c72e17b0666e25235c13ec482c702d"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/dto/product/ProductResponse.java",
+      "sha256": "aa10a19926be0536afcb64566ea1e22adbd23508ae485539f1fdd0f179f640a4"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/dto/product/VariantResponse.java",
+      "sha256": "94c7026251d62ff088c09c125f8d9e6bfa7afca7c9523bb3a9fb67232471aed4"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/controller/internal/InternalVariantController.java",
+      "sha256": "973ba556a1394e804c449414e3bb58260716fef82dcd5147cf442576d3360bf7"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/dto/internal/InternalVariantItem.java",
+      "sha256": "9a1d27924c993773439ff74eb3afbd6ad4e2ace73c64caba979c068728e3050b"
+    },
+    {
+      "path": "commerce-service/src/main/java/com/stylemind/commerce/repository/product/ProductVariantRepository.java",
+      "sha256": "d4ea0471eeb8e7a26ff39c57ccc6f95e68077a66bf81c181fb4451cef92ca177"
+    },
+    {
+      "path": "wardrobe-community-service/src/main/resources/db/migration/V1__create_outfit_tables.sql",
+      "sha256": "0ca8177b27f822343224774014f2116342bed353131f0c88ba5eec50a4c06f31"
+    },
+    {
+      "path": "wardrobe-community-service/src/main/resources/db/migration/V2__add_outfit_sharing.sql",
+      "sha256": "677be3c9c1ffd521322938a4d52fb0307cc7145260055ca1adfe068bc7efa737"
+    },
+    {
+      "path": "wardrobe-community-service/src/main/java/com/stylemind/wardrobecommunity/controller/outfit/OutfitController.java",
+      "sha256": "c33c999aa16ddae27723d24b08d79733ec9e987436397c040041fa04e0748865"
+    },
+    {
+      "path": "wardrobe-community-service/src/main/java/com/stylemind/wardrobecommunity/validation/outfit/OutfitRequestValidator.java",
+      "sha256": "6dad8a7cce6cd777fc93265d3a9cef0a364ea7619181886d2ed6ea028e90b5e2"
+    },
+    {
+      "path": "wardrobe-community-service/src/main/java/com/stylemind/wardrobecommunity/client/commerce/CommerceCatalogClient.java",
+      "sha256": "a0da7433f4f56581ab68fe0465e6ca3a9cb40c3f6777c2c7149182f954e45edd"
+    }
+  ],
+  "phases": [
+    {
+      "id": "P01",
+      "title": "Reconcile and harness",
+      "status": "VERIFIED",
+      "task_rows": [
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102
+      ],
+      "required_approvals": [],
+      "allowed_scope": [
+        "Documentation, scoped AGENTS, read-only planning validator"
+      ],
+      "depends_on": [],
+      "completion_evidence": "docs/planning/stylist/EP-07_REVIEW_2026-10-27.md"
+    },
+    {
+      "id": "P02",
+      "title": "Pure engine and fixtures",
+      "status": "VERIFIED",
+      "task_rows": [
+        96,
+        101,
+        102
+      ],
+      "required_approvals": [
+        "rules"
+      ],
+      "allowed_scope": [
+        "P02 pure engine TOP+BOTTOM correction, synthetic fixtures/tests, P02 report and manifest only; no other product slots, live mapping, public API/schema, providers, other services, persistent database, commit/push/merge"
+      ],
+      "depends_on": [
+        "P01"
+      ],
+      "completion_evidence": "docs/planning/stylist/EP-07_P02_IMPLEMENTATION_REPORT.md",
+      "owner_acceptance": {
+        "status": "ACCEPTED",
+        "recorded_at": "2026-10-28",
+        "owner_evidence": "Owner: Tai lieu baseline va ket qua trien khai P02 da duoc duyet (Accepted).",
+        "applies_to": "The 2026-10-28 acceptance is historical. Prompt 08 on 2026-10-29 separately authorizes the TOP+BOTTOM correction; see current execution evidence."
+      },
+      "execution_evidence": {
+        "verified_at": "2026-10-31",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "BUILD SUCCESS; 83 tests, 0 failures, 0 errors, 0 skipped (52 P02 engine, 13 existing regression, 16 P03-A PostgreSQL integration, 2 parser unit).",
+        "environment": "Local JVM; PostgreSQL 18 Testcontainers disposable integration database; no persistent database, live Gateway/Identity, provider or paid call."
+      }
+    },
+    {
+      "id": "P03",
+      "title": "Conversation and context",
+      "status": "PARTIAL",
+      "task_rows": [
+        93,
+        94,
+        95,
+        96
+      ],
+      "required_approvals": [
+        "rules",
+        "api",
+        "schema",
+        "p03b1_intake"
+      ],
+      "allowed_scope": [
+        "P03-A: session/message persistence, create-session and owner-scoped history APIs, tests and Postman",
+        "P03-B1 only: approved shop/manual styling-request intake and owner-scoped read-back; V2 exactly styling_request and styling_constraint; status RECEIVED only; validation, A/B ownership, transaction, disposable integration tests, P02/P03-A regression and Postman; no owned context, provider/LLM, generation or persistent database"
+      ],
+      "depends_on": [
+        "P01"
+      ],
+      "preparation_memo": "docs/planning/stylist/EP-07_P03_DECISION_MEMO.md (historical; superseded for P03-A only)",
+      "partial_slice": "P03-A",
+      "partial_slice_evidence": "docs/planning/stylist/EP-07_P03A_SESSION_HISTORY_REPORT.md",
+      "partial_slice_execution_evidence": {
+        "verified_at": "2026-10-31",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "P03-A tests: 16 PostgreSQL integration + 2 strict parser unit; 0 failures/errors/skips. Combined gate: 83 tests, 0 failures/errors/skips.",
+        "environment": "Testcontainers PostgreSQL 18 disposable database; no persistent project database."
+      },
+      "approved_additional_slice": "P03-B1",
+      "approved_additional_slice_evidence": "docs/planning/stylist/EP-07_P03B_CONTRACT_PROPOSAL.md §§2–5, §8; owner approval recorded in phase_authorizations.P03.additional_slice_approvals.P03-B1",
+      "additional_slice_execution_evidence": {
+        "status": "VERIFIED_DISPOSABLE_SCOPE",
+        "verified_at": "2026-11-04",
+        "commands": [
+          "mvn -B -ntp -f stylist-service/pom.xml -DskipTests compile",
+          "mvn -B -ntp -f stylist-service/pom.xml -Dtest=StylistSessionApiIntegrationTests test",
+          "mvn -B -ntp -f stylist-service/pom.xml test"
+        ],
+        "result": "BUILD SUCCESS; full Stylist suite: 119 tests, 0 failures, 0 errors, 0 skipped. Focused PostgreSQL session/request integration class: 23 tests, 0 failures/errors/skips. The suite covers P02/P03-A regression and the approved P03-B1 intake/read-back scenarios.",
+        "environment": "Docker Linux Engine 28.5.2; postgres:18-alpine (PostgreSQL 18.6) Testcontainers disposable database with random mapped port 53198. Flyway V1 and V2 applied only to that disposable database. Testcontainers cleanup completed; no Compose, persistent database, shared Qdrant or other service accessed.",
+        "evidence_artifacts": [
+          "docs/planning/stylist/EP-07_P03B1_IMPLEMENTATION_REPORT.md",
+          "stylist-service/target/p03b1-full-suite.log",
+          "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.session.StylistSessionApiIntegrationTests.xml",
+          "stylist-service/target/surefire-reports/TEST-*.xml"
+        ],
+        "runtime_http": "Postman/Newman through Gateway was not run; collection/environment structure was validated separately.",
+        "scope_note": "Only approved P03-B1 request storage/read-back. P03 remains PARTIAL; no owned context, generation, provider/LLM, P04.3, persistent database migration, other service, commit or push. Commerce planning drift remains unresolved."
+      },
+      "follow_up_execution_evidence": {
+        "verified_at": "2026-11-05",
+        "commands": [
+          "mvn -B -ntp -f stylist-service/pom.xml '-Dtest=StylistSessionApiIntegrationTests,StylingRequestParserUnicodeTests' test",
+          "mvn -B -ntp -f stylist-service/pom.xml verify"
+        ],
+        "result": "BUILD SUCCESS; targeted run: 36 tests, 0 failures, 0 errors, 0 skipped (32 PostgreSQL/embedded-HTTP integration + 4 parser tests). Full verify: 132 tests, 0 failures, 0 errors, 0 skipped, including two Qdrant integration tests.",
+        "environment": "Docker Linux Engine 28.5.2; PostgreSQL 18.6 via postgres:18-alpine Testcontainers on random mapped port 50635; Qdrant qdrant/qdrant:v1.20.0 Testcontainers on random mapped port 50596. Disposable databases/collections only; V1/V2 applied only to disposable PostgreSQL. Testcontainers cleanup completed; no persistent DB, shared Compose, or volume accessed.",
+        "evidence_artifacts": [
+          "docs/planning/stylist/EP-07_P03B1_FOLLOW_UP_REPORT.md",
+          "stylist-service/target/p03b1-follow-up-20261105/full-verify.log",
+          "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.session.StylistSessionApiIntegrationTests.xml",
+          "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.session.StylingRequestParserUnicodeTests.xml",
+          "stylist-service/postman/StyleMind-Stylist-P03B1.postman_collection.json",
+          "stylist-service/postman/StyleMind-Stylist-P03B1.postman_environment.json"
+        ],
+        "postman_runtime": "Collection and placeholder environment parse as Postman v2.1 JSON with nine requests. Newman/Postman runtime through Gateway was not run; embedded HTTP integration tests are not Gateway E2E evidence.",
+        "planning_guard": "node scripts/verify-stylist-planning.cjs --phase P03 exits 1 because of existing Commerce source/fingerprint drift. Commerce files, fingerprints, and reviewed_head were not changed.",
+        "scope_note": "F-01 through F-04 follow-up findings were verified in the approved P03-B1 disposable/local scope. P03, US-07.01, and EP-07 remain PARTIAL; no API/schema/migration or business-scope change, generation, owned context, provider/LLM, P04.3, service integration, persistent DB, commit, or push."
+      }
+    },
+    {
+      "id": "P04",
+      "title": "Qdrant and embedding retrieval",
+      "status": "PARTIAL",
+      "task_rows": [
+        98
+      ],
+      "required_approvals": [
+        "embedding",
+        "qdrant"
+      ],
+      "allowed_scope": [
+        "Stylist retrieval adapter, isolated config and tests; no shared Compose changes"
+      ],
+      "depends_on": [
+        "P01"
+      ],
+      "partial_slice": "P04.1_DISPOSABLE_QDRANT_RETRIEVAL_POC",
+      "partial_slice_status": "VERIFIED_DISPOSABLE_FIXTURE_SCOPE",
+      "partial_slice_evidence": "docs/planning/stylist/EP-07_P04_1_RETRIEVAL_POC_REPORT.md",
+      "partial_slice_execution_evidence": {
+        "verified_at": "2026-11-02",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml test",
+        "result": "BUILD SUCCESS; 97 tests, 0 failures, 0 errors, 0 skipped. Includes 52 P02 engine, 14 P04.1 retrieval/embedding/Qdrant, 16 P03-A PostgreSQL integration, 2 P03-A parser and 13 application tests.",
+        "environment": "Local JVM; Qdrant v1.20.0 Testcontainers with random mapped port and disposable test collections; PostgreSQL 18 Testcontainers for P03-A. No persistent project database, shared Compose, Commerce runtime, external embedding provider, LLM or paid call."
+      },
+      "follow_up_execution_evidence": {
+        "verified_at": "2026-11-04",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml test",
+        "result": "BUILD SUCCESS; 112 tests, 0 failures, 0 errors, 0 skipped. Includes 52 P02 engine, 29 P04.1 retrieval/seed/adapter tests (including 2 real Qdrant Testcontainers integration tests), 16 P03-A PostgreSQL integration, 2 P03-A parser and 13 application/security/OpenAPI tests.",
+        "environment": "Local JVM; Docker Linux Engine 28.5.2; qdrant/qdrant:v1.20.0 in disposable Testcontainers with random mapped host port 58289 and two UUID-named test collections; disposable PostgreSQL 18 Testcontainers for P03-A. Docker container inventory was identical before/after, with no Testcontainers container or Qdrant volume remaining. No persistent database, shared Qdrant/Compose, Commerce runtime, external provider or LLM.",
+        "evidence_artifacts": [
+          "stylist-service/target/p041-verification-20261104/VERIFICATION_SUMMARY.md",
+          "stylist-service/target/p041-verification-20261104/stylist-full-suite.log",
+          "stylist-service/target/p041-verification-20261104/suite-results.json",
+          "stylist-service/target/surefire-reports/TEST-com.stylemind.stylist.retrieval.QdrantCandidateRetrievalIntegrationTests.xml",
+          "stylist-service/target/surefire-reports/TEST-*.xml"
+        ],
+        "scope_note": "P04.1 verified only for six SOURCE_SEED fixture rows, deterministic fake embeddings and disposable Testcontainers. Historical Docker-blocked attempts are retained in the reports. P04 remains PARTIAL; R98, R99 and EP-07 remain incomplete. Known Commerce source/fingerprint drift remains unresolved."
+      }
+    },
+    {
+      "id": "P05",
+      "title": "Reviewed knowledge graph",
+      "status": "PARTIAL",
+      "task_rows": [
+        98
+      ],
+      "required_approvals": [
+        "neo4j",
+        "knowledge"
+      ],
+      "allowed_scope": [
+        "Stylist graph adapter and approved knowledge scope"
+      ],
+      "depends_on": [
+        "P01"
+      ],
+      "partial_slice": "WAVE_2",
+      "partial_slice_description": "Reviewed knowledge adapter and controlled reviewed-artifact import",
+      "partial_slice_evidence": "docs/planning/stylist/EP-07_WAVE_2_IMPLEMENTATION_REPORT.md",
+      "partial_slice_note": "Neo4jReviewedKnowledgeIntegrationTests and Wave 2 verify; only synthetic/disposable artifact fixtures, no human-approved production knowledge artifact.",
+      "partial_slice_execution_evidence": {
+        "verified_at": "2026-11-05",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "BUILD SUCCESS; 154 tests, 0 failures, 0 errors, 0 skipped.",
+        "environment": "Disposable Testcontainers only; no persistent DB, shared Compose/store, external provider, live Commerce or Gateway/Newman.",
+        "scope_note": "Wave 2 is a partial implementation. Live business data, provider smoke, R95/R99 and EP-07 acceptance remain incomplete."
+      }
+    },
+    {
+      "id": "P06",
+      "title": "Selected model adapter",
+      "status": "PARTIAL",
+      "task_rows": [
+        100,
+        102
+      ],
+      "required_approvals": [
+        "rules",
+        "generation"
+      ],
+      "allowed_scope": [
+        "One Stylist AI adapter, strict parser/fault tests and approved synthetic benchmark"
+      ],
+      "depends_on": [
+        "P02"
+      ],
+      "partial_slice": "WAVE_2",
+      "partial_slice_description": "Approved OpenAI embedding and structured generation adapters",
+      "partial_slice_evidence": "docs/planning/stylist/EP-07_WAVE_2_IMPLEMENTATION_REPORT.md",
+      "partial_slice_note": "OpenAiAdapterHttpContractTests using local embedded HTTP fixture; live provider smoke NOT EXECUTED and semantic quality not evaluated.",
+      "partial_slice_execution_evidence": {
+        "verified_at": "2026-11-05",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "BUILD SUCCESS; 154 tests, 0 failures, 0 errors, 0 skipped.",
+        "environment": "Disposable Testcontainers only; no persistent DB, shared Compose/store, external provider, live Commerce or Gateway/Newman.",
+        "scope_note": "Wave 2 is a partial implementation. Live business data, provider smoke, R95/R99 and EP-07 acceptance remain incomplete."
+      }
+    },
+    {
+      "id": "P07",
+      "title": "Recommendations and final grounding",
+      "status": "PARTIAL",
+      "task_rows": [
+        97,
+        100,
+        101,
+        102
+      ],
+      "required_approvals": [
+        "rules",
+        "api",
+        "schema",
+        "generation"
+      ],
+      "allowed_scope": [
+        "Stylist orchestrator, final authoritative validation, approved recommendation persistence, tests and Postman"
+      ],
+      "depends_on": [
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06"
+      ],
+      "partial_slice": "WAVE_2",
+      "partial_slice_description": "Generation APIs, V3 recommendation persistence/read-back and final grounding",
+      "partial_slice_evidence": "docs/planning/stylist/EP-07_WAVE_2_IMPLEMENTATION_REPORT.md",
+      "partial_slice_note": "Full Stylist verify 154 tests, 0 failures/errors/skips. Disposable PostgreSQL/Qdrant/Neo4j and local Commerce/OpenAI HTTP fixtures only; no live end-to-end run.",
+      "partial_slice_execution_evidence": {
+        "verified_at": "2026-11-05",
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "BUILD SUCCESS; 154 tests, 0 failures, 0 errors, 0 skipped.",
+        "environment": "Disposable Testcontainers only; no persistent DB, shared Compose/store, external provider, live Commerce or Gateway/Newman.",
+        "scope_note": "Wave 2 is a partial implementation. Live business data, provider smoke, R95/R99 and EP-07 acceptance remain incomplete."
+      }
+    },
+    {
+      "id": "P08",
+      "title": "Catalog event projections",
+      "status": "PLANNED",
+      "task_rows": [
+        99
+      ],
+      "required_approvals": [
+        "catalog_events",
+        "qdrant",
+        "neo4j"
+      ],
+      "allowed_scope": [
+        "Stylist projection coordination, approved durability and recovery tests; no producer implementation"
+      ],
+      "depends_on": [
+        "P04",
+        "P05"
+      ]
+    },
+    {
+      "id": "P09",
+      "title": "Full target live integration",
+      "status": "PLANNED",
+      "task_rows": [
+        94,
+        95,
+        98,
+        99,
+        100,
+        101,
+        102
+      ],
+      "required_approvals": [
+        "api",
+        "rules",
+        "owned_context",
+        "live_run"
+      ],
+      "allowed_scope": [
+        "Named disposable integration, actual producer contracts and scoped client config; partial shop slice must be named PARTIAL"
+      ],
+      "depends_on": [
+        "P07",
+        "P08"
+      ]
+    },
+    {
+      "id": "P10",
+      "title": "Acceptance and handover",
+      "status": "PLANNED",
+      "task_rows": [
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102
+      ],
+      "required_approvals": [
+        "api",
+        "rules",
+        "schema",
+        "generation",
+        "embedding",
+        "qdrant",
+        "neo4j",
+        "knowledge",
+        "catalog_events",
+        "owned_context",
+        "live_run"
+      ],
+      "allowed_scope": [
+        "Evidence, actual Postman runtime, quality evaluation and remaining findings"
+      ],
+      "requires_current_workbook": true,
+      "depends_on": [
+        "P09"
+      ]
+    }
+  ],
+  "phase_authorizations": {
+    "P01": {
+      "owner_evidence": "Owner request in this chat 2026-10-27: review documents, pull latest branch, update AI Stylist plan/structure/flows/model strategy and configure harness.",
+      "approved_scope": "Documentation and read-only harness/source checks only; no business implementation, migrations, runtime or paid model calls.",
+      "recorded_at": "2026-10-27"
+    },
+    "P02": {
+      "owner_evidence": "Owner-provided Prompt 08 attachment pasted in this chat on 2026-10-29, titled “STYLEMIND — EP-07 AI STYLIST PROMPT 08 — CORRECT P02 PRODUCT SCOPE + IMPLEMENT P03-A”. It explicitly approves exactly TOP+BOTTOM product scope, P02 correction, and the limited P03-A session/history slice.",
+      "approved_scope": "Correct P02 to exactly TOP+BOTTOM in pure Java engine, synthetic fixtures/tests, and P02 docs/manifest. No other slots or live mapping.",
+      "approved_rules": {
+        "context": [
+          "Explicit scalar values, including explicit null, override caller-selected saved requirements.",
+          "If neither source provides a value, it is absent/null in the runtime model.",
+          "Profile preferences are soft ranking evidence only.",
+          "Constraints and selected owned item IDs are the full request sets; do not inherit or union prior-request arrays.",
+          "P02 checks object/fixture behavior only; no public HTTP contract."
+        ],
+        "provenance": [
+          "Use explicit SHOP_VARIANT and OWNED_WARDROBE source-reference types with source-reference XOR.",
+          "Never treat outfit_item_id or variant_id as wardrobe_item_id.",
+          "OWNED_WARDROBE is synthetic fixture evidence only, not proof of live Wardrobe ownership support."
+        ],
+        "budget": [
+          "Budget is per outfit; every unique SHOP_VARIANT has quantity one.",
+          "Use exact whole VND, no floating point or rounding, and checked overflow.",
+          "Confirmed owned fixtures add zero purchase cost; optional items still add their cost.",
+          "Exclude shipping, tax, and discount.",
+          "Hard budget is inclusive at equality; total above it is rejected; hard budget without amount is invalid; zero is valid.",
+          "Soft budget affects score only and never rejects an outfit."
+        ],
+        "templates": [
+          "Every outfit contains exactly one TOP and one BOTTOM.",
+          "ONE_PIECE, SHOES, ACCESSORY and all other slot values are rejected at the boundary.",
+          "Each source item appears once; no additional item/cross-sell slot is added.",
+          "Selected permitted owned fixtures are anchors retained in every result; conflicting or hard-excluded anchors invalidate context."
+        ],
+        "exclusions_and_mapping": [
+          "Use the exclusion types in the contract memo; hard exclusion wins over every soft preference.",
+          "Unknown hard constraints are rejected without guessing; unknown soft preferences are ignored with a warning.",
+          "Category/slot/style/color fixture mappings are labeled SYNTHETIC_TEST_ONLY and do not define live Commerce taxonomy."
+        ],
+        "ranking_and_bounds": {
+          "weights": {
+            "context": 3,
+            "style": 2,
+            "color": 2,
+            "brand": 1,
+            "soft_budget": 1,
+            "reviewed_compatibility": 3
+          },
+          "missing_evidence_score": 0,
+          "context_and_compatibility": "Fixture evidence only; no LLM.",
+          "score_arithmetic": "Exact rational/decimal; deterministic tie-break.",
+          "max_candidates": 60,
+          "max_candidates_per_mandatory_slot": 20,
+          "max_combinations": 1000,
+          "max_results": 3,
+          "distinct_results": "Each pair of results differs by at least one non-anchor item.",
+          "relax_hard_rules_to_fill_results": false,
+          "no_result_meaning": "No outfit found within the bounded search; not a catalog-wide absence claim."
+        }
+      },
+      "recorded_at": "2026-10-29"
+    },
+    "P03": {
+      "owner_evidence": "Owner-provided Prompt 08 attachment pasted in this chat on 2026-10-29, titled “STYLEMIND — EP-07 AI STYLIST PROMPT 08 — CORRECT P02 PRODUCT SCOPE + IMPLEMENT P03-A”. It explicitly approves exactly TOP+BOTTOM product scope, P02 correction, and the limited P03-A session/history slice.",
+      "approved_scope": "P03-A only: session creation, owner-scoped message history, exactly two persistence tables, tests and Postman handover. Does not authorize the remainder of P03, US-07.01 or EP-07 completion.",
+      "recorded_at": "2026-10-29",
+      "additional_slice_approvals": {
+        "P03-B1": {
+          "owner_evidence": "Owner approval in this chat on 2026-11-04 for exact P03-B1 proposal scope.",
+          "approved_scope": "Shop/manual request intake and owner-scoped read-back; RECEIVED only; V2 exactly styling_request and styling_constraint; disposable tests; no owned context, provider/LLM, generation, P04.3, persistent DB, other services, commit or push.",
+          "recorded_at": "2026-11-04"
+        }
+      }
+    },
+    "P04": {
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-02, titled “EP-07 — P04.1 IMPLEMENT DISPOSABLE QDRANT RETRIEVAL POC”. It explicitly authorizes only the disposable fixture retrieval POC using deterministic fake 128-dimensional embeddings and Qdrant test resources.",
+      "approved_scope": "P04.1 only: index/search the six approved WOMEN SOURCE_SEED test fixtures using the fixture-only ao→TOP and quan→BOTTOM mappings; retain UNISEX and child-title rows as excluded negative fixtures. No public API, P02/P03-A changes, migrations, other services, shared Compose, Commerce runtime/database, Neo4j, event synchronization, paid embedding provider, LLM or production-readiness claim.",
+      "recorded_at": "2026-11-02"
+    },
+    "WAVE_2": {
+      "owner_evidence": "Owner-provided attachment in this chat on 2026-11-05, titled “STYLEMIND — ACCELERATED DELIVERY 2 IMPLEMENT GENERATION API, REAL MODEL ADAPTERS AND RECOMMENDATION PERSISTENCE”.",
+      "approved_scope": "Stylist-only generation and recommendation read APIs, immutable V1/V2 plus V3 two-table recommendation persistence/request lifecycle, approved OpenAI embedding/generation adapters, runtime Qdrant and reviewed-only Neo4j adapters, tests, Postman and Wave 2 handover. Provider smoke is separately bounded at USD 2 and was not executed without a key and conservative reservation ledger.",
+      "excluded_scope": "No Identity/profile or Wardrobe/owned context, no Commerce source edits/catalog events, no other service, no shared Compose or persistent DB migration, no production deployment, no P09/P10 acceptance.",
+      "recorded_at": "2026-11-05"
+    }
+  },
+  "rendered_assets": [
+    {
+      "path": "docs/planning/stylist/diagrams/01-business-workflow.svg",
+      "source": "docs/planning/stylist/EP-07_FLOWS.md",
+      "block_index": 1,
+      "source_block_sha256": "bb702ee44e458af559605c14d5da816b82cddda0be3d4b53d9e44f27fd5f79c1",
+      "svg_sha256": "5ad2b18689aad955cc73f42c2e16c5e5ecf5be4f273320de344864909c611ca3"
+    },
+    {
+      "path": "docs/planning/stylist/diagrams/02-generation-sequence.svg",
+      "source": "docs/planning/stylist/EP-07_FLOWS.md",
+      "block_index": 2,
+      "source_block_sha256": "fb281c25892a903f2d960dc1cc6f1da7b109ced98ec88d1124a2a88f6f130cc8",
+      "svg_sha256": "7181276e22928052c970917c5979453140c4a95a3e3b546e62248523c6180b0d"
+    },
+    {
+      "path": "docs/planning/stylist/diagrams/03-service-structure.svg",
+      "source": "docs/planning/stylist/EP-07_TECHNICAL_DESIGN.md",
+      "block_index": 1,
+      "source_block_sha256": "4040fb672ef2e9f8f9802944209b9e35231fe6e3da016c6d962c40f4f9fd8194",
+      "svg_sha256": "f787b3e350f27843eb13a8ffad978e3a7d4e7a7190913c978aa3a7e0fa674c08"
+    }
+  ],
+  "persistence_decision": {
+    "status": "APPROVED",
+    "technology": "Spring Data JPA / Hibernate",
+    "owner_evidence": "Owner: Chung ta se lam ve JPA, khong lam ve JDBC.",
+    "recorded_at": "2026-10-28",
+    "approved_scope": "Stylist persistence framework only; no schema/API/migration/implementation approval"
+  },
+  "execution_evidence": {
+    "wave_2": {
+      "verified_at": "2026-11-05",
+      "branch": "feature/ep-07-ai-stylist",
+      "head_at_start": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+      "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+      "result": "BUILD SUCCESS; 154 tests, 0 failures, 0 errors, 0 skipped. Surefire XML total: 18 suites, 154 tests.",
+      "test_counts": {
+        "P02_engine_unit": 52,
+        "retrieval_policy_pipeline_and_store_tests": 43,
+        "session_request_api_transaction_and_parser_tests": 42,
+        "generation_orchestration_tests": 2,
+        "application_security_openapi_tests": 13,
+        "openai_adapter_local_http_contract_tests": 2
+      },
+      "environment": "Docker Linux Engine 28.5.2; disposable Testcontainers PostgreSQL 18.6 (postgres:18-alpine), Qdrant v1.20.0 (qdrant/qdrant:v1.20.0), and Neo4j 5.26 (neo4j:5.26) with random mapped ports. V3 ran only on disposable PostgreSQL. Testcontainers/Ryuk owned cleanup. No Compose, persistent database, shared Qdrant, live Commerce, live Gateway or provider was accessed.",
+      "postman": "Collection and placeholder environment JSON structurally validated after creation. Postman/Newman through Gateway was not run.",
+      "provider": "No external OpenAI call. Local HTTP contract fixture verifies actual configured client request shape, model identifiers, dimensions, native strict schema and no retry; it is not provider availability or billing evidence.",
+      "planning_guard": "Both `node scripts/verify-stylist-planning.cjs` and `node scripts/verify-stylist-planning.cjs --phase P07` exit 1: 21 sources, 21 documents, 105 links, 10 JSON examples, 15 Mermaid blocks. Existing committed-range Commerce drift (8 files), Stylist source-fingerprint drift (`pom.xml`, `application.properties`, `SecurityConfiguration.java`) and Commerce fingerprint drift (`ProductController`, `VariantResponse`, `ProductVariantRepository`) remain. No fingerprint or reviewed_head was updated; Commerce files were not edited.",
+      "scope_note": "Only the owner-approved Wave 2 implementation scope. No persistent migration, other service, shared Compose, provider smoke, live cross-service/Gateway acceptance, commit or push.",
+      "completion_follow_up_2026_11_06": {
+        "verified_at": "2026-11-06",
+        "branch": "feature/ep-07-ai-stylist",
+        "head": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+        "stylist_verify": "BUILD SUCCESS; 165 tests across 19 suites, 0 failures, 0 errors, 0 skipped.",
+        "gateway_tests": "mvn -B -ntp -f api-gateway/pom.xml test: BUILD SUCCESS; 11 tests, 0 failures, 0 errors, 0 skipped.",
+        "provider_smoke_guard_tests": "node stylist-service/scripts/wave2-provider-smoke.test.cjs: 7 passed, 0 failed; external provider smoke not run because STYLEMIND_OPENAI_API_KEY was absent (presence-only check).",
+        "gateway_newman": "Disposable Gateway/Stylist HTTP run: 10 requests, 20 assertions, 0 failures. Concurrent same-request calls: one 409 and one 200, one generation execution. Fixture-signed JWT, local Commerce/OpenAI/JWKS fixtures, synthetic reviewed-shaped data; not live cross-service/provider evidence.",
+        "disposable_resources": "PostgreSQL 18, Qdrant v1.20.0 and Neo4j 5.26, random host ports, no volumes, exact named --rm containers; all removed after run. V3/Testcontainers also exercised by Maven verify only on disposable PostgreSQL. No shared Compose, persistent database/store, live Commerce or provider accessed.",
+        "updated_findings": "F-01 nullable Commerce catalog metadata is preserved as unknown and covered by RuntimeCatalogImportRunnerIntegrationTests. F-02 uses exact official Responses input-token count for the exact generation payload, rejects over 6000 before chat, and caps output at 2000. Unknown color cannot satisfy a hard color exclusion.",
+        "planning_guard": "Both planning guards still exit 1 (21 sources, 22 required documents, 111 links, 10 JSON examples, 15 Mermaid blocks): eight Commerce committed-range drift files; Stylist fingerprint drift in pom.xml, application.properties and SecurityConfiguration.java; Commerce fingerprint drift in ProductController, VariantResponse and ProductVariantRepository. No reviewed_head/fingerprint refresh; Commerce source untouched.",
+        "report": "docs/planning/stylist/EP-07_WAVE_2_COMPLETION_REPORT.md",
+        "wave_2_status": "Local disposable implementation verification passed. P03/P04/P05/P06/P07, R95/R99, live data/provider acceptance and EP-07 remain partial/incomplete. No commit/push."
+      },
+      "gemini_adapter_follow_up_2026_11_06": {
+        "verified_at": "2026-11-06",
+        "branch": "feature/ep-07-ai-stylist",
+        "head": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+        "targeted_command": "mvn -B -ntp -f stylist-service/pom.xml -Dtest=GeminiAdapterHttpContractTests,AiProviderSelectionTests,RuntimeQdrantGenerationIntegrationTests,OpenAiAdapterHttpContractTests,RuntimeCatalogImportRunnerIntegrationTests test",
+        "targeted_result": "BUILD SUCCESS; 27 tests, 0 failures, 0 errors, 0 skipped. A preceding importer-only run also passed 2 tests, 0 failures/errors/skips.",
+        "stylist_verify_command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "stylist_verify_result": "BUILD SUCCESS; 179 tests across 21 suites, 0 failures, 0 errors, 0 skipped. Surefire XML totals agree.",
+        "test_counts": {
+          "GeminiAdapterHttpContractTests": 8,
+          "AiProviderSelectionTests": 5,
+          "OpenAiAdapterHttpContractTests": 10,
+          "RuntimeQdrantGenerationIntegrationTests": 2,
+          "RuntimeCatalogImportRunnerIntegrationTests": 2,
+          "full_suite": 179
+        },
+        "provider_live_verification": {
+          "status": "BLOCKED",
+          "reason": "No STYLEMIND_GEMINI_API_KEY was present in the local process environment and the exact AI Studio project's billing tier, selected-model access and quota were not verified. The chat-exposed key was not read or used.",
+          "external_call_counts": {
+            "countTokens": 0,
+            "embedContent": 0,
+            "generateContent": 0
+          },
+          "gateway_newman": "NOT_RUN with Gemini; no live Gemini pipeline evidence."
+        },
+        "environment": "Docker Linux Engine 28.5.2; disposable Testcontainers PostgreSQL 18, Qdrant v1.20.0 and Neo4j 5.26-community with random mapped ports. Ryuk cleanup completed; no Testcontainers-labeled containers remained. No Compose, persistent database/shared store, live Commerce or external AI provider was accessed.",
+        "planning_guard": "Both node scripts/verify-stylist-planning.cjs and --phase P07 exit 1 after registering the report: 21 sources, 22 documents, 116 links, 10 JSON examples, 15 Mermaid blocks. Eight Commerce committed-range drift files; Stylist fingerprint drift in pom.xml/application.properties/SecurityConfiguration.java; Commerce fingerprint drift in ProductController/VariantResponse/ProductVariantRepository. No broken local link; no fingerprint/reviewed_head refresh.",
+        "report": "docs/planning/stylist/EP-07_GEMINI_FREE_TIER_VERIFICATION_REPORT.md",
+        "status": "Local adapter/disposable tests verified only. R95/R99/P08/EP-07 remain incomplete; no commit or push."
+      }
+    },
+    "owner_ai_stylist_handover_2026_11_07": {
+      "verified_at": "2026-11-07",
+      "branch": "feature/ep-07-ai-stylist",
+      "head": "c9f20d1d1fc1779eca735b3de3ac9f1745b43985",
+      "stylist_verify": {
+        "command": "mvn -B -ntp -f stylist-service/pom.xml verify",
+        "result": "BUILD SUCCESS; 191 tests, 0 failures, 0 errors, 1 live-only test skipped; the skip is not a pass."
+      },
+      "offline_gateway_newman": {
+        "status": "PASS",
+        "requests": 10,
+        "assertions": 20,
+        "failures": 0,
+        "provider": "Gemini HTTP fixture; no external calls",
+        "gateway": "Local Gateway and Stylist processes",
+        "disposable_resources": "PostgreSQL 18.6, Qdrant v1.20.0 and Neo4j 5.26; random ports, no shared/persistent resources."
+      },
+      "live_gateway": {
+        "status": "PASS",
+        "model": "gemini-3.5-flash-lite",
+        "embedding_model": "gemini-embedding-001",
+        "embedding_dimensions": 1536,
+        "execution": "One approved positive direct HTTP flow through local Gateway; Newman not run for live calls.",
+        "meter_before": { "embedding": 9, "countTokens": 19, "generation": 5 },
+        "meter_added": { "embedding": 3, "countTokens": 4, "generation": 1 },
+        "meter_after_and_limits": { "embedding": 12, "countTokens": 23, "generation": 6 },
+        "blocked_attempts": 0,
+        "provider_http_statuses": { "embedding": [200, 200, 200], "countTokens": [200, 200, 200, 200], "generation": 200 },
+        "generation_usage": { "prompt_tokens": 304, "output_tokens": 157, "latency_ms": 3774 },
+        "gateway_flow": {
+          "session_status": 201,
+          "intake_status": 201,
+          "intake_state": "RECEIVED",
+          "generate_status": 200,
+          "request_state": "SUCCEEDED",
+          "slots": ["TOP", "BOTTOM"],
+          "list_status": 200,
+          "detail_status": 200,
+          "detail_total_current_price_vnd": 550000,
+          "replay_status": 200,
+          "replay_added_provider_calls": 0,
+          "foreign_owner_status": 404,
+          "foreign_owner_added_provider_calls": 0
+        },
+        "postgres_rows": { "succeeded_requests": 1, "recommendations": 1, "recommendation_items": 2, "assistant_messages": 0 },
+        "real_components": ["Gateway", "Stylist", "Gemini Developer API", "disposable PostgreSQL", "disposable Qdrant", "disposable Neo4j"],
+        "fixtures": ["Commerce", "JWKS; JWTs were fixture-signed, not Identity-issued"],
+        "free_tier": "Owner-confirmed Free Tier and billing disabled; no billing-console telemetry was collected.",
+        "persistent_database_accessed": false,
+        "containers_removed": true
+      },
+      "planning_guard": "Both node scripts/verify-stylist-planning.cjs and --phase P07 exit 1: 21 sources, 22 documents, 126 links, 10 JSON examples, 15 Mermaid blocks. Eight committed-range Commerce drift paths and six source fingerprint drift entries remain. No fingerprint or reviewed_head was refreshed; see docs/qa/stylist/AI_STYLIST_HANDOVER_REPORT.md.",
+      "remaining_gates": ["R95 Identity/Wardrobe context contract and integration", "R99 Commerce catalog event producer/contract", "real Commerce catalog and final-check acceptance", "human-reviewed production knowledge and quality evaluation", "persistent migration/deployment verification"],
+      "scope": "Shop-only Stylist work. No API, DTO, migration or business-rule change; no other-service source, workbook, .env, commit or push."
+    }
+  }
+}

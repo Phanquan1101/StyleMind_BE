@@ -1,0 +1,68 @@
+{
+  "status": "NOT_COMPLETED_CHROME_CONTROL_BLOCKED",
+  "embedding": "REAL_PASS",
+  "qdrant": {
+    "distance": "Cosine",
+    "verification": "real10-embedding-verification.json",
+    "unique_catalog_vectors": 10,
+    "alias": "stylemind_stylist_runtime_gemini_demo10_20261109",
+    "bottom": 5,
+    "dimensions": 1536,
+    "catalog_vectors": 10,
+    "top": 5
+  },
+  "generation": "NOT_RUN",
+  "generation_attempts_this_run": 0,
+  "recommendation_id": null,
+  "chrome_new_products_verified": false,
+  "screenshot": null,
+  "browser_blocker": {
+    "tool": "Windows Computer Use",
+    "further_browser_input_stopped": true,
+    "action": "Reload the existing StyleMind tab with Ctrl+R before entering the fresh request",
+    "reason": "The tool could not determine the current browser URL with enough confidence to enforce policy and stopped Computer Use for this turn"
+  },
+  "live_runtime": {
+    "mock_enabled": false,
+    "import_enabled": false,
+    "generation_model": "gemini-3.5-flash-lite",
+    "kept_running": true,
+    "stylist_pid": 21868,
+    "gateway_health": "UP",
+    "jar": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\stylist-service\\target\\semantic-demo-20261109-193059\\stylist-service-semantic10-20261109-193059.jar",
+    "provider": "Google Gemini Developer API",
+    "port": 18085,
+    "direct_health": "UP"
+  },
+  "meter_before": {
+    "tokenCount": 33,
+    "generation": 9,
+    "embedding": 18
+  },
+  "meter_after": {
+    "metadata": 0,
+    "embedding": 28,
+    "tokenCount": 43,
+    "generation": 9,
+    "blocked": 3
+  },
+  "remaining_approved_attempts": {
+    "tokenCount": 2,
+    "generation": 1,
+    "embedding": 1
+  },
+  "free_tier_verification": "live-preflight-2026-11-09.json",
+  "database_row_counts": [
+    "BEGIN",
+    "sessions|24",
+    "requests|24",
+    "recommendations|14",
+    "items|28",
+    "COMMIT"
+  ],
+  "no_new_recommendation_this_run": true,
+  "old_qdrant_collection_preserved": true,
+  "git_commit_push": false,
+  "superseded_by_completed_result": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\reports\\gemini-10-product-demo\\real-gemini-chrome-result-2026-11-09.json",
+  "completion_recommendation_id": "d0cb8b3d-b7cc-42c9-b026-8fb82a86491a"
+}

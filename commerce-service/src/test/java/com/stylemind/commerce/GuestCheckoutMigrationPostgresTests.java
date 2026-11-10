@@ -39,13 +39,14 @@ class GuestCheckoutMigrationPostgresTests {
                     payment_reference,amount_vnd,confirmed_at,received_at,outcome,reason)
                 VALUES (?,repeat('a',64),?,?,NULL,'COD','GUEST',125000,now(),now(),'APPLIED','COD_COLLECTION_CONFIRMED')
                 """, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
-        // The owner already applied guest V9. V10 must retain that history and populated guest data.
+        // The owner already applied guest V9. V10/V11 retain that history and populated guest data.
         String throughV9 = jdbc.queryForObject("SELECT string_agg(checksum::text,',' ORDER BY installed_rank) FROM flyway_schema_history WHERE success", String.class);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT string_agg(checksum::text,',' ORDER BY installed_rank) FROM flyway_schema_history WHERE success AND version <> '10'", String.class)).isEqualTo(throughV9);
+        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(6);
+        assertThat(jdbc.queryForObject("SELECT string_agg(checksum::text,',' ORDER BY installed_rank) FROM flyway_schema_history WHERE success AND installed_rank <= 9", String.class)).isEqualTo(throughV9);
         assertThat(jdbc.queryForObject("SELECT customer_id FROM public.customer_order WHERE order_id=?", UUID.class, id)).isEqualTo(customer);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.customer_order WHERE customer_id IS NULL", Integer.class)).isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT to_regclass('public.variant_inventory') IS NOT NULL", Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT to_regclass('public.variant_inventory') IS NULL", Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='product_variant' AND column_name='quantity'", Integer.class)).isEqualTo(1);
     }
 
     private void insert(JdbcTemplate jdbc, UUID customer, String hash) {

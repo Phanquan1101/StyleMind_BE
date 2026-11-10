@@ -1,0 +1,83 @@
+{
+  "info": {
+    "_postman_id": "f7328a8d-02f0-4a99-89e7-270f4056907d",
+    "name": "StyleMind Stylist — P03-A Session and History",
+    "description": "Create a Stylist session and read its owner-scoped message history. Requires a running Gateway and access tokens issued by Identity. No token or secret is embedded.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayBaseUrl", "value": "http://localhost:8080" },
+    { "key": "customerAToken", "value": "" },
+    { "key": "customerBToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "sessionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create session as Customer A",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman P03-A session\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions",
+        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{customerAToken}}", "type": "string" } ] }
+      },
+      "event": [ {
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('created', function () { pm.response.to.have.status(201); });",
+          "pm.test('no-store and Location', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); pm.expect(pm.response.headers.get('Location')).to.be.ok; });",
+          "pm.test('session DTO', function () { var body = pm.response.json(); pm.expect(body.session_id).to.be.a('string'); pm.expect(body.closed_at).to.eql(null); pm.environment.set('sessionId', body.session_id); });"
+        ] }
+      } ]
+    },
+    {
+      "name": "2. Read own empty history as Customer A",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/messages?limit=20",
+        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{customerAToken}}", "type": "string" } ] }
+      },
+      "event": [ {
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('history returned', function () { pm.response.to.have.status(200); });",
+          "pm.test('empty history and no cursor', function () { var body = pm.response.json(); pm.expect(body.items).to.eql([]); pm.expect(body.next_cursor).to.eql(null); });",
+          "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+        ] }
+      } ]
+    },
+    {
+      "name": "3. Customer B cannot read Customer A history",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/messages",
+        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{customerBToken}}", "type": "string" } ] }
+      },
+      "event": [ {
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('foreign session is concealed as not found', function () { pm.response.to.have.status(404); });",
+          "pm.test('no-store', function () { pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+        ] }
+      } ]
+    },
+    {
+      "name": "4. Admin cannot read another customer history",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayBaseUrl}}/stylist/api/v1/stylist/sessions/{{sessionId}}/messages",
+        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{adminToken}}", "type": "string" } ] }
+      },
+      "event": [ {
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('admin remains self-only', function () { pm.response.to.have.status(404); });"
+        ] }
+      } ]
+    }
+  ]
+}

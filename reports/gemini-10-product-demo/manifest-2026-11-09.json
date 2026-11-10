@@ -1,0 +1,219 @@
+{
+  "manifest_version": 1,
+  "prepared_at": "2026-11-09",
+  "commerce_source": "http://127.0.0.1:18083/api/v1/products?page=0&size=100&demographic_segment=WOMEN",
+  "commerce_batch_lookup": "POST http://127.0.0.1:18083/api/v1/variants/batch-lookup",
+  "commerce_total_products": 4,
+  "commerce_active_variants": 16,
+  "variant_count": 10,
+  "top_count": 5,
+  "bottom_count": 5,
+  "unique_product_count": 4,
+  "local_smoke_category_mapping_only": {
+    "production_mapping": false,
+    "TOP": "fbb973c7-c888-53ba-8648-76a4700c3757",
+    "BOTTOM": "397b5054-84f4-5cc6-8047-56787826b9bf"
+  },
+  "selection_note": "Exactly 5 active Commerce variants per slot. Current catalog contains only 2 unique TOP products and 2 unique BOTTOM products; all BOTTOM colors are gray and material fields are null. Size variants share their parent product image.",
+  "embedding": {
+    "normalization": "L2",
+    "model": "gemini-embedding-001",
+    "distance": "Cosine",
+    "dimensions": 1536,
+    "text_template_revision": "catalog-v1",
+    "provider": "Google Gemini Developer API"
+  },
+  "generation": {
+    "provider": "Google Gemini Developer API",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "allowlist": {
+    "variant_ids": [
+      "422142c6-f46e-50fc-b499-079cb2239a22",
+      "59271e26-6dfb-5945-a4f1-1f08bad65fe6",
+      "0e6e57bc-2850-551a-9727-815608977c08",
+      "4a0e0969-da24-5665-97a7-8a5bed5aee56",
+      "0afb75b2-2bdb-5738-bdca-e1c1000d41b7",
+      "826e5271-885b-527e-9127-18d0107abd22",
+      "fcb0033c-9f59-5649-b2dd-a950c4e3856f",
+      "25cd52d9-8ca3-5927-9529-8d4f71c1e20e",
+      "08a64937-f0e6-51e0-90b4-3c2289423a20",
+      "b5af6fed-a767-5c89-beff-20213eae244a"
+    ],
+    "property": "stylemind.stylist.catalog.import-variant-ids",
+    "value": "422142c6-f46e-50fc-b499-079cb2239a22,59271e26-6dfb-5945-a4f1-1f08bad65fe6,0e6e57bc-2850-551a-9727-815608977c08,4a0e0969-da24-5665-97a7-8a5bed5aee56,0afb75b2-2bdb-5738-bdca-e1c1000d41b7,826e5271-885b-527e-9127-18d0107abd22,fcb0033c-9f59-5649-b2dd-a950c4e3856f,25cd52d9-8ca3-5927-9529-8d4f71c1e20e,08a64937-f0e6-51e0-90b4-3c2289423a20,b5af6fed-a767-5c89-beff-20213eae244a"
+  },
+  "qdrant": {
+    "old_collection_preserved": true,
+    "old_physical_collection": "stylemind_stylist_catalog_3faa327f8d8d4581b91e0c576390e8c4",
+    "new_alias": "stylemind_stylist_runtime_gemini_demo10_20261109",
+    "old_alias": "stylemind_stylist_runtime_gemini_local"
+  },
+  "image_head_checks": [
+    {
+      "content_type": "image/jpeg",
+      "status": 200,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473233/stylemind/products/b118d854-d0a9-5564-b6ba-43de80452e1b.jpg"
+    },
+    {
+      "content_type": "image/jpeg",
+      "status": 200,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473237/stylemind/products/3daab282-226d-57fa-82e5-6541e1ad3b4e.jpg"
+    },
+    {
+      "content_type": "image/jpeg",
+      "status": 200,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473449/stylemind/products/007dc577-f32e-56fc-8910-86835bfa0d1b.jpg"
+    },
+    {
+      "content_type": "image/jpeg",
+      "status": 200,
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473458/stylemind/products/354de0dd-2da7-5f8e-8daa-da552e13c1cf.jpg"
+    }
+  ],
+  "variants": [
+    {
+      "slot": "TOP",
+      "product_id": "e3124bd3-0865-5b72-814a-64870fbac25e",
+      "variant_id": "422142c6-f46e-50fc-b499-079cb2239a22",
+      "category_uuid": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "product_name": "Adidas - Áo thun nữ - Mẫu 19010",
+      "color": "Xanh dương",
+      "size": "L",
+      "material": null,
+      "reference_price_vnd": 199000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473233/stylemind/products/b118d854-d0a9-5564-b6ba-43de80452e1b.jpg"
+    },
+    {
+      "slot": "TOP",
+      "product_id": "e3124bd3-0865-5b72-814a-64870fbac25e",
+      "variant_id": "59271e26-6dfb-5945-a4f1-1f08bad65fe6",
+      "category_uuid": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "product_name": "Adidas - Áo thun nữ - Mẫu 19010",
+      "color": "Xanh dương",
+      "size": "M",
+      "material": null,
+      "reference_price_vnd": 199000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473233/stylemind/products/b118d854-d0a9-5564-b6ba-43de80452e1b.jpg"
+    },
+    {
+      "slot": "TOP",
+      "product_id": "e3124bd3-0865-5b72-814a-64870fbac25e",
+      "variant_id": "0e6e57bc-2850-551a-9727-815608977c08",
+      "category_uuid": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "product_name": "Adidas - Áo thun nữ - Mẫu 19010",
+      "color": "Xanh dương",
+      "size": "S",
+      "material": null,
+      "reference_price_vnd": 199000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473233/stylemind/products/b118d854-d0a9-5564-b6ba-43de80452e1b.jpg"
+    },
+    {
+      "slot": "TOP",
+      "product_id": "3320b323-a6d5-5d19-a3de-33f692564325",
+      "variant_id": "4a0e0969-da24-5665-97a7-8a5bed5aee56",
+      "category_uuid": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "product_name": "Adidas - Áo thun nữ - Mẫu 2245",
+      "color": "Trắng",
+      "size": "L",
+      "material": null,
+      "reference_price_vnd": 199000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473237/stylemind/products/3daab282-226d-57fa-82e5-6541e1ad3b4e.jpg"
+    },
+    {
+      "slot": "TOP",
+      "product_id": "3320b323-a6d5-5d19-a3de-33f692564325",
+      "variant_id": "0afb75b2-2bdb-5738-bdca-e1c1000d41b7",
+      "category_uuid": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "product_name": "Adidas - Áo thun nữ - Mẫu 2245",
+      "color": "Trắng",
+      "size": "M",
+      "material": null,
+      "reference_price_vnd": 199000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473237/stylemind/products/3daab282-226d-57fa-82e5-6541e1ad3b4e.jpg"
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "d4939698-c5d2-591d-8e54-c886a83ab60b",
+      "variant_id": "826e5271-885b-527e-9127-18d0107abd22",
+      "category_uuid": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "product_name": "Adidas - Quần thể thao nữ - Mẫu 2113",
+      "color": "Xám",
+      "size": "L",
+      "material": null,
+      "reference_price_vnd": 329000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473449/stylemind/products/007dc577-f32e-56fc-8910-86835bfa0d1b.jpg"
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "d4939698-c5d2-591d-8e54-c886a83ab60b",
+      "variant_id": "fcb0033c-9f59-5649-b2dd-a950c4e3856f",
+      "category_uuid": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "product_name": "Adidas - Quần thể thao nữ - Mẫu 2113",
+      "color": "Xám",
+      "size": "M",
+      "material": null,
+      "reference_price_vnd": 329000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473449/stylemind/products/007dc577-f32e-56fc-8910-86835bfa0d1b.jpg"
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "d4939698-c5d2-591d-8e54-c886a83ab60b",
+      "variant_id": "25cd52d9-8ca3-5927-9529-8d4f71c1e20e",
+      "category_uuid": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "product_name": "Adidas - Quần thể thao nữ - Mẫu 2113",
+      "color": "Xám",
+      "size": "S",
+      "material": null,
+      "reference_price_vnd": 329000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473449/stylemind/products/007dc577-f32e-56fc-8910-86835bfa0d1b.jpg"
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "801fee40-b3c2-5ea9-a422-daf4b6f87c52",
+      "variant_id": "08a64937-f0e6-51e0-90b4-3c2289423a20",
+      "category_uuid": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "product_name": "Adidas - Quần thể thao nữ - Mẫu 53748",
+      "color": "Xám",
+      "size": "L",
+      "material": null,
+      "reference_price_vnd": 329000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473458/stylemind/products/354de0dd-2da7-5f8e-8daa-da552e13c1cf.jpg"
+    },
+    {
+      "slot": "BOTTOM",
+      "product_id": "801fee40-b3c2-5ea9-a422-daf4b6f87c52",
+      "variant_id": "b5af6fed-a767-5c89-beff-20213eae244a",
+      "category_uuid": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "product_name": "Adidas - Quần thể thao nữ - Mẫu 53748",
+      "color": "Xám",
+      "size": "M",
+      "material": null,
+      "reference_price_vnd": 329000,
+      "product_status": "ACTIVE",
+      "variant_status": "ACTIVE",
+      "image_url": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473458/stylemind/products/354de0dd-2da7-5f8e-8daa-da552e13c1cf.jpg"
+    }
+  ],
+  "status": "SUPERSEDED_INCORRECT_PRODUCT_DIVERSITY",
+  "import_authorized": false,
+  "superseded_by": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\reports\\gemini-10-product-demo\\manifest-distinct-products-2026-11-09.json"
+}

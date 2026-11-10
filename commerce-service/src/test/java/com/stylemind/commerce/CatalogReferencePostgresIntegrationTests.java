@@ -80,7 +80,6 @@ class CatalogReferencePostgresIntegrationTests {
     void clearDisposableDatabase() {
         jdbc.update("DELETE FROM public.variant_image");
         jdbc.update("DELETE FROM public.image_asset");
-        jdbc.update("DELETE FROM public.variant_inventory");
         jdbc.update("DELETE FROM public.product_variant");
         jdbc.update("DELETE FROM public.product");
         jdbc.update("DELETE FROM public.category");

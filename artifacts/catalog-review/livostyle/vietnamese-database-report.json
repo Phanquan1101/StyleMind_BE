@@ -1,0 +1,22 @@
+{
+  "status": "APPLIED",
+  "phase": "REFINEMENT",
+  "method": "LOCAL_EDITORIAL_REWRITE",
+  "external_translation_used": false,
+  "products": 200,
+  "variants": 2705,
+  "shared_image_alts": 1337,
+  "variant_image_alts": 18865,
+  "measurement_tables_preserved": 198,
+  "old_inactive_catalog_unchanged": true,
+  "nontext_data_unchanged": true,
+  "backup_file": "commerce-service\\.seed-data\\db-backups\\vietnamese-2026-11-10T12-29-49-462Z\\before-vietnamese.dump",
+  "backup_sha256": "e889ad2aa00145d8c78de57d71a0b26529227c1368aa9135b2e7b6b91a468101",
+  "backup_bytes": 1213687,
+  "actual_restore_tested": true,
+  "transaction_rollback_tested": true,
+  "text_recovery_tested": true,
+  "english_recovery_tested": false,
+  "prior_english_recovery_report": "vietnamese-database-initial-report.json",
+  "updated_at": "2026-11-10T12:30:38.321Z"
+}

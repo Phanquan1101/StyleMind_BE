@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -27,6 +28,15 @@ public class ApiExceptionHandler {
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
                 "INVALID_REQUEST", request);
+    }
+
+    @ExceptionHandler(StylistApiException.class)
+    public ResponseEntity<ProblemDetail> stylistError(StylistApiException exception, HttpServletRequest request) {
+        ErrorCode error = exception.errorCode();
+        return ResponseEntity.status(error.status())
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiProblemDetails.create(error.status(), error.status().getReasonPhrase(),
+                        error.detail(), error.name(), request, exception.requestId()));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -62,6 +72,7 @@ public class ApiExceptionHandler {
             String code,
             HttpServletRequest request) {
         return ResponseEntity.status(status)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiProblemDetails.create(status, title, detail, code, request));
     }
 }

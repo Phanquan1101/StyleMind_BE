@@ -1,0 +1,352 @@
+{
+  "source_manifest": "C:\\Users\\FPTSHOP\\Desktop\\StyleMind_BE\\commerce-service\\src\\main\\resources\\db\\seed\\development-catalog.json",
+  "source_sha256": "7390703932057db9c1547837a177be19f7a86356f4b401af2d28fb0ec6aad9c0",
+  "source_products": 381,
+  "source_variants": 2120,
+  "categories": [
+    {
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "name": "Áo",
+      "slug": "ao"
+    },
+    {
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "name": "Quần",
+      "slug": "quan"
+    }
+  ],
+  "brands": [
+    {
+      "brandId": "6b19861b-3707-59e1-a14f-190bfc74b4cc",
+      "name": "Arrow",
+      "slug": "arrow"
+    },
+    {
+      "brandId": "ba4d2bb3-c0d1-5e30-827f-cfb75b17833e",
+      "name": "Femella",
+      "slug": "femella"
+    },
+    {
+      "brandId": "28018e7d-3e5a-587c-bfb5-92d2f386a9e2",
+      "name": "Lee",
+      "slug": "lee"
+    },
+    {
+      "brandId": "dd320a19-8119-5988-9bd4-62f5e6e6cd4f",
+      "name": "Levis",
+      "slug": "levis"
+    },
+    {
+      "brandId": "b6a83ed8-d80a-5885-b10f-d82673f55c75",
+      "name": "Nike",
+      "slug": "nike"
+    },
+    {
+      "brandId": "62f4c5b4-4aff-5547-a9c7-428d77816fc7",
+      "name": "Puma",
+      "slug": "puma"
+    },
+    {
+      "brandId": "ca6d993c-dbee-5582-92dc-3caab561164d",
+      "name": "s.Oliver",
+      "slug": "s-oliver"
+    },
+    {
+      "brandId": "ec9dbd30-9cc2-5286-aa4b-8d0469127df3",
+      "name": "United Colors of Benetton",
+      "slug": "united-colors-of-benetton"
+    }
+  ],
+  "products": [
+    {
+      "productId": "9e213abf-0408-584e-b672-ba5f8af766bc",
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "brandId": "ca6d993c-dbee-5582-92dc-3caab561164d",
+      "name": "s.Oliver - Áo sơ mi nữ - Mẫu 21126",
+      "description": "Áo sơ mi nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "fdf90a15-0f39-53ff-8a42-a3d1c5c1ebdb",
+          "sku": "MYNTRA-21126-M",
+          "size": "M",
+          "color": "Trắng",
+          "material": null,
+          "unitPriceVnd": 249000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "84ae9eb7-aec7-5654-8a79-4fc21aa8e9e6",
+              "imageAssetId": "08ffaa6a-683e-50ff-b6c8-f28110df3d54",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473107/stylemind/products/08ffaa6a-683e-50ff-b6c8-f28110df3d54.jpg",
+              "altText": "s.Oliver - Áo sơ mi nữ - Mẫu 21126 - Màu Trắng",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "4956d0a4-4047-5cfc-8597-42427cb69eba",
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "brandId": "ba4d2bb3-c0d1-5e30-827f-cfb75b17833e",
+      "name": "Femella - Áo sơ mi nữ - Mẫu 59893",
+      "description": "Áo sơ mi nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "64b1b82f-f3d6-53cc-ad80-8ce7ddde5b80",
+          "sku": "MYNTRA-59893-M",
+          "size": "M",
+          "color": "Xanh dương",
+          "material": null,
+          "unitPriceVnd": 249000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "668f7602-8736-5204-a5ca-874e3e845765",
+              "imageAssetId": "1f2927e7-07c5-5965-a736-825dd2f92cef",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473116/stylemind/products/1f2927e7-07c5-5965-a736-825dd2f92cef.jpg",
+              "altText": "Femella - Áo sơ mi nữ - Mẫu 59893 - Màu Xanh dương",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "03e897ee-8d1d-5d21-a30d-e8d08a25b6e1",
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "brandId": "dd320a19-8119-5988-9bd4-62f5e6e6cd4f",
+      "name": "Levis - Áo kiểu nữ - Mẫu 4902",
+      "description": "Áo kiểu nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "885e73e1-039f-53ec-bb20-70dbc1c87631",
+          "sku": "MYNTRA-4902-M",
+          "size": "M",
+          "color": "Hồng",
+          "material": null,
+          "unitPriceVnd": 199000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "7300f666-e9cc-577e-9b90-60b0ac43e03e",
+              "imageAssetId": "47b0f065-54f9-5b0e-8c69-793985e6e274",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473195/stylemind/products/47b0f065-54f9-5b0e-8c69-793985e6e274.jpg",
+              "altText": "Levis - Áo kiểu nữ - Mẫu 4902 - Màu Hồng",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "0750c0a1-6535-56d2-8d22-1359bdcc4588",
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "brandId": "ec9dbd30-9cc2-5286-aa4b-8d0469127df3",
+      "name": "United Colors of Benetton - Áo thun nữ - Mẫu 6233",
+      "description": "Áo thun nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "b4c62fa7-071e-5113-9415-4c551cde42e4",
+          "sku": "MYNTRA-6233-M",
+          "size": "M",
+          "color": "Xanh lá",
+          "material": null,
+          "unitPriceVnd": 199000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "faca847f-7bb5-53c9-9709-c0941a82a190",
+              "imageAssetId": "605179f7-02e6-51f9-bb4b-9124b05452b5",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473284/stylemind/products/605179f7-02e6-51f9-bb4b-9124b05452b5.jpg",
+              "altText": "United Colors of Benetton - Áo thun nữ - Mẫu 6233 - Màu Xanh lá",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "7e2e725b-2e02-5755-9777-ae018a0208f5",
+      "categoryId": "fbb973c7-c888-53ba-8648-76a4700c3757",
+      "brandId": "b6a83ed8-d80a-5885-b10f-d82673f55c75",
+      "name": "Nike - Áo thun nữ - Mẫu 7512",
+      "description": "Áo thun nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "b6f5262b-8c38-57ac-903f-ce2f47e9e989",
+          "sku": "MYNTRA-7512-M",
+          "size": "M",
+          "color": "Đen",
+          "material": null,
+          "unitPriceVnd": 199000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "4c38baa6-c125-50c8-820e-231c92b54479",
+              "imageAssetId": "200b34f5-b7fa-532b-b122-30dad83776b4",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473291/stylemind/products/200b34f5-b7fa-532b-b122-30dad83776b4.jpg",
+              "altText": "Nike - Áo thun nữ - Mẫu 7512 - Màu Đen",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "387d2bf1-6aca-5451-a39a-87514f2232bf",
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "brandId": "6b19861b-3707-59e1-a14f-190bfc74b4cc",
+      "name": "Arrow - Quần dài nữ - Mẫu 26372",
+      "description": "Quần dài nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "7ae03113-91cf-5cd5-aa03-8b3938623969",
+          "sku": "MYNTRA-26372-28",
+          "size": "28",
+          "color": "Xám",
+          "material": null,
+          "unitPriceVnd": 399000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "6f7b2fac-555b-5a5c-a354-7f4852796812",
+              "imageAssetId": "698bd437-d464-5f93-a6df-6906fffd9f6b",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473465/stylemind/products/698bd437-d464-5f93-a6df-6906fffd9f6b.jpg",
+              "altText": "Arrow - Quần dài nữ - Mẫu 26372 - Màu Xám",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "3dd82042-a9e2-5bfb-be35-2db88c9e4931",
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "brandId": "ec9dbd30-9cc2-5286-aa4b-8d0469127df3",
+      "name": "United Colors of Benetton - Quần dài nữ - Mẫu 11316",
+      "description": "Quần dài nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "bc0ccf46-436e-5e51-8e30-872403241b0d",
+          "sku": "MYNTRA-11316-28",
+          "size": "28",
+          "color": "Be",
+          "material": null,
+          "unitPriceVnd": 399000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "556af125-3b7a-52b0-b108-8b971bc73644",
+              "imageAssetId": "a9cf1079-0a55-5a9f-bd40-5b24b2ab427c",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473465/stylemind/products/a9cf1079-0a55-5a9f-bd40-5b24b2ab427c.jpg",
+              "altText": "United Colors of Benetton - Quần dài nữ - Mẫu 11316 - Màu Be",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "08bf2573-6515-5e6c-8c22-6acf4e1933c5",
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "brandId": "28018e7d-3e5a-587c-bfb5-92d2f386a9e2",
+      "name": "Lee - Quần jean nữ - Mẫu 9145",
+      "description": "Quần jean nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "99b31e05-ba2d-5072-9c40-bd9b189e0e71",
+          "sku": "MYNTRA-9145-28",
+          "size": "28",
+          "color": "Xanh dương",
+          "material": null,
+          "unitPriceVnd": 449000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "0e7e0f94-4b8e-5afd-ad8a-94accfa0b9e1",
+              "imageAssetId": "b7801b5f-3eee-5e8d-ba37-08518cb48442",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473358/stylemind/products/b7801b5f-3eee-5e8d-ba37-08518cb48442.jpg",
+              "altText": "Lee - Quần jean nữ - Mẫu 9145 - Màu Xanh dương",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "3a9eef41-f434-5df9-9660-7399a822a0f7",
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "brandId": "b6a83ed8-d80a-5885-b10f-d82673f55c75",
+      "name": "Nike - Quần thể thao nữ - Mẫu 43081",
+      "description": "Quần thể thao nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "3e650983-ead0-5131-918b-7e36ba93dd03",
+          "sku": "MYNTRA-43081-M",
+          "size": "M",
+          "color": "Xanh navy",
+          "material": null,
+          "unitPriceVnd": 329000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "3fc802ff-05d6-5610-bddc-d46aa4321a6b",
+              "imageAssetId": "7a5a67fe-8c4a-5236-b405-c7f46900c90e",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473457/stylemind/products/7a5a67fe-8c4a-5236-b405-c7f46900c90e.jpg",
+              "altText": "Nike - Quần thể thao nữ - Mẫu 43081 - Màu Xanh navy",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "004feeaf-fce6-5f83-acb4-88160d84254c",
+      "categoryId": "397b5054-84f4-5cc6-8047-56787826b9bf",
+      "brandId": "62f4c5b4-4aff-5547-a9c7-428d77816fc7",
+      "name": "Puma - Quần short nữ - Mẫu 31231",
+      "description": "Quần short nữ, thuộc bộ sưu tập phát triển của StyleMind.",
+      "demographicSegment": "WOMEN",
+      "variants": [
+        {
+          "variantId": "7682dcc7-79d1-54a2-a1b9-4a3f25948544",
+          "sku": "MYNTRA-31231-28",
+          "size": "28",
+          "color": "Đen",
+          "material": null,
+          "unitPriceVnd": 279000,
+          "onHandQuantity": 20,
+          "images": [
+            {
+              "imageId": "96d0e303-5e98-5909-891d-e094fa125760",
+              "imageAssetId": "eb188b5b-9216-5125-ae32-cc12a06346db",
+              "imageUrl": "https://res.cloudinary.com/pbf2upl3/image/upload/v1793473430/stylemind/products/eb188b5b-9216-5125-ae32-cc12a06346db.jpg",
+              "altText": "Puma - Quần short nữ - Mẫu 31231 - Màu Đen",
+              "displayOrder": 0,
+              "primary": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

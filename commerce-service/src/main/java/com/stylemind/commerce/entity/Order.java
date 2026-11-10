@@ -11,4 +11,7 @@ public class Order {
  @Column(name="accepted_total_vnd",nullable=false) private long acceptedTotalVnd; @Column(name="placed_at",nullable=false) private OffsetDateTime placedAt;
  @Column(name="guest_session_hash",length=64) private String guestSessionHash;
  @Column(name="completed_at") private OffsetDateTime completedAt;
+ @Column(name="confirmation_state",nullable=false) private String confirmationState;
+ @Column(name="confirmed_by_user_id") private UUID confirmedByUserId;
+ @Column(name="confirmed_at") private OffsetDateTime confirmedAt;
 }

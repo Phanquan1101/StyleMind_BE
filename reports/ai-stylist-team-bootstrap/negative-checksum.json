@@ -1,0 +1,5 @@
+{
+  "result": "PASS",
+  "rejectedBeforeDocker": true,
+  "expectedError": "Bundle checksum mismatch: catalog-policy.json"
+}

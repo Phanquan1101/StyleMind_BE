@@ -1,0 +1,55 @@
+{
+  "status": "LOCAL_EDITORIAL_REWRITE_READY",
+  "products": 200,
+  "variants": 2705,
+  "images": 1337,
+  "measurement_tables": 198,
+  "external_translation_used": false,
+  "max_description_codepoints": 824,
+  "warnings": [
+    {
+      "id": "d8baf5fa-70b6-5658-9b7c-ec2e523e2e03",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "4b177b66-f916-5eba-9511-3aea8310f389",
+      "reason": "SOURCE_HAS_NO_MEASUREMENT_TABLE"
+    },
+    {
+      "id": "211d15c3-dc64-516f-90f8-b826adbb247d",
+      "reason": "SOURCE_HAS_NO_MEASUREMENT_TABLE"
+    },
+    {
+      "id": "32fef33c-af12-5787-96e4-86ffe0fdabe2",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "d08ab21d-e21f-53d9-93bf-72a9454e4ebc",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "67551697-20c7-5c75-b45c-38408ecfc78b",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "fb675d82-903c-586a-9e5f-7e5779ea0311",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "89eb8fa3-91a4-50d4-9415-c2b1d3d8e9f5",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "5e618491-2907-5d95-954f-f722d9a05422",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "31ea7784-7305-5e27-99dd-f926d3c1284e",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    },
+    {
+      "id": "ad1e4f94-a08e-5691-83d0-e689501655c0",
+      "reason": "SOURCE_COMPOSITION_TOTAL_AMBIGUOUS"
+    }
+  ]
+}

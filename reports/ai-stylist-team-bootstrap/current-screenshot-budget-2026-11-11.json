@@ -1,0 +1,23 @@
+{
+  "mode": "OFFLINE_DIAGNOSTIC_ONLY",
+  "requestId": "0cc1f6ef-4dd7-48be-aa80-cc7199055085",
+  "intake": "RECEIVED",
+  "generate": "NO_RESULT",
+  "recommendations": 0,
+  "fixtureGenerationCalls": 0,
+  "cheapestAllowedPairFromCurrentCommerce": {
+    "total": 598000,
+    "top": {
+      "name": "Levis - Áo kiểu nữ - Mẫu 4902",
+      "color": "Hồng",
+      "price": 199000,
+      "slot": "TOP"
+    },
+    "bottom": {
+      "name": "Arrow - Quần dài nữ - Mẫu 26372",
+      "color": "Xám",
+      "price": 399000,
+      "slot": "BOTTOM"
+    }
+  }
+}

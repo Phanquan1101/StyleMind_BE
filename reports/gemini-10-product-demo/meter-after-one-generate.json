@@ -1,0 +1,991 @@
+{
+  "startedAt": "2026-11-09T13:14:58.327Z",
+  "calls": {
+    "metadata": 0,
+    "embedding": 29,
+    "tokenCount": 45,
+    "generation": 10,
+    "blocked": 3
+  },
+  "events": [
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 382,
+      "inputTokens": 19
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 37,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 425,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.690916761754838,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 132,
+      "inputTokens": 19
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 42,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 434,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6923646981488869,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 373,
+      "inputTokens": 32
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 101,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 431,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6969634542261781,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 182,
+      "inputTokens": 324
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "latencyMs": 1217,
+      "promptTokens": 324,
+      "outputTokens": 173,
+      "thoughtTokens": null
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 429,
+      "blocked": true,
+      "latencyMs": 0
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 484,
+      "inputTokens": 41
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 132,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 433,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6974286852836457,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 191,
+      "inputTokens": 333
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "latencyMs": 1475,
+      "promptTokens": 333,
+      "outputTokens": 188,
+      "thoughtTokens": null
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 366,
+      "inputTokens": 41
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 134,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 421,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6973629735777611,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 143,
+      "inputTokens": 334
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 429,
+      "blocked": true,
+      "latencyMs": 0
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 429,
+      "blocked": true,
+      "latencyMs": 0
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 805,
+      "inputTokens": 58
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 179,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 456,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6995668838667378,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 165,
+      "inputTokens": 591
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "latencyMs": 1386,
+      "promptTokens": 591,
+      "outputTokens": 184,
+      "thoughtTokens": null
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 584,
+      "inputTokens": 21
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 38,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 469,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6892350364186562,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 149,
+      "inputTokens": 22
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 46,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 464,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6905742844397909,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 187,
+      "inputTokens": 21
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 43,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 508,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6896756305153227,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 182,
+      "inputTokens": 18
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 36,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 486,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6919686173006,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 153,
+      "inputTokens": 18
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 34,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 444,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6908583147749853,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 114,
+      "inputTokens": 21
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 47,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 383,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6902908349189397,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 114,
+      "inputTokens": 21
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 39,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 403,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6895836944581147,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 118,
+      "inputTokens": 22
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 42,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 426,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6891348003986623,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 117,
+      "inputTokens": 23
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 59,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 409,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.689840370871119,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 115,
+      "inputTokens": 24
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_DOCUMENT",
+      "requestedDimensions": 1536,
+      "inputCharacters": 57,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 438,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6896885670832834,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "contents",
+      "requestFields": [
+        "contents",
+        "contents[].parts[].text",
+        "contents[].role"
+      ],
+      "latencyMs": 489,
+      "inputTokens": 37
+    },
+    {
+      "operation": "embedding",
+      "model": "gemini-embedding-001",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "endpointAction": "batchEmbedContents",
+      "taskType": "RETRIEVAL_QUERY",
+      "requestedDimensions": 1536,
+      "inputCharacters": 120,
+      "requestFields": [
+        "requests[0].model",
+        "requests[0].content",
+        "requests[0].taskType",
+        "requests[0].outputDimensionality"
+      ],
+      "inputCount": 1,
+      "latencyMs": 416,
+      "responseKeys": [
+        "embeddings"
+      ],
+      "embeddingObjectKeys": [
+        "values"
+      ],
+      "embeddingDimensions": 1536,
+      "embeddingValuesNumeric": true,
+      "rawVectorL2Norm": 0.6981069118597925,
+      "embeddingsArrayCount": 1,
+      "firstEmbeddingsDimensions": 1536
+    },
+    {
+      "operation": "tokenCount",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "requestShapeValid": true,
+      "requestKind": "generateContentRequest",
+      "requestFields": [
+        "generateContentRequest.model",
+        "generateContentRequest.systemInstruction",
+        "generateContentRequest.contents"
+      ],
+      "generationConfigFields": [
+        "generateContentRequest.generationConfig.candidateCount",
+        "generateContentRequest.generationConfig.maxOutputTokens",
+        "generateContentRequest.generationConfig.responseFormat",
+        "generateContentRequest.generationConfig.thinkingConfig"
+      ],
+      "latencyMs": 153,
+      "inputTokens": 584
+    },
+    {
+      "operation": "generation",
+      "model": "gemini-3.5-flash-lite",
+      "status": 200,
+      "reserved": true,
+      "dispatched": true,
+      "latencyMs": 1433,
+      "promptTokens": 584,
+      "outputTokens": 186,
+      "thoughtTokens": null
+    }
+  ],
+  "connectAttempts": 9,
+  "connectAccepted": 9,
+  "connectRejected": 0,
+  "tlsHandshakeErrors": 0,
+  "stoppedOn429": false
+}

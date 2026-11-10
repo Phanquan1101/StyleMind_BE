@@ -18,5 +18,6 @@ public record OrderResponse(
         OrderAddressResponse address,
         List<OrderItemResponse> items,
         List<OrderHistoryResponse> history,
-        @JsonProperty("cancellation_request") CancellationRequestResponse cancellationRequest) {
+        @JsonProperty("cancellation_request") CancellationRequestResponse cancellationRequest,
+        @JsonProperty("confirmation_state") String confirmationState) {
 }

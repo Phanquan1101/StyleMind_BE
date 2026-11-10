@@ -1,3 +1,3 @@
 package com.stylemind.commerce.repository.order;
-import com.stylemind.commerce.entity.OrderItem; import java.util.List; import java.util.UUID; import org.springframework.data.jpa.repository.JpaRepository;
-public interface OrderItemRepository extends JpaRepository<OrderItem,UUID> { List<OrderItem> findByOrderIdOrderByOrderItemIdAsc(UUID orderId); }
+import com.stylemind.commerce.entity.OrderItem; import java.util.List; import java.util.UUID; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.data.jpa.repository.Lock; import org.springframework.data.jpa.repository.Query; import org.springframework.data.repository.query.Param; import jakarta.persistence.LockModeType;
+public interface OrderItemRepository extends JpaRepository<OrderItem,UUID> { List<OrderItem> findByOrderIdOrderByOrderItemIdAsc(UUID orderId); @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select i from OrderItem i where i.orderId=:orderId order by i.variantId") List<OrderItem> findLockedByOrderId(@Param("orderId") UUID orderId); }

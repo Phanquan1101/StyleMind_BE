@@ -3,6 +3,7 @@ package com.stylemind.stylist.security;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.Instant;
+import java.util.UUID;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -29,6 +30,13 @@ public final class ApiProblemDetails {
         if (correlationId != null) {
             problem.setProperty("correlationId", correlationId);
         }
+        return problem;
+    }
+
+    public static ProblemDetail create(
+            HttpStatus status, String title, String detail, String code, HttpServletRequest request, UUID requestId) {
+        ProblemDetail problem = create(status, title, detail, code, request);
+        if (requestId != null) problem.setProperty("request_id", requestId);
         return problem;
     }
 }

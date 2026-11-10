@@ -1,0 +1,12 @@
+{
+  "original_english_backup": {
+    "file": "commerce-service\\.seed-data\\db-backups\\vietnamese-2026-11-10T12-25-35-724Z\\before-vietnamese.dump",
+    "sha256": "bc73df323616747f9e4693d7bef4a7ff1d8141b68d8dba0ad9b6afaa2774b604",
+    "actual_restore_tested": true
+  },
+  "refinement_backup": {
+    "file": "commerce-service\\.seed-data\\db-backups\\vietnamese-2026-11-10T12-29-49-462Z\\before-vietnamese.dump",
+    "sha256": "e889ad2aa00145d8c78de57d71a0b26529227c1368aa9135b2e7b6b91a468101",
+    "actual_restore_tested": true
+  }
+}

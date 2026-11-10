@@ -1,0 +1,334 @@
+{
+    "status":  "REVIEW_ONLY_NOT_A_SEED",
+    "source_sha256":  "A061EE0B9EDEBB6CCACA4369FCF82CE496E40F5000C25E578FEE5F212C91FD22",
+    "total_products":  2938,
+    "total_variants":  20766,
+    "in_stock_variants":  15839,
+    "archive_thumbnails":  3823,
+    "products_with_matching_thumbnail":  2938,
+    "structurally_valid_products":  2938,
+    "products_requiring_review":  0,
+    "scopes":  [
+                   {
+                       "count":  1341,
+                       "scope":  "clothing"
+                   },
+                   {
+                       "count":  636,
+                       "scope":  "other"
+                   },
+                   {
+                       "count":  961,
+                       "scope":  "tops_and_pants"
+                   }
+               ],
+    "categories":  [
+                       {
+                           "count":  671,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Dresses"
+                       },
+                       {
+                           "count":  224,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outfit Sets"
+                       },
+                       {
+                           "count":  180,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops"
+                       },
+                       {
+                           "count":  172,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Rings"
+                       },
+                       {
+                           "count":  151,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Sweaters"
+                       },
+                       {
+                           "count":  149,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e One-Pieces"
+                       },
+                       {
+                           "count":  101,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Blouses"
+                       },
+                       {
+                           "count":  90,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Earrings"
+                       },
+                       {
+                           "count":  82,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Tank Tops"
+                       },
+                       {
+                           "count":  79,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Belts"
+                       },
+                       {
+                           "count":  78,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Cover Ups"
+                       },
+                       {
+                           "count":  63,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Shorts \u003e Short Trousers"
+                       },
+                       {
+                           "count":  56,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Trousers"
+                       },
+                       {
+                           "count":  53,
+                           "category":  "Apparel \u0026 Accessories \u003e Shoes"
+                       },
+                       {
+                           "count":  50,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Hoodies"
+                       },
+                       {
+                           "count":  49,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Sunglasses"
+                       },
+                       {
+                           "count":  47,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets"
+                       },
+                       {
+                           "count":  42,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e T-Shirts"
+                       },
+                       {
+                           "count":  40,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Sweatshirts"
+                       },
+                       {
+                           "count":  40,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Skirts"
+                       },
+                       {
+                           "count":  32,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Cardigans"
+                       },
+                       {
+                           "count":  30,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Necklaces"
+                       },
+                       {
+                           "count":  30,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Baseball Caps"
+                       },
+                       {
+                           "count":  27,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Classic Bikinis"
+                       },
+                       {
+                           "count":  27,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Shorts"
+                       },
+                       {
+                           "count":  26,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Shorts \u003e Denim Shorts"
+                       },
+                       {
+                           "count":  26,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Bodysuits"
+                       },
+                       {
+                           "count":  23,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Leggings"
+                       },
+                       {
+                           "count":  20,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Scarves \u0026 Shawls"
+                       },
+                       {
+                           "count":  19,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Shirts"
+                       },
+                       {
+                           "count":  18,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hair Accessories \u003e Wigs"
+                       },
+                       {
+                           "count":  18,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Pants \u003e Cargo Pants"
+                       },
+                       {
+                           "count":  18,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Pajamas"
+                       },
+                       {
+                           "count":  17,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Jewelry Sets"
+                       },
+                       {
+                           "count":  16,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Beanies"
+                       },
+                       {
+                           "count":  14,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Nightgowns"
+                       },
+                       {
+                           "count":  14,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Bracelets"
+                       },
+                       {
+                           "count":  14,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats"
+                       },
+                       {
+                           "count":  13,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Track Pants"
+                       },
+                       {
+                           "count":  10,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Sweatpants"
+                       },
+                       {
+                           "count":  9,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbag \u0026 Wallet Accessories \u003e Keychains"
+                       },
+                       {
+                           "count":  8,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Socks \u003e Crew Socks"
+                       },
+                       {
+                           "count":  8,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e One-Piece Swimsuits"
+                       },
+                       {
+                           "count":  7,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Skorts"
+                       },
+                       {
+                           "count":  7,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Sun Hats"
+                       },
+                       {
+                           "count":  6,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Sports Bras"
+                       },
+                       {
+                           "count":  6,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Vests"
+                       },
+                       {
+                           "count":  5,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Sport Jackets"
+                       },
+                       {
+                           "count":  5,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Lingerie \u003e Shapewear \u003e Bodysuits"
+                       },
+                       {
+                           "count":  5,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swim Boxers"
+                       },
+                       {
+                           "count":  4,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swimwear Tops"
+                       },
+                       {
+                           "count":  4,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing"
+                       },
+                       {
+                           "count":  3,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbags, Wallets \u0026 Cases \u003e Handbags \u003e Cross Body Bags"
+                       },
+                       {
+                           "count":  3,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Overcoats"
+                       },
+                       {
+                           "count":  3,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbags, Wallets \u0026 Cases \u003e Handbags"
+                       },
+                       {
+                           "count":  3,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Ponchos"
+                       },
+                       {
+                           "count":  2,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Sleepwear \u0026 Loungewear \u003e Robes"
+                       },
+                       {
+                           "count":  2,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Swimwear \u003e Swim Dresses"
+                       },
+                       {
+                           "count":  2,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Winter Hats"
+                       },
+                       {
+                           "count":  2,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbags, Wallets \u0026 Cases \u003e Handbags \u003e Shopper Bags"
+                       },
+                       {
+                           "count":  2,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Trucker Jackets"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Activewear \u003e Activewear Pants \u003e Leggings"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbags, Wallets \u0026 Cases \u003e Handbags \u003e Shoulder Bags"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Handbags, Wallets \u0026 Cases \u003e Wallets \u0026 Money Clips \u003e Coin Purses"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Socks \u003e Knee Socks"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Visors"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Brooches \u0026 Lapel Pins"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Jewelry \u003e Body Jewelry"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hats \u003e Bucket Hats"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Traditional \u0026 Ceremonial Clothing \u003e Kimonos"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hair Accessories \u003e Headbands"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Outerwear \u003e Coats \u0026 Jackets \u003e Windbreakers"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing \u003e Clothing Tops \u003e Tunics"
+                       },
+                       {
+                           "count":  1,
+                           "category":  "Apparel \u0026 Accessories \u003e Clothing Accessories \u003e Hair Accessories"
+                       }
+                   ],
+    "duplicate_title_groups":  47,
+    "limitations":  [
+                        "No visual image/product/color matching performed.",
+                        "Remote image URLs were not fetched or checked for availability.",
+                        "Vendor is preserved as source information, not assumed to be a brand.",
+                        "No USD to VND conversion or inventory quantities invented.",
+                        "in_stock is not a stock quantity.",
+                        "Same titles are flagged for review, not automatically merged.",
+                        "Scope uses source taxonomy; category accuracy and gender have not been visually verified.",
+                        "No application data, seed, schema or database was changed."
+                    ]
+}

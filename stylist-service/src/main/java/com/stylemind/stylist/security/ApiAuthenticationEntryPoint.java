@@ -35,6 +35,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         objectMapper.writeValue(response.getOutputStream(),
                 ApiProblemDetails.create(status, status.getReasonPhrase(), detail, code, request));

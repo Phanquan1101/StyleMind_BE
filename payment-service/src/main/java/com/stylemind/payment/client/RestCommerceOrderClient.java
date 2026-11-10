@@ -3,6 +3,7 @@ package com.stylemind.payment.client;
 import com.stylemind.payment.config.CommerceClientProperties;
 import com.stylemind.payment.errors.PaymentApiException;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -16,10 +17,13 @@ public class RestCommerceOrderClient implements CommerceOrderClient {
 
     private final CommerceClientProperties properties;
     private final RestClient restClient;
+    private final String snapshotToken;
 
-    public RestCommerceOrderClient(CommerceClientProperties properties, RestClient.Builder restClientBuilder) {
+    public RestCommerceOrderClient(CommerceClientProperties properties, RestClient.Builder restClientBuilder,
+            @Value("${stylemind.payment.commerce.snapshot-token:}") String snapshotToken) {
         this.properties = properties;
         this.restClient = restClientBuilder.build();
+        this.snapshotToken = StringUtils.hasText(snapshotToken) ? snapshotToken : properties.serviceToken();
     }
 
     @Override
@@ -31,8 +35,8 @@ public class RestCommerceOrderClient implements CommerceOrderClient {
         try {
             RestClient.RequestHeadersSpec<?> request = restClient.get()
                     .uri(properties.baseUrl() + "/internal/v1/orders/{orderId}/payment-snapshot", orderId);
-            if (StringUtils.hasText(properties.serviceToken())) {
-                request = request.header(SERVICE_TOKEN_HEADER, properties.serviceToken());
+            if (StringUtils.hasText(snapshotToken)) {
+                request = request.header(SERVICE_TOKEN_HEADER, snapshotToken);
             }
             CommerceOrderPaymentSnapshot snapshot = request.retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
