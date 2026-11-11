@@ -35,6 +35,7 @@ public interface OrderService {
     OrderListResponse list(UUID customerId, boolean admin, OrderRequestValidator.ListCriteria criteria);
 
     QrCheckoutListResponse listPendingQrCheckouts(UUID customerId, OrderRequestValidator.ListCriteria criteria);
+    QrCheckoutListResponse listRecentUnpaidQrCheckouts(UUID customerId, OrderRequestValidator.ListCriteria criteria);
 
     OrderResponse get(UUID customerId, boolean admin, UUID orderId);
 

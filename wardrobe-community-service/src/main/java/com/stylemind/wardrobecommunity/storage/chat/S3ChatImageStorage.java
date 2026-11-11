@@ -41,6 +41,7 @@ public class S3ChatImageStorage implements ChatImageStorage {
         this.endpoint = endpoint;
         this.region = region;
     }
+    @Override public boolean isAvailable() { return enabled && !bucket.isBlank() && !region.isBlank(); }
     @Override public void requireAvailable() {
         if (!enabled || bucket.isBlank() || region.isBlank()) { throw unavailable(); }
     }

@@ -29,6 +29,7 @@ public class ApiExceptionHandler {
         ProblemDetail detail = ApiProblemDetails.create(exception.status(), exception.status().getReasonPhrase(),
                 "Friend invitation action could not be completed", exception.getMessage(), request);
         if (exception.invitationId() != null) detail.setProperty("friend_invitation_id", exception.invitationId());
+        if (exception.recipientHint() != null) detail.setProperty("recipient_hint", exception.recipientHint());
         detail.setProperty("retry_after_seconds", exception.retryAfter());
         var response = ResponseEntity.status(exception.status()).cacheControl(org.springframework.http.CacheControl.noStore());
         if (exception.retryAfter() > 0) response.header("Retry-After", Long.toString(exception.retryAfter()));

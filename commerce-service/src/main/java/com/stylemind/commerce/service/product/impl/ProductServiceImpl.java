@@ -83,13 +83,30 @@ public class ProductServiceImpl implements ProductService {
     public ProductListResponse listPublicProducts(ProductListCriteria criteria) {
         String keyword = criteria.keyword() == null ? null
                 : "%" + criteria.keyword().toLowerCase(java.util.Locale.ROOT) + "%";
-        Page<Product> page = products.searchPublic(keyword, criteria.categoryId(), criteria.demographicSegment(),
+        Page<Product> page = products.searchPublic(keyword, criteria.categoryIds().size(), categoryIdsOrNil(criteria), criteria.demographicSegment(),
                 criteria.minPriceVnd(), criteria.maxPriceVnd(),
                 PageRequest.of(criteria.page(), criteria.size(),
                         Sort.by(Sort.Order.asc("name"), Sort.Order.asc("productId"))));
         List<ProductResponse> items = productResponses(page.getContent(), true);
         return new ProductListResponse(items, criteria.page(), criteria.size(), page.getTotalElements(),
                 page.getTotalPages());
+    }
+
+    private static java.util.Collection<UUID> categoryIdsOrNil(ProductListCriteria criteria) {
+        // an IN clause cannot be empty; the count parameter switches the filter off in that case
+        return criteria.categoryIds().isEmpty() ? List.of(new UUID(0L, 0L)) : criteria.categoryIds();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductListResponse listAdminProducts(ProductListCriteria criteria) {
+        String keyword = criteria.keyword() == null ? null
+                : "%" + criteria.keyword().toLowerCase(java.util.Locale.ROOT) + "%";
+        Page<Product> page = products.searchAdmin(keyword, criteria.categoryIds().size(), categoryIdsOrNil(criteria),
+                criteria.status(), PageRequest.of(criteria.page(), criteria.size(),
+                        Sort.by(Sort.Order.asc("name"), Sort.Order.asc("productId"))));
+        return new ProductListResponse(productResponses(page.getContent(), false), criteria.page(), criteria.size(),
+                page.getTotalElements(), page.getTotalPages());
     }
 
     @Transactional(readOnly = true)

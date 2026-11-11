@@ -69,6 +69,13 @@ public class ProductController {
         return productService.activeVariantLookup(validator.variantIds(request));
     }
 
+    @GetMapping(path = "/api/v1/admin/products", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List products of every status (ADMIN only)",
+            description = "Filters: keyword (name or SKU), category_id (repeatable), status, page, size (max 100).")
+    public ProductListResponse listAdminProducts(HttpServletRequest request) {
+        return productService.listAdminProducts(validator.adminListCriteria(request));
+    }
+
     @PostMapping(path = "/api/v1/admin/products", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Create product (ADMIN only)")

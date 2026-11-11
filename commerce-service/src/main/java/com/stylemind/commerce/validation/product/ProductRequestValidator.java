@@ -35,7 +35,7 @@ public class ProductRequestValidator {
     private static final Set<String> VARIANT_FIELDS = Set.of(
             "sku", "size", "color", "material", "unit_price_vnd", "quantity", "variant_status");
     private static final Set<String> LIST_QUERY_FIELDS = Set.of(
-            "keyword", "category_id", "min_price_vnd", "max_price_vnd", "demographic_segment", "page", "size");
+            "keyword", "category_id", "min_price_vnd", "max_price_vnd", "demographic_segment", "page", "size", "status");
     private static final Set<String> IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
     private static final String SKU_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,63}";
@@ -46,7 +46,7 @@ public class ProductRequestValidator {
         UUID categoryId = requiredUuid(body, "category_id", "Vui lòng chọn danh mục", errors);
         UUID brandId = requiredUuid(body, "brand_id", "Vui lòng chọn thương hiệu", errors);
         String name = requiredText(body, "name", "Tên sản phẩm", 160, errors);
-        String description = optionalText(body, "description", "Mô tả", 2000, errors);
+        String description = optionalText(body, "description", "Mô tả", 2000, true, errors);
         String demographic = optionalSyntaxCode(body, "demographic_segment", "Nhóm đối tượng", errors);
         ProductStatus status = requiredEnum(body, "product_status", "Trạng thái sản phẩm", ProductStatus.class, errors);
         throwIfAny(errors);
@@ -78,18 +78,51 @@ public class ProductRequestValidator {
     }
 
     public ProductListCriteria listCriteria(HttpServletRequest request) {
+        return criteria(request, false);
+    }
+
+    /** Admin list: same filters plus status; keyword also matches SKU. */
+    public ProductListCriteria adminListCriteria(HttpServletRequest request) {
+        return criteria(request, true);
+    }
+
+    private ProductListCriteria criteria(HttpServletRequest request, boolean admin) {
         Map<String, String[]> parameters = request.getParameterMap();
-        if (!LIST_QUERY_FIELDS.containsAll(parameters.keySet())) {
+        if (!LIST_QUERY_FIELDS.containsAll(parameters.keySet()) || (!admin && parameters.containsKey("status"))) {
             throw invalidRequest();
         }
         parameters.forEach((key, values) -> {
-            if (values == null || values.length != 1 || values[0] == null) {
+            // category_id may repeat (OR filter); everything else is single-valued
+            if (values == null || values.length == 0 || values[0] == null
+                    || (values.length != 1 && !"category_id".equals(key))) {
                 throw invalidRequest();
             }
         });
         String keyword = queryText(parameters, "keyword", 120);
         String demographic = querySyntaxCode(parameters, "demographic_segment");
-        UUID categoryId = parameter(parameters, "category_id") == null ? null : uuid(parameter(parameters, "category_id"));
+        String[] rawCategories = parameters.get("category_id");
+        List<UUID> categoryIds = new ArrayList<>();
+        if (rawCategories != null) {
+            if (rawCategories.length > 20) {
+                throw invalidRequest();
+            }
+            for (String raw : rawCategories) {
+                UUID id = uuid(raw);
+                if (!categoryIds.contains(id)) {
+                    categoryIds.add(id);
+                }
+            }
+        }
+        String status = parameter(parameters, "status");
+        if (status != null && !status.isBlank()) {
+            try {
+                status = ProductStatus.valueOf(status).name();
+            } catch (IllegalArgumentException e) {
+                throw invalidRequest();
+            }
+        } else {
+            status = null;
+        }
         Long minPrice = parseLong(parameter(parameters, "min_price_vnd"));
         Long maxPrice = parseLong(parameter(parameters, "max_price_vnd"));
         if ((minPrice != null && minPrice < 0) || (maxPrice != null && maxPrice < 0)
@@ -101,7 +134,7 @@ public class ProductRequestValidator {
         if (page < 0 || size < 1 || size > 100) {
             throw invalidRequest();
         }
-        return new ProductListCriteria(keyword, categoryId, minPrice, maxPrice, demographic, page, size);
+        return new ProductListCriteria(keyword, List.copyOf(categoryIds), minPrice, maxPrice, demographic, status, page, size);
     }
 
     public List<UUID> variantIds(VariantBatchLookupRequest request) {
@@ -198,6 +231,12 @@ public class ProductRequestValidator {
     }
 
     private static String optionalText(JsonNode body, String field, String label, int max, List<FieldError> errors) {
+        return optionalText(body, field, label, max, false, errors);
+    }
+
+    /** Descriptions are free text: line breaks and tabs are normal there (the imported catalog has them); other control characters are not. */
+    private static String optionalText(JsonNode body, String field, String label, int max, boolean multiline,
+            List<FieldError> errors) {
         JsonNode node = body.get(field);
         if (node == null || node.isNull()) {
             return null;
@@ -214,7 +253,7 @@ public class ProductRequestValidator {
             errors.add(new FieldError(field, "TOO_LONG", label + " tối đa " + max + " ký tự"));
             return null;
         }
-        if (value.codePoints().anyMatch(Character::isISOControl)) {
+        if (value.codePoints().anyMatch(cp -> Character.isISOControl(cp) && !(multiline && (cp == '\n' || cp == '\r' || cp == '\t')))) {
             errors.add(new FieldError(field, "INVALID_FORMAT", label + " chứa ký tự không hợp lệ"));
             return null;
         }

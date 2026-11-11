@@ -54,6 +54,12 @@ public class QrCheckoutController {
                 .body(orders.listPendingQrCheckouts(subject(auth), validator.pendingQrList(request)));
     }
 
+    @GetMapping("/api/v1/qr-checkouts")
+    public ResponseEntity<QrCheckoutListResponse> recentUnpaid(Authentication auth, HttpServletRequest request) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(orders.listRecentUnpaidQrCheckouts(subject(auth), validator.pendingQrList(request)));
+    }
+
     @PostMapping(path = "/api/v1/qr-checkouts/recover", consumes = "application/json")
     public ResponseEntity<QrCheckoutReservationService.PaymentContext> recover(Authentication auth, @RequestBody JsonNode body) {
         return ResponseEntity.ok().header("Cache-Control", "no-store")

@@ -22,7 +22,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
                     and (:minPrice is null or v.unitPriceVnd >= :minPrice)
                     and (:maxPrice is null or v.unitPriceVnd <= :maxPrice))
               and (:keyword is null or lower(p.name) like :keyword or lower(coalesce(p.description, '')) like :keyword)
-              and (:categoryId is null or p.categoryId = :categoryId)
+              and (:categoryCount = 0 or p.categoryId in :categoryIds)
               and (:demographic is null or p.demographicSegment = :demographic)
             """,
             countQuery = """
@@ -35,10 +35,29 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
                     and (:minPrice is null or v.unitPriceVnd >= :minPrice)
                     and (:maxPrice is null or v.unitPriceVnd <= :maxPrice))
               and (:keyword is null or lower(p.name) like :keyword or lower(coalesce(p.description, '')) like :keyword)
-              and (:categoryId is null or p.categoryId = :categoryId)
+              and (:categoryCount = 0 or p.categoryId in :categoryIds)
               and (:demographic is null or p.demographicSegment = :demographic)
             """)
-    Page<Product> searchPublic(@Param("keyword") String keyword, @Param("categoryId") UUID categoryId,
+    Page<Product> searchPublic(@Param("keyword") String keyword, @Param("categoryCount") int categoryCount,
+            @Param("categoryIds") java.util.Collection<UUID> categoryIds,
             @Param("demographic") String demographic, @Param("minPrice") Long minPrice,
             @Param("maxPrice") Long maxPrice, Pageable pageable);
+
+    @Query(value = """
+            select p from Product p
+            where (:status is null or p.productStatus = :status)
+              and (:categoryCount = 0 or p.categoryId in :categoryIds)
+              and (:keyword is null or lower(p.name) like :keyword
+                   or exists (select v.variantId from ProductVariant v where v.productId = p.productId and lower(v.sku) like :keyword))
+            """,
+            countQuery = """
+            select count(p) from Product p
+            where (:status is null or p.productStatus = :status)
+              and (:categoryCount = 0 or p.categoryId in :categoryIds)
+              and (:keyword is null or lower(p.name) like :keyword
+                   or exists (select v.variantId from ProductVariant v where v.productId = p.productId and lower(v.sku) like :keyword))
+            """)
+    Page<Product> searchAdmin(@Param("keyword") String keyword, @Param("categoryCount") int categoryCount,
+            @Param("categoryIds") java.util.Collection<UUID> categoryIds, @Param("status") String status,
+            Pageable pageable);
 }

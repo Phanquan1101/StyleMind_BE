@@ -49,6 +49,14 @@ public class FriendInvitationServiceImpl implements FriendInvitationService {
         return persistence.accept(actor,actor(actor).email(),id,token);
     }
 
+    @Override public InvitationActionResult cancel(UUID actor,UUID id) {
+        return persistence.cancel(actor,id);
+    }
+
+    @Override public InvitationActionResult decline(UUID actor,UUID id) {
+        return persistence.decline(actor,actor(actor).email(),id);
+    }
+
     @Override public IncomingFriendInvitationListResponse incoming(UUID actor,FriendPageCriteria criteria) {
         var page = persistence.incoming(actor, actor(actor).email(), criteria);
         var senderIds = page.items().stream().map(IncomingFriendInvitationResponse::senderAccountId).distinct().toList();

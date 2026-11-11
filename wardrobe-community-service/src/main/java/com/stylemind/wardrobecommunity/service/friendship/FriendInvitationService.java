@@ -9,5 +9,7 @@ public interface FriendInvitationService {
     InvitationActionResult create(UUID actorId, String recipientEmail);
     InvitationActionResult resend(UUID actorId, UUID invitationId);
     InvitationActionResult accept(UUID actorId, UUID invitationId, String token);
+    InvitationActionResult cancel(UUID actorId, UUID invitationId);
+    InvitationActionResult decline(UUID actorId, UUID invitationId);
     IncomingFriendInvitationListResponse incoming(UUID actorId, FriendPageCriteria criteria);
 }
