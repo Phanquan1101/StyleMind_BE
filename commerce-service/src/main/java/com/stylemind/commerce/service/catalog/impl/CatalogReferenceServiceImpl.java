@@ -23,6 +23,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
 
     private final CategoryRepository categories;
     private final BrandRepository brands;
+    private final com.stylemind.commerce.repository.product.ProductRepository products;
 
     @Transactional(readOnly = true)
     public CatalogReferenceListResponse list(CatalogReferenceType type) {
@@ -41,9 +42,15 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
 
     @Transactional(readOnly = true)
     public CatalogReferenceListResponse listAdmin(CatalogReferenceType type) {
-        return new CatalogReferenceListResponse(type == CatalogReferenceType.CATEGORY
-                ? categories.findAllByOrderByNameAscCategoryIdAsc().stream().map(this::response).toList()
-                : brands.findAllByOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
+        if (type == CatalogReferenceType.CATEGORY) {
+            java.util.Map<UUID, Long> counts = new java.util.HashMap<>();
+            products.countProductsByCategory().forEach(row -> counts.put((UUID) row[0], (Long) row[1]));
+            return new CatalogReferenceListResponse(categories.findAllByOrderByNameAscCategoryIdAsc().stream()
+                    .map(entity -> new CatalogReferenceResponse(entity.getCategoryId(), entity.getName(), entity.getSlug(),
+                            entity.isActive(), counts.getOrDefault(entity.getCategoryId(), 0L)))
+                    .toList());
+        }
+        return new CatalogReferenceListResponse(brands.findAllByOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +65,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
     public CatalogReferenceResponse create(CatalogReferenceType type, CatalogReferenceRequest command) {
         try {
             if (type == CatalogReferenceType.CATEGORY) {
-                Category entity = new Category(); entity.setCategoryId(UUID.randomUUID()); apply(entity, command);
+                Category entity = new Category(); entity.setCategoryId(UUID.randomUUID()); requireUniqueName(entity.getCategoryId(), command); apply(entity, command);
                 return response(categories.saveAndFlush(entity));
             }
             Brand entity = new Brand(); entity.setBrandId(UUID.randomUUID()); apply(entity, command);
@@ -72,7 +79,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
     public CatalogReferenceResponse replace(CatalogReferenceType type, UUID id, CatalogReferenceRequest command) {
         try {
             if (type == CatalogReferenceType.CATEGORY) {
-                Category entity = categories.findById(id).orElseThrow(this::notFound); apply(entity, command);
+                Category entity = categories.findById(id).orElseThrow(this::notFound); requireUniqueName(id, command); apply(entity, command);
                 return response(categories.saveAndFlush(entity));
             }
             Brand entity = brands.findById(id).orElseThrow(this::notFound); apply(entity, command);
@@ -80,6 +87,18 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
         } catch (DataIntegrityViolationException exception) {
             throw duplicateSlug();
         }
+    }
+
+    /** Permanent removal; only a category that no product (of any status) uses can go. */
+    @Transactional
+    public void deleteCategoryPermanently(UUID id) {
+        Category entity = categories.findById(id).orElseThrow(this::notFound);
+        if (products.countByCategoryId(id) > 0) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CATEGORY_HAS_PRODUCTS",
+                    "Category still has products; hide it instead of deleting it");
+        }
+        categories.delete(entity);
+        categories.flush();
     }
 
     @Transactional
@@ -96,6 +115,13 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
         if (entity.isActive()) {
             entity.setActive(false);
             brands.saveAndFlush(entity);
+        }
+    }
+
+    private void requireUniqueName(UUID id, CatalogReferenceRequest command) {
+        if (categories.existsByNameIgnoreCaseAndCategoryIdNot(command.name(), id)) {
+            throw ApiOperationException.invalidFields(java.util.List.of(
+                    new com.stylemind.commerce.errors.FieldError("name", "DUPLICATE_NAME", "Đã có danh mục cùng tên")));
         }
     }
 

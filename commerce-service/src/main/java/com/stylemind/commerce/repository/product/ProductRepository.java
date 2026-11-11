@@ -9,6 +9,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ProductRepository extends JpaRepository<Product, UUID> {
+    @Query("select p.categoryId, count(p) from Product p group by p.categoryId")
+    java.util.List<Object[]> countProductsByCategory();
+
+    long countByCategoryId(UUID categoryId);
+
     boolean existsByCategoryIdAndProductStatus(UUID categoryId, String productStatus);
     boolean existsByBrandIdAndProductStatus(UUID brandId, String productStatus);
 

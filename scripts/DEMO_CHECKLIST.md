@@ -63,7 +63,7 @@ https://<ten-mien-tinh>.ngrok-free.dev/payment/internal/v1/sepay/webhooks
 - Sự kiện: **Có tiền vào**. Tài khoản ngân hàng: đúng tài khoản trong `STYLEMIND_SEPAY_QR_ACCOUNT_NUMBER` và đã liên kết SePay.
 - Kiểu chứng thực: **HMAC-SHA256**, Secret Key **trùng với `STYLEMIND_SEPAY_WEBHOOK_SECRET`**. SePay chỉ hiện secret một lần khi tạo; nếu SePay tự sinh secret thì chép vào `.env` rồi `docker compose -p stylemind -f docker-compose.yml up -d payment-service`.
 - Kiểu dữ liệu: **JSON** (nếu chọn form-data/urlencoded, payment-service trả `415`).
-- Nhận diện mã thanh toán (Công ty → Cấu hình → Cấu trúc mã thanh toán): tiền tố **`SM`**, phần đuôi đúng **12 ký tự chữ và số** (độ dài hậu tố phải bao gồm 12; webhook chỉ đọc trường `code`, **không** đọc `content`) (mã của StyleMind dạng `SM` + 12 ký tự hex in hoa, ví dụ `SMEDA9EC9A7C56`). Nếu SePay không nhận ra mã thì trường `code` rỗng và payment-service ghi `MISSING_PAYMENT_REFERENCE`, đơn **không** sang PAID.
+- Nhận diện mã thanh toán (Công ty → Cấu hình → Cấu trúc mã thanh toán): tiền tố **`SM`**, phần đuôi đúng **12 ký tự chữ và số** (mã của StyleMind dạng `SM` + 12 ký tự hex in hoa, ví dụ `SMEDA9EC9A7C56`). Webhook đọc trường `code`; nếu `code` rỗng hoặc sai định dạng thì tự bóc mã từ `content` (không phân biệt hoa thường, chuẩn hóa in hoa). Nội dung chứa **nhiều mã khác nhau** thì không đoán: ghi ngoại lệ `UNMATCHED_REFERENCE`; không có mã nào thì ghi `MISSING_PAYMENT_REFERENCE` và đơn **không** sang PAID.
 - Đúng **nội dung chuyển khoản** hiển thị trên trang QR và đúng **số tiền**; chuyển trong thời gian đếm ngược (khoảng 20 phút), nếu trễ sẽ bị ghi `LATE_PAYMENT`.
 
 ### C3. Kiểm tra webhook đã tới chưa
@@ -93,6 +93,8 @@ Tạo QR trên trang thanh toán, lấy mã tham chiếu và số tiền hiển 
 ```powershell
 node scripts/simulate-sepay-webhook.cjs --reference SMXXXXXXXXXXXX --amount <so-tien> --checkout <checkoutId> --email an@sm.test
 ```
+
+Giả lập SePay không nhận ra mã: thêm `--no-code` (và `--content "<nội dung chuyển khoản>"`) — mã sẽ được bóc từ nội dung.
 
 Gửi qua ngrok (kiểm tra cả đường tunnel): thêm `--base-url https://<ten-mien-tinh>.ngrok-free.dev` (mặc định `http://localhost:8080`).
 

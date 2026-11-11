@@ -18,7 +18,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -60,7 +64,8 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
         SepayWebhookRequest request = parse(rawBody);
         String providerEventId = request.id() == null ? null : String.valueOf(request.id());
         long amount = request.transferAmount() == null ? 0 : request.transferAmount();
-        String receivedReference = normalizeBlankToNull(request.code());
+        ReferenceResolution resolution = resolveReference(request.code(), request.content());
+        String receivedReference = resolution.reference();
         Instant settledAt = parseTransactionDate(request.transactionDate()).orElse(receivedAt);
 
         if (providerEventId == null || amount < 0) {
@@ -74,6 +79,11 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
                     SepayWebhookExceptionReason.UNSUPPORTED_TRANSFER_TYPE, receivedAt);
         }
 
+        if (resolution.ambiguous()) {
+            // Several different payment codes in one transfer: never guess which order it is for.
+            return recordException(null, providerEventId, null, amount,
+                    SepayWebhookExceptionReason.UNMATCHED_REFERENCE, receivedAt);
+        }
         if (!StringUtils.hasText(receivedReference)) {
             return recordException(null, providerEventId, null, amount,
                     SepayWebhookExceptionReason.MISSING_PAYMENT_REFERENCE, receivedAt);
@@ -179,6 +189,39 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
         } catch (RuntimeException exception) {
             throw new SepayWebhookMalformedException(new IllegalArgumentException("Invalid transaction timestamp"));
         }
+    }
+
+    /** Outcome of looking for the payment reference: the reference to use, or ambiguous (several different codes). */
+    private record ReferenceResolution(String reference, boolean ambiguous) { }
+
+    /**
+     * SePay normally fills "code" with the reference it detected in the transfer text. When "code" is empty or is not
+     * a valid reference, the reference is read from "content" (prefix + 12 hex characters, case-insensitive, normalised
+     * to upper case). Exactly one distinct code is accepted; more than one is ambiguous. A non-empty "code" that is not
+     * in our format and has no usable code in "content" is kept as received so it is recorded as UNMATCHED_REFERENCE.
+     */
+    private ReferenceResolution resolveReference(String code, String content) {
+        String prefix = properties.paymentCodePrefix();
+        Pattern format = Pattern.compile("(?<![A-Za-z0-9])" + Pattern.quote(prefix) + "[0-9A-Fa-f]{12}(?![0-9A-Fa-f])",
+                Pattern.CASE_INSENSITIVE);
+        String trimmedCode = normalizeBlankToNull(code);
+        if (trimmedCode != null && format.matcher(trimmedCode).matches()) {
+            return new ReferenceResolution(trimmedCode.toUpperCase(java.util.Locale.ROOT), false);
+        }
+        Set<String> found = new LinkedHashSet<>();
+        if (StringUtils.hasText(content)) {
+            Matcher matcher = format.matcher(content);
+            while (matcher.find()) {
+                found.add(matcher.group().toUpperCase(java.util.Locale.ROOT));
+            }
+        }
+        if (found.size() == 1) {
+            return new ReferenceResolution(found.iterator().next(), false);
+        }
+        if (found.size() > 1) {
+            return new ReferenceResolution(null, true);
+        }
+        return new ReferenceResolution(trimmedCode, false);
     }
 
     private String normalizeBlankToNull(String value) {

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
     List<Category> findAllByOrderByNameAscCategoryIdAsc();
+    boolean existsByNameIgnoreCaseAndCategoryIdNot(String name, UUID categoryId);
     List<Category> findAllByActiveTrueOrderByNameAscCategoryIdAsc();
     java.util.Optional<Category> findByCategoryIdAndActiveTrue(UUID categoryId);
 }

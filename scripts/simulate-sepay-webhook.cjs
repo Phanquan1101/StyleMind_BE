@@ -13,6 +13,9 @@
  *   --date "yyyy-MM-dd HH:mm:ss"  transaction date in Vietnam time (default: now). Use the real transfer time to replay a
  *                        real payment whose webhook never arrived (it is compared with the attempt expiry, not with today)
  *   --event-id <n>       provider event id (default: current time in ms; reuse to test idempotency)
+ *   --no-code            send an empty "code" field (like SePay when it does not detect the payment code); the reference
+ *                        is then read from "content"
+ *   --content <text>     transfer text sent as "content" (default: "<reference> thanh toan don hang StyleMind")
  *   --base-url <url>     gateway base URL (default http://localhost:8080); use your ngrok URL to send through the tunnel,
  *                        e.g. --base-url https://<your-domain>.ngrok-free.dev
  *   --url <url>          full webhook URL (overrides --base-url); default <base-url>/payment/internal/v1/sepay/webhooks
@@ -87,8 +90,8 @@ const body = JSON.stringify({
   transactionDate,
   accountNumber: '0000000000',
   subAccount: null,
-  code: reference,
-  content: `${reference} thanh toan don hang StyleMind`,
+  code: args['no-code'] ? '' : reference,
+  content: typeof args.content === 'string' ? args.content : `${reference} thanh toan don hang StyleMind`,
   transferType: 'in',
   description: `BankAPINotify ${reference}`,
   transferAmount: amount,

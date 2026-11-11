@@ -33,6 +33,10 @@ public class CatalogReferenceRequestValidator {
             throw invalidRequest();
         }
         String name = trimText(nameNode.textValue(), 100);
+        if (name.codePointCount(0, name.length()) < 2) {
+            throw ApiOperationException.invalidFields(java.util.List.of(
+                    new com.stylemind.commerce.errors.FieldError("name", "TOO_SHORT", "Tên phải có ít nhất 2 ký tự")));
+        }
         String slug = slugNode.textValue().strip().toLowerCase(Locale.ROOT);
         if (!slug.matches(SLUG_PATTERN) || slug.contains("--")) {
             throw invalidRequest();

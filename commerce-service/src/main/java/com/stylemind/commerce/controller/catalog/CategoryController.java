@@ -109,7 +109,13 @@ public class CategoryController {
                     @ApiResponse(responseCode = "403", description = "ADMIN role required"),
                     @ApiResponse(responseCode = "404", description = "Category not found")
             })
-    public ResponseEntity<Void> delete(@PathVariable String categoryId) {
+    public ResponseEntity<Void> delete(@PathVariable String categoryId,
+            @org.springframework.web.bind.annotation.RequestParam(name = "permanent", defaultValue = "false") boolean permanent) {
+        if (permanent) {
+            // 409 CATEGORY_HAS_PRODUCTS when any product still uses the category
+            service.deleteCategoryPermanently(id(categoryId));
+            return ResponseEntity.noContent().build();
+        }
         service.delete(CatalogReferenceType.CATEGORY, id(categoryId));
         return ResponseEntity.noContent().build();
     }
