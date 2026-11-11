@@ -73,13 +73,17 @@ async function otpFromMailpit(email, since) {
 async function ensureAccount(email) {
   let login = await api('POST', '/api/v1/auth/login', { body: { email, password: PASSWORD } });
   if (login.status === 200) return { token: login.json.access_token, created: false };
-  const since = Date.now() - 2000;
+  let since = Date.now() - 2000;
   const reg = await api('POST', '/api/v1/auth/register', { body: { email, password: PASSWORD } });
-  if (reg.status >= 400 && reg.status !== 409) must(reg, 'register ' + email);
-  if (reg.status === 409) {
-    // Registered but not verified yet (or registered with another password).
-    const resend = await api('POST', '/api/v1/auth/resend-email-verification', { body: { email } });
-    if (resend.status >= 400) {
+  // 409 = exists; 5xx on a cold stack = account created but the verification e-mail call timed out. Both mean "pending verification".
+  if (reg.status >= 400 && reg.status !== 409 && reg.status < 500) must(reg, 'register ' + email);
+  if (reg.status === 409 || reg.status >= 500 || login.status === 403) {
+    since = Date.now() - 10 * 60 * 1000; // an earlier e-mail may already be in Mailpit
+    let sent = false;
+    for (let attempt = 0; attempt < 6 && !sent; attempt++) {
+      const resend = await api('POST', '/api/v1/auth/resend-email-verification', { body: { email } });
+      if (resend.status < 400) { sent = true; since = Date.now() - 2000; break; }
+      if (resend.status === 429) { log(`  ${email}: resend is rate-limited, waiting 20s...`); await sleep(20000); continue; }
       throw new Error(`${email} already exists and cannot be logged in with SEED_PASSWORD (HTTP ${login.status}); resend failed (${resend.status}). Reset the database volume or use the right password.`);
     }
   }

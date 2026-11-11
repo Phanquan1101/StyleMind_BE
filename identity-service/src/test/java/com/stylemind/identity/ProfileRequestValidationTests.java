@@ -108,11 +108,11 @@ class ProfileRequestValidationTests {
 
     @Test
     void heightUsesExactDecimalInclusiveRangeAndAtMostOneFractionalDigit() throws Exception {
-        for (String number : List.of("50", "50.0", "250", "250.0", "172.4")) {
+        for (String number : List.of("100", "100.0", "230", "230.0", "172.4")) {
             assertThat(validator.validateReplacement(replace(replacement("null", number, "null", "null", "null",
                     "[]", "[]", "[]"))).heightCm()).isEqualByComparingTo(new BigDecimal(number));
         }
-        for (String number : List.of("49.9", "250.1", "172.45", "100.00")) {
+        for (String number : List.of("99.9", "230.1", "172.45", "150.00")) {
             assertInvalid(() -> validator.validateReplacement(replace(replacement("null", number, "null", "null",
                     "null", "[]", "[]", "[]"))));
         }
@@ -120,11 +120,11 @@ class ProfileRequestValidationTests {
 
     @Test
     void weightUsesExactDecimalInclusiveRangeAndAtMostOneFractionalDigit() throws Exception {
-        for (String number : List.of("20", "20.0", "300", "300.0", "65.5")) {
+        for (String number : List.of("30", "30.0", "200", "200.0", "65.5")) {
             assertThat(validator.validateReplacement(replace(withWeight(number))).weightKg())
                     .isEqualByComparingTo(new BigDecimal(number));
         }
-        for (String number : List.of("19.9", "300.1", "65.55", "70.00")) {
+        for (String number : List.of("29.9", "200.1", "65.55", "70.00")) {
             assertInvalid(() -> validator.validateReplacement(replace(withWeight(number))));
         }
         assertThatThrownBy(() -> replace(withWeight("\"70\""))).isInstanceOf(JsonProcessingException.class);
@@ -136,17 +136,14 @@ class ProfileRequestValidationTests {
     }
 
     @Test
-    void labelsTrimPreserveFreeFormAndEnforceCodePointLimits() throws Exception {
-        String body = replacement("null", "null", "\"  size Ñ 🧵  \"", "null", "null", "[]", "[]", "[]");
-        assertThat(validator.validateReplacement(replace(body)).usualTopSize()).isEqualTo("size Ñ 🧵");
-        assertThat(validator.validateReplacement(replace(replacement("null", "null", "\"" + "x".repeat(32)
-                + "\"", "null", "null", "[]", "[]", "[]"))).usualTopSize()).hasSize(32);
-        assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", "\"" + "x".repeat(33)
-                + "\"", "null", "null", "[]", "[]", "[]"))));
-        assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", "\"  \"", "null",
-                "null", "[]", "[]", "[]"))));
-        assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", "\"a\\tb\"", "null",
-                "null", "[]", "[]", "[]"))));
+    void sizeLabelsAreTrimmedNormalisedAndMustBeInTheAllowedLists() throws Exception {
+        assertThat(validator.validateReplacement(replace(replacement("null", "null", "\"  m  \"", "null", "null",
+                "[]", "[]", "[]"))).usualTopSize()).isEqualTo("M");
+        // Free-form labels, empty/blank values and control characters are no longer accepted.
+        for (String bad : List.of("\"size Ñ 🧵\"", "\"" + "x".repeat(33) + "\"", "\"  \"", "\"a\\tb\"")) {
+            assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", bad, "null", "null",
+                    "[]", "[]", "[]"))));
+        }
     }
 
     @Test
@@ -176,6 +173,21 @@ class ProfileRequestValidationTests {
                 "[]", "[]", "[\"not-a-uuid\"]"))));
         assertInvalid(() -> validator.validateReplacement(replace(replacement("null", "null", "null", "null", "null",
                 "[]", "[]", "[\"f0000000-0000-0000-0000-00000000000g\"]"))));
+    }
+
+    @Test
+    void sizesMustComeFromTheAllowedListsAndErrorsNameTheField() throws Exception {
+        StyleProfileUpdateRequest ok = validator.validateReplacement(replace(replacement("null", "null", "\"xxl\"", "\"30\"",
+                "\"40\"", "[]", "[]", "[]")));
+        assertThat(ok.usualTopSize()).isEqualTo("2XL");
+        assertThat(ok.usualBottomSize()).isEqualTo("30");
+        assertThat(ok.shoeSize()).isEqualTo("40");
+
+        assertThatThrownBy(() -> validator.validateReplacement(replace(replacement("null", "99", "\"L2\"", "\"50\"",
+                "\"47\"", "[]", "[]", "[]"))))
+                .isInstanceOfSatisfying(com.stylemind.identity.errors.ApiOperationException.class, exception ->
+                        assertThat(exception.fieldErrors()).extracting(com.stylemind.identity.errors.FieldError::field)
+                                .containsExactlyInAnyOrder("height_cm", "usual_top_size", "usual_bottom_size", "shoe_size"));
     }
 
     private PatchMyProfileRequest patch(String json) throws JsonProcessingException {

@@ -10,6 +10,8 @@
  *   --amount <vnd>       transferred amount in VND; must equal the attempt amount to settle (required)
  *   --duplicate          send the same event twice (second delivery must be treated as a duplicate)
  *   --late               use a transaction date after the attempt expired (recorded as LATE_PAYMENT)
+ *   --date "yyyy-MM-dd HH:mm:ss"  transaction date in Vietnam time (default: now). Use the real transfer time to replay a
+ *                        real payment whose webhook never arrived (it is compared with the attempt expiry, not with today)
  *   --event-id <n>       provider event id (default: current time in ms; reuse to test idempotency)
  *   --url <url>          default http://localhost:8080/payment/internal/v1/sepay/webhooks
  *   --checkout <id>      optional QR checkout id: poll its status afterwards (needs --email)
@@ -72,7 +74,8 @@ if (!Number.isInteger(eventId) || eventId <= 0) fail('--event-id must be a posit
 function vietnamTime(offsetMs) {
   return new Date(Date.now() + 7 * 3600 * 1000 + offsetMs).toISOString().slice(0, 19).replace('T', ' ');
 }
-const transactionDate = vietnamTime(args.late ? 24 * 3600 * 1000 : -1000);
+if (args.date && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(args.date))) fail('--date must look like "2026-11-12 02:05:30"');
+const transactionDate = args.date ? String(args.date) : vietnamTime(args.late ? 24 * 3600 * 1000 : -1000);
 
 const body = JSON.stringify({
   id: eventId,
@@ -123,7 +126,7 @@ async function pollCheckout() {
 }
 
 (async () => {
-  console.log(`event id ${eventId}, reference ${reference}, amount ${amount}, transactionDate ${transactionDate}${args.late ? ' (LATE)' : ''}`);
+  console.log(`event id ${eventId}, reference ${reference}, amount ${amount}, transactionDate ${transactionDate}${args.late ? ' (LATE)' : ''}${args.date ? ' (custom date)' : ''}`);
   const status = await send('webhook');
   if (args.duplicate) await send('webhook (duplicate, same event id)');
   if (status === 200) await pollCheckout();

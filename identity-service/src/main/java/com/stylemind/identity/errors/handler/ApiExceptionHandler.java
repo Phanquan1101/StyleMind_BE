@@ -2,6 +2,8 @@ package com.stylemind.identity.errors.handler;
 
 import com.stylemind.identity.errors.ApiOperationException;
 import com.stylemind.identity.errors.ErrorCode;
+import com.stylemind.identity.errors.FieldError;
+import java.util.List;
 import com.stylemind.identity.security.handler.ApiProblemDetails;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,7 +26,29 @@ public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ProblemDetail> invalidFields(MethodArgumentNotValidException exception, HttpServletRequest request) {
+        List<FieldError> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldError(snakeCase(error.getField()), error.getCode() == null ? "INVALID" : error.getCode(),
+                        error.getDefaultMessage() == null ? "Giá trị không hợp lệ" : error.getDefaultMessage()))
+                .toList();
+        ProblemDetail problem = ApiProblemDetails.create(ErrorCode.INVALID_REQUEST.status(), "Bad Request",
+                "Request is missing or malformed", ErrorCode.INVALID_REQUEST.code(), request);
+        if (!errors.isEmpty()) {
+            problem.setProperty("errors", errors);
+        }
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ErrorCode.INVALID_REQUEST.status());
+        if (isNoStoreEndpoint(request)) {
+            response.header("Cache-Control", "no-store");
+        }
+        return response.body(problem);
+    }
+
+    private static String snakeCase(String field) {
+        return field.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(java.util.Locale.ROOT);
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class,
             MissingServletRequestParameterException.class})
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(ErrorCode.INVALID_REQUEST, "Bad Request", "Request is missing or malformed", request);
@@ -48,6 +72,9 @@ public class ApiExceptionHandler {
             ApiOperationException exception, HttpServletRequest request) {
         ProblemDetail problem = ApiProblemDetails.create(exception.status(), exception.status().getReasonPhrase(),
                 exception.detail(), exception.code(), request);
+        if (!exception.fieldErrors().isEmpty()) {
+            problem.setProperty("errors", exception.fieldErrors());
+        }
         if (exception.accountCreated()) {
             problem.setProperty("account_created", true);
             problem.setProperty("account_status", "PENDING_VERIFICATION");
