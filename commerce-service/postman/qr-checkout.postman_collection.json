@@ -10,6 +10,10 @@
   ],
   "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
   "item": [
+    { "name": "Danh sách phiên QR chờ thanh toán của tôi", "request": { "method": "GET", "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/pending?page=0&size=10" }, "event": [{ "listen": "test", "script": { "exec": [
+      "pm.test('HTTP 200 and no-store', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });",
+      "pm.test('Paged pending QR sessions', () => { const data = pm.response.json(); pm.expect(data.items).to.be.an('array'); pm.expect(data.page).to.eql(0); pm.expect(data.size).to.eql(10); data.items.forEach(item => { pm.expect(item.status).to.be.oneOf(['PREPARING', 'AWAITING_PAYMENT']); pm.expect(item.checkoutId).to.be.a('string'); pm.expect(new Date(item.expiresAt).getTime()).to.be.above(Date.now()); }); });"
+    ] } }] },
     { "name": "Chuẩn bị phiên", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/buy-now", "body": { "mode": "raw", "raw": "{\"checkout_key\":\"{{checkoutKey}}\",\"shipping_address_id\":\"{{addressId}}\",\"payment_method\":\"SEPAY_VIETQR\",\"variant_id\":\"{{variantId}}\",\"quantity\":1}" } } },
     { "name": "Khôi phục phiên", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/recover", "body": { "mode": "raw", "raw": "{\"checkout_key\":\"{{checkoutKey}}\"}" } } },
     { "name": "Tạo mã VietQR", "request": { "method": "POST", "url": "{{baseUrl}}/commerce/api/v1/qr-checkouts/{{checkoutId}}/payment-attempt" } },

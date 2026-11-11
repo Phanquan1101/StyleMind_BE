@@ -122,6 +122,29 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
         return mapper.toResponse(attempt, PaymentAttemptStatus.SETTLED.name());
     }
 
+    @Override
+    @Transactional
+    public PaymentAttemptResponse confirmDeliveredCod(UUID orderId, UUID adminUserId, Instant now) {
+        // Shared with attempt creation; retries use the original receipt and never collect twice.
+        repository.lockOrder(orderId);
+        var attempt = repository.findCodForOrder(orderId).orElseThrow(() -> new PaymentApiException(
+                HttpStatus.CONFLICT, "COD_ATTEMPT_REQUIRED", "Recover the original COD payment attempt before collection"));
+        var order = commerceOrderClient.getPaymentSnapshot(orderId);
+        if (order == null || !orderId.equals(order.orderId()) || order.paymentMethod() != PaymentMethod.COD
+                || order.acceptedTotalVnd() != attempt.expectedAmountVnd()
+                || !java.util.Objects.equals(order.customerId(), attempt.customerId())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "COD_ORDER_MISMATCH", "COD order does not match the payment attempt");
+        }
+        if (!"COMPLETED".equals(order.orderStatus())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "COD_DELIVERY_REQUIRED", "COD collection requires a delivered order");
+        }
+        if (PaymentAttemptStatus.SETTLED.name().equals(attempt.attemptStatus())) {
+            return mapper.toResponse(attempt, PaymentAttemptStatus.SETTLED.name());
+        }
+        return confirmCodCollection(new ConfirmCodCollectionRequest(attempt.paymentAttemptId(),
+                order.acceptedTotalVnd(), "DELIVERED-COD-" + orderId, now), adminUserId, now);
+    }
+
     private void validateCollectionAttempt(ConfirmCodCollectionRequest request, PaymentAttemptSnapshot attempt) {
         if (!PaymentMethod.COD.name().equals(attempt.paymentMethod())) {
             throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_METHOD_MISMATCH",

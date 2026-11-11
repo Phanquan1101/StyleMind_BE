@@ -148,7 +148,7 @@ public class FriendInvitationPersistenceService {
         var rows=(long)criteria.page()*criteria.size()>Integer.MAX_VALUE ? List.<FriendInvitation>of()
                 : invitations.findIncoming(actor,email,now,PageRequest.of(criteria.page(),criteria.size()));
         return new IncomingInvitationPage(rows.stream().map(row->new IncomingFriendInvitationResponse(
-                row.getFriendInvitationId(),row.getSenderAccountId(),null,row.getCreatedAt(),row.getExpiresAt())).toList(),total);
+                row.getFriendInvitationId(),row.getSenderAccountId(),null,null,row.getCreatedAt(),row.getExpiresAt())).toList(),total);
     }
 
     private InvitationPreparation prepare(FriendInvitation row,OffsetDateTime now,int status,String outcome) {

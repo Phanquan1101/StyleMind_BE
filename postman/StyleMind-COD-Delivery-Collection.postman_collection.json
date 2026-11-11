@@ -1,0 +1,8 @@
+{
+  "info": { "name": "StyleMind COD Delivery Collection", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "variable": [ { "key": "gateway_url", "value": "http://localhost:8080" }, { "key": "order_id", "value": "" }, { "key": "admin_token", "value": "" }, { "key": "customer_token", "value": "" } ],
+  "item": [
+    { "name": "Admin confirms actual COD collection for completed order (safe replay)", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{admin_token}}" } ], "url": "{{gateway_url}}/payment/api/v1/admin/orders/{{order_id}}/cod-collection" }, "event": [ { "listen": "test", "script": { "exec": [ "pm.test('COD is paid', () => { pm.response.to.have.status(200); const p = pm.response.json(); pm.expect(p.status).to.eql('PAID'); pm.expect(p.method).to.eql('COD'); pm.expect(p.orderId).to.eql(pm.variables.get('order_id')); });" ] } } ] },
+    { "name": "Owner checks return eligibility after payment event delivery", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{customer_token}}" } ], "url": "{{gateway_url}}/commerce/api/v1/orders/{{order_id}}/returns" } }
+  ]
+}

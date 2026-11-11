@@ -127,6 +127,32 @@ class PaymentCreationHttpPostgresTests {
         assertThat(count("payment_attempt")).isZero();
     }
 
+    @Test
+    void deliveredCodEndpointRequiresAdminAndReplaysTheSameReceipt() {
+        UUID order = UUID.randomUUID(), owner = UUID.randomUUID(), admin = UUID.randomUUID();
+        var attempt = push(order, owner, "COD");
+        String path = "/api/v1/admin/orders/" + order + "/cod-collection";
+        assertThat(post(path, null, null, null).getStatusCode().value()).isEqualTo(401);
+        assertThat(post(path, null, "Authorization", "Bearer " + token(owner, "CUSTOMER")).getStatusCode().value()).isEqualTo(403);
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "SHIPPED"));
+        assertThat(post(path, null, "Authorization", "Bearer " + token(admin, "ADMIN")).getStatusCode().value()).isEqualTo(409);
+        assertThat(count("financial_transaction")).isZero();
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED"));
+        for (int i = 0; i < 2; i++) {
+            var response = post(path, null, "Authorization", "Bearer " + token(admin, "ADMIN"));
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody().path("id").asText()).isEqualTo(attempt.path("id").asText());
+            assertThat(response.getBody().path("status").asText()).isEqualTo("PAID");
+        }
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT recorded_by_user_id FROM financial_transaction", UUID.class)).isEqualTo(admin);
+    }
+
     private JsonNode push(UUID order, UUID customer, String method) {
         var body = Map.of("order_id", order, "customer_id", customer, "accepted_total_vnd", 125000,
                 "payment_method", method, "order_status", method.equals("COD") ? "PLACED" : "PENDING_PAYMENT",

@@ -1,0 +1,806 @@
+{
+  "info": {
+    "name": "StyleMind — Returns and Manual Refunds",
+    "description": "Local fixture workflow. Select a folder to run. All mutation requests require allowRefundMutations=true in the environment. Payment completion records a manual transfer; use synthetic references in a test database.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "orderItemId",
+      "value": ""
+    },
+    {
+      "key": "returnRequestKey",
+      "value": ""
+    },
+    {
+      "key": "returnId",
+      "value": ""
+    },
+    {
+      "key": "refundSourceId",
+      "value": ""
+    },
+    {
+      "key": "transferReference",
+      "value": ""
+    },
+    {
+      "key": "proofReference",
+      "value": ""
+    },
+    {
+      "key": "refundSourceType",
+      "value": "RETURN"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Read return eligibility and queue",
+      "item": [
+        {
+          "name": "Customer order return eligibility",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"Eligibility and rows are present\", function () { const body=pm.response.json(); pm.expect(body.eligible).to.be.a(\"boolean\"); pm.expect(body.items).to.be.an(\"array\"); pm.expect(body.available_items).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/commerce/api/v1/orders/{{orderId}}/returns"
+          }
+        },
+        {
+          "name": "Admin return queue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/commerce/api/v1/admin/returns?page=0&size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Return and final inspection",
+      "item": [
+        {
+          "name": "Customer selects one item and attaches evidence",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }",
+                  "if (!pm.collectionVariables.get('returnRequestKey')) { pm.collectionVariables.set('returnRequestKey', pm.variables.replaceIn('{{$guid}}')); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REQUESTED'); }); }",
+                  "if (pm.response.code < 300) { const id=pm.response.json().return_id; pm.collectionVariables.set('returnId',id); pm.collectionVariables.set('refundSourceId',id); pm.collectionVariables.set('refundSourceType','RETURN'); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "request",
+                  "type": "text",
+                  "value": "{\n  \"request_key\": \"{{returnRequestKey}}\",\n  \"reason\": \"Sản phẩm bị lỗi đường may\",\n  \"items\": [\n    {\n      \"order_item_id\": \"{{orderItemId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Choose one synthetic JPG or PNG file using Postman"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/orders/{{orderId}}/returns"
+          }
+        },
+        {
+          "name": "Admin asks for clearer images",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('MORE_IMAGES_REQUESTED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"REQUEST_IMAGES\",\n  \"reason\": \"Vui lòng gửi ảnh rõ vị trí lỗi\"\n}"
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/admin/returns/{{returnId}}/decision"
+          }
+        },
+        {
+          "name": "Customer provides another picture",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REQUESTED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Choose one synthetic JPG or PNG file using Postman"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/returns/{{returnId}}/evidence"
+          }
+        },
+        {
+          "name": "Shop approves pickup",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('PICKUP_APPROVED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"APPROVE_PICKUP\",\n  \"reason\": \"Cửa hàng sẽ liên hệ để đến lấy hàng\"\n}"
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/admin/returns/{{returnId}}/decision"
+          }
+        },
+        {
+          "name": "Shop records a passed inspection",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('PENDING_REFUND'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"PASS_INSPECTION\",\n  \"reason\": \"Đã kiểm tra và nhận lại hàng\"\n}"
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/admin/returns/{{returnId}}/decision"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Refund destination and transfer record",
+      "item": [
+        {
+          "name": "Prepare refund from the approved source",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test('Server supplied a refund amount', function () { pm.expect(pm.response.json().amount_vnd).to.be.above(0); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/prepare"
+          }
+        },
+        {
+          "name": "Customer supplies a synthetic bank account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('PENDING'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank_name\": \"Test Bank\",\n  \"account_number\": \"1234567890\",\n  \"account_holder\": \"TEST CUSTOMER\"\n}"
+            },
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/destination"
+          }
+        },
+        {
+          "name": "Admin claims the transfer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('PROCESSING'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/start"
+          }
+        },
+        {
+          "name": "Processing admin reads the destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/destination"
+          }
+        },
+        {
+          "name": "Admin records a completed manual transfer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REFUNDED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transfer_reference\": \"{{transferReference}}\",\n  \"proof_reference\": \"{{proofReference}}\"\n}"
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete"
+          }
+        },
+        {
+          "name": "Customer verifies the persisted refund",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REFUNDED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Optional rejection or failed-transfer path",
+      "item": [
+        {
+          "name": "Shop rejects a pickup after inspection",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REJECTED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"FAIL_INSPECTION\",\n  \"reason\": \"Hàng khi nhận lại không đạt điều kiện\"\n}"
+            },
+            "url": "{{baseUrl}}/commerce/api/v1/admin/returns/{{returnId}}/decision"
+          }
+        },
+        {
+          "name": "Admin records a failed transfer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('FAILED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Ngân hàng từ chối giao dịch\"\n}"
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/fail"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Transfer receipt",
+      "item": [
+        {
+          "name": "Admin uploads immutable transfer receipt (optional, PROCESSING or REFUNDED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Receipt saved',()=> { pm.response.to.have.status(200); pm.expect(pm.response.json().has_receipt).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          }
+        },
+        {
+          "name": "Customer reads private receipt after refund completion",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Private image',()=> { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); pm.expect(pm.response.headers.get('Content-Type')).to.match(/^image\\/(jpeg|png)/); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin reads private receipt",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          }
+        }
+      ]
+    }
+  ]
+}

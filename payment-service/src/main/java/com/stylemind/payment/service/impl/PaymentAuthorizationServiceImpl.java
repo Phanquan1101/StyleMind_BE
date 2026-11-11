@@ -33,6 +33,16 @@ public class PaymentAuthorizationServiceImpl implements PaymentAuthorizationServ
         }
     }
 
+    @Override
+    public RefundActor refundActor(Jwt jwt) {
+        boolean customer = hasRole(jwt, "CUSTOMER");
+        boolean admin = hasRole(jwt, "ADMIN");
+        if (!customer && !admin) {
+            throw new PaymentApiException(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Customer or Admin role is required");
+        }
+        return new RefundActor(customerSubject(jwt), customer, admin);
+    }
+
     private boolean hasRole(Jwt jwt, String expectedRole) {
         Collection<String> roles = jwt.getClaimAsStringList("roles");
         if (roles == null) {
@@ -48,3 +58,4 @@ public class PaymentAuthorizationServiceImpl implements PaymentAuthorizationServ
                 .anyMatch(expected::equals);
     }
 }
+

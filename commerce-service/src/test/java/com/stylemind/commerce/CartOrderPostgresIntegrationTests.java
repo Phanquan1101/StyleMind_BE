@@ -145,6 +145,67 @@ class CartOrderPostgresIntegrationTests {
     }
 
     @Test
+    void pendingQrListReturnsOnlyTheOwnersLiveCheckoutsWithStablePagination() throws Exception {
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 1);
+        var method = com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR;
+        UUID first = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test",
+                new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                        "list-qr-first", ADDRESS_ID, method), selection);
+        UUID second = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test",
+                new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                        "list-qr-second", ADDRESS_ID, method), selection);
+        UUID cancelled = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test",
+                new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                        "list-qr-cancelled", ADDRESS_ID, method), selection);
+        UUID expired = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test",
+                new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                        "list-qr-expired", ADDRESS_ID, method), selection);
+        qrReservations.cancel(cancelled, CUSTOMER_ID, null, java.time.OffsetDateTime.now());
+        jdbc.update("UPDATE qr_checkout SET created_at=now()-interval '20 minutes',expires_at=now()-interval '5 minutes' WHERE checkout_id=?", expired);
+        jdbc.update("UPDATE qr_checkout SET created_at=now()-interval '2 minutes' WHERE checkout_id=?", first);
+        var foreign = UUID.randomUUID();
+        qrReservations.reserve(foreign, OTHER_CUSTOMER_ID, null, "list-qr-other", 100000, "{}",
+                List.of(new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(
+                        variantId, 1, 100000, "{}")), java.time.OffsetDateTime.now());
+        paidQrOrder();
+
+        mockMvc.perform(get("/api/v1/qr-checkouts/pending?page=0&size=1")
+                .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].checkoutId").value(second.toString()))
+                .andExpect(jsonPath("$.items[0].totalVnd").value(100000))
+                .andExpect(jsonPath("$.items[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].expiresAt").isNotEmpty())
+                .andExpect(jsonPath("$.total_elements").value(2))
+                .andExpect(jsonPath("$.total_pages").value(2));
+        mockMvc.perform(get("/api/v1/qr-checkouts/pending?page=1&size=1")
+                .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].checkoutId").value(first.toString()));
+        mockMvc.perform(get("/api/v1/qr-checkouts/pending")
+                .header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].checkoutId").value(foreign.toString()));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void pendingQrListRequiresAuthenticationAndValidatesPagingAndFilters() throws Exception {
+        mockMvc.perform(get("/api/v1/qr-checkouts/pending")).andExpect(status().isUnauthorized());
+        for (String query : List.of("page=-1", "size=0", "size=101", "size=abc", "page=2147483648",
+                "page=0&page=1", "customer_id=" + OTHER_CUSTOMER_ID, "status=CANCELLED")) {
+            mockMvc.perform(get("/api/v1/qr-checkouts/pending?" + query)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(get("/api/v1/qr-checkouts/pending?page=2")
+                .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.total_elements").value(0));
+    }
+
+    @Test
     void prepareQrCheckoutUsesServerPriceAndAddressWithoutCreatingOrder() {
         var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
                 "qr-prepare-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);

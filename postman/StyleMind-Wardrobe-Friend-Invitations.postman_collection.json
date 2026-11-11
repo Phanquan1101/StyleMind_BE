@@ -46,6 +46,7 @@
                   " pm.test(\"Expected HTTP status\",()=>pm.response.to.have.status(200));",
                   " if(pm.response.code!==200) { pm.execution.setNextRequest(null); throw new Error(\"Stop after unexpected fixture response\"); }",
                   " pm.test(\"Page shape\",()=>pm.expect(pm.response.json()).to.have.keys(\"items\",\"page\",\"size\",\"total_elements\",\"total_pages\"));",
+                  " pm.test(\"Incoming invitations include sender identity fields\",()=>pm.response.json().items.forEach(item=>{pm.expect(item).to.have.property(\"sender_email\");pm.expect(item).to.have.property(\"sender_display_name\");}));",
                   "})();"
                 ]
               }

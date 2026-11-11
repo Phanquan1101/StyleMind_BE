@@ -33,7 +33,7 @@ Sau khi kết bạn bằng folder 01, có thể dùng [collection list/unfriend]
 | --- | --- | --- |
 | POST /friend-invitations | recipient_email | 201 email accepted; 200 pending/incoming/already-friends, không tự gửi lại |
 | POST /friend-invitations/{id}/resend | {} | 200 credential/deadline mới; chỉ sender và nhánh được phép |
-| GET /friend-invitations/incoming | page/size | 200 current verified recipient; không expired/cutoff |
+| GET /friend-invitations/incoming | page/size | 200 cho người nhận có email đã xác minh. Lời mời còn hiệu lực trả `sender_email` và `sender_display_name` từ Identity. Tên có thể null nếu người gửi chưa đặt tên. |
 | POST /friend-invitations/{id}/accept | {} | 200 chấp nhận incoming chủ động, JWT/email đúng người |
 | POST /friend-invitations/accept | friend_invitation_id/token | 200 credential hợp lệ và verified recipient |
 

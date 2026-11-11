@@ -15,6 +15,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -23,7 +25,7 @@ public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
-            MissingServletRequestParameterException.class})
+            MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
                 "INVALID_REQUEST", request);
@@ -41,6 +43,13 @@ public class ApiExceptionHandler {
             HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
         return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type",
                 "Request media type is not supported", "UNSUPPORTED_MEDIA_TYPE", request);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ProblemDetail> uploadTooLarge(
+            MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large", "Upload exceeds the allowed size",
+                "UPLOAD_TOO_LARGE", request);
     }
 
     @ExceptionHandler(ApiOperationException.class)

@@ -39,6 +39,26 @@ class OrderPaymentPostgresIntegrationTests {
     @Autowired PlatformTransactionManager manager;
     @Autowired ObjectMapper mapper;
     @Autowired com.stylemind.payment.repository.PaymentAttemptRepository attempts;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.stylemind.payment.client.CommerceOrderClient commerce;
+
+    @Test
+    void concurrentDeliveryCollectionAndRetryRecordOneReceiptAndOneOutbox() throws Exception {
+        UUID order = UUID.randomUUID(), owner = UUID.randomUUID(), admin = UUID.randomUUID();
+        var attempt = payments.createOrderAttempt(request(order, owner, 125000, "COD", "PLACED"), Instant.now());
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED"));
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            var jobs = new ArrayList<java.util.concurrent.Future<String>>();
+            for (int i = 0; i < 4; i++) jobs.add(executor.submit(
+                    () -> payments.confirmDeliveredCod(order, admin, Instant.now()).status()));
+            for (var job : jobs) assertThat(job.get(30, TimeUnit.SECONDS)).isEqualTo("PAID");
+        }
+        assertThat(payments.confirmDeliveredCod(order, admin, Instant.now()).id()).isEqualTo(attempt.id());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM financial_transaction WHERE payment_attempt_id=?", Integer.class, attempt.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_outbox WHERE aggregate_id=?", Integer.class, attempt.id())).isEqualTo(1);
+    }
 
     @Test
     void concurrentInitialRequestsCreateOneAttemptAndReturnSameId() throws Exception {

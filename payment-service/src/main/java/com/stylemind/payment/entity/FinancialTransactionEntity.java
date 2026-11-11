@@ -13,6 +13,9 @@ public class FinancialTransactionEntity {
 
     protected FinancialTransactionEntity() { }
 
+    public UUID getTransactionId() { return transactionId; }
+    public long getActualAmountVnd() { return actualAmountVnd; }
+
     @Id
     @Column(name = "transaction_id")
     private UUID transactionId;
@@ -38,3 +41,4 @@ public class FinancialTransactionEntity {
     @Column(name = "settled_at")
     private Instant settledAt;
 }
+

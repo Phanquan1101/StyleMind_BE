@@ -51,13 +51,18 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/guest/checkout/selected/prices", "/api/v1/guest/checkout/buy-now/prices", "/api/v1/guest/checkout/recover", "/api/v1/guest/orders/selected", "/api/v1/guest/orders/buy-now").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/guest/qr-checkouts/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/guest/qr-checkouts/*", "/api/v1/guest/qr-checkouts/*/payment-attempt", "/api/v1/guest/qr-checkouts/*/cancel").permitAll()
+                        .requestMatchers("/api/v1/orders/*/returns", "/api/v1/returns/*/evidence")
+                        .hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers("/api/v1/returns/*/evidence/*")
+                        .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/categories", "/api/v1/admin/categories/**",
                                 "/api/v1/admin/brands", "/api/v1/admin/brands/**",
                                 "/api/v1/admin/products", "/api/v1/admin/products/**",
                                 "/api/v1/admin/variants", "/api/v1/admin/variants/**",
                                 "/api/v1/admin/variant-images", "/api/v1/admin/variant-images/**",
                                 "/api/v1/admin/orders", "/api/v1/admin/orders/**",
-                                "/api/v1/admin/cancellation-requests", "/api/v1/admin/cancellation-requests/**")
+                                "/api/v1/admin/cancellation-requests", "/api/v1/admin/cancellation-requests/**",
+                                "/api/v1/admin/returns", "/api/v1/admin/returns/**")
                         .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

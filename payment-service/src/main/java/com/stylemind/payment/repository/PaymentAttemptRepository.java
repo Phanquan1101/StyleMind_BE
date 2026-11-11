@@ -51,6 +51,12 @@ public class PaymentAttemptRepository {
         return Optional.ofNullable(entityManager.find(PaymentAttemptEntity.class, id)).map(PaymentAttemptEntity::snapshot);
     }
 
+    public Optional<PaymentAttemptSnapshot> findCodForOrder(UUID orderId) {
+        return entityManager.createQuery("SELECT a FROM PaymentAttemptEntity a WHERE a.orderId=:id AND a.paymentMethod='COD' AND a.attemptStatus IN ('PENDING','SETTLED') ORDER BY CASE WHEN a.attemptStatus='SETTLED' THEN 0 ELSE 1 END, a.generatedAt, a.paymentAttemptId", PaymentAttemptEntity.class)
+                .setParameter("id", orderId).setMaxResults(1).getResultList().stream()
+                .map(PaymentAttemptEntity::snapshot).findFirst();
+    }
+
     public Optional<PaymentAttemptSnapshot> findByIdForUpdate(UUID id) {
         return Optional.ofNullable(entityManager.find(PaymentAttemptEntity.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE))
                 .map(PaymentAttemptEntity::snapshot);
