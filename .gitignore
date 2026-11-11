@@ -14,3 +14,6 @@ Thumbs.db
 .venv-dataset/
 commerce-service/.seed-data/
 __pycache__/
+
+# local demo settings (ngrok domain) - never commit
+scripts/.demo.local

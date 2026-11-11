@@ -13,7 +13,9 @@
  *   --date "yyyy-MM-dd HH:mm:ss"  transaction date in Vietnam time (default: now). Use the real transfer time to replay a
  *                        real payment whose webhook never arrived (it is compared with the attempt expiry, not with today)
  *   --event-id <n>       provider event id (default: current time in ms; reuse to test idempotency)
- *   --url <url>          default http://localhost:8080/payment/internal/v1/sepay/webhooks
+ *   --base-url <url>     gateway base URL (default http://localhost:8080); use your ngrok URL to send through the tunnel,
+ *                        e.g. --base-url https://<your-domain>.ngrok-free.dev
+ *   --url <url>          full webhook URL (overrides --base-url); default <base-url>/payment/internal/v1/sepay/webhooks
  *   --checkout <id>      optional QR checkout id: poll its status afterwards (needs --email)
  *   --email <email>      account that owns the checkout; password from SEED_PASSWORD (default Stylemind@123)
  *
@@ -66,7 +68,9 @@ function readSecret() {
 const secret = readSecret();
 if (!secret) fail('webhook secret not found (set SEPAY_WEBHOOK_SECRET or STYLEMIND_SEPAY_WEBHOOK_SECRET in .env)');
 
-const url = args.url || 'http://localhost:8080/payment/internal/v1/sepay/webhooks';
+const baseUrl = String(args['base-url'] || 'http://localhost:8080').replace(/\/+$/, '');
+if (!/^https?:\/\//.test(baseUrl)) fail('--base-url must start with http:// or https://');
+const url = args.url || baseUrl + '/payment/internal/v1/sepay/webhooks';
 const eventId = args['event-id'] ? Number(args['event-id']) : Date.now();
 if (!Number.isInteger(eventId) || eventId <= 0) fail('--event-id must be a positive integer');
 
@@ -97,7 +101,7 @@ async function send(label) {
   const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'X-SePay-Timestamp': timestamp, 'X-SePay-Signature': signature },
+    headers: { 'content-type': 'application/json', 'X-SePay-Timestamp': timestamp, 'X-SePay-Signature': signature, 'ngrok-skip-browser-warning': '1' },
     body,
   });
   const text = await res.text();
@@ -109,7 +113,7 @@ async function send(label) {
 async function pollCheckout() {
   if (!args.checkout) return;
   if (!args.email) { console.log('--checkout needs --email to log in; skipping status check'); return; }
-  const base = (args.url ? new URL(args.url).origin : 'http://localhost:8080');
+  const base = args.url ? new URL(args.url).origin : baseUrl;
   const login = await fetch(base + '/api/v1/auth/login', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: args.email, password: process.env.SEED_PASSWORD || 'Stylemind@123' }),

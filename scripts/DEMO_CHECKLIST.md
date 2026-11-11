@@ -34,17 +34,26 @@ Khi demo: đăng nhập mới ngay trước giờ trình bày. Access token số
 
 ## C. Webhook SePay thật qua ngrok
 
-### C1. Tunnel
+### C1. Tunnel (một lệnh)
+
+Lưu tên miền ngrok một lần (file này nằm trong `.gitignore`, **không commit**):
 
 ```powershell
-ngrok http 8080 --url=<ten-mien-tinh>.ngrok-free.app
+Set-Content scripts\.demo.local 'NGROK_DOMAIN=<ten-mien-tinh>.ngrok-free.dev'   # hoặc đặt $env:NGROK_DOMAIN
+powershell -ExecutionPolicy Bypass -File scripts\start-demo.ps1
+```
+
+Script bật `docker compose up -d`, chờ Gateway :8080 healthy, mở ngrok trong cửa sổ PowerShell mới (nếu chưa chạy), tự gọi `POST {}` vào URL webhook (**401 = tunnel thông**), làm nóng các service, đăng nhập thử `an@sm.test` và in tóm tắt (FE, Mailpit, ngrok inspector `http://127.0.0.1:4040`, URL webhook cho SePay). Thiếu ngrok/authtoken/domain thì script dừng và in cách khắc phục. Tương đương thủ công:
+
+```powershell
+ngrok http 8080 --url=<ten-mien-tinh>.ngrok-free.dev
 ```
 
 - Trỏ vào **Gateway :8080** (không phải 8083).
 - URL webhook dán vào SePay:
 
 ```
-https://<ten-mien-tinh>.ngrok-free.app/payment/internal/v1/sepay/webhooks
+https://<ten-mien-tinh>.ngrok-free.dev/payment/internal/v1/sepay/webhooks
 ```
 
 (Gateway bỏ tiền tố `/payment` rồi chuyển sang payment-service.)
@@ -54,7 +63,7 @@ https://<ten-mien-tinh>.ngrok-free.app/payment/internal/v1/sepay/webhooks
 - Sự kiện: **Có tiền vào**. Tài khoản ngân hàng: đúng tài khoản trong `STYLEMIND_SEPAY_QR_ACCOUNT_NUMBER` và đã liên kết SePay.
 - Kiểu chứng thực: **HMAC-SHA256**, Secret Key **trùng với `STYLEMIND_SEPAY_WEBHOOK_SECRET`**. SePay chỉ hiện secret một lần khi tạo; nếu SePay tự sinh secret thì chép vào `.env` rồi `docker compose -p stylemind -f docker-compose.yml up -d payment-service`.
 - Kiểu dữ liệu: **JSON** (nếu chọn form-data/urlencoded, payment-service trả `415`).
-- Nhận diện mã thanh toán (Công ty → Cấu hình → Cấu trúc mã thanh toán): tiền tố **`SM`**, phần đuôi gồm **12 ký tự chữ và số** (mã của StyleMind dạng `SM` + 12 ký tự hex in hoa, ví dụ `SMEDA9EC9A7C56`). Nếu SePay không nhận ra mã thì trường `code` rỗng và payment-service ghi `MISSING_PAYMENT_REFERENCE`, đơn **không** sang PAID.
+- Nhận diện mã thanh toán (Công ty → Cấu hình → Cấu trúc mã thanh toán): tiền tố **`SM`**, phần đuôi đúng **12 ký tự chữ và số** (độ dài hậu tố phải bao gồm 12; webhook chỉ đọc trường `code`, **không** đọc `content`) (mã của StyleMind dạng `SM` + 12 ký tự hex in hoa, ví dụ `SMEDA9EC9A7C56`). Nếu SePay không nhận ra mã thì trường `code` rỗng và payment-service ghi `MISSING_PAYMENT_REFERENCE`, đơn **không** sang PAID.
 - Đúng **nội dung chuyển khoản** hiển thị trên trang QR và đúng **số tiền**; chuyển trong thời gian đếm ngược (khoảng 20 phút), nếu trễ sẽ bị ghi `LATE_PAYMENT`.
 
 ### C3. Kiểm tra webhook đã tới chưa
@@ -84,6 +93,8 @@ Tạo QR trên trang thanh toán, lấy mã tham chiếu và số tiền hiển 
 ```powershell
 node scripts/simulate-sepay-webhook.cjs --reference SMXXXXXXXXXXXX --amount <so-tien> --checkout <checkoutId> --email an@sm.test
 ```
+
+Gửi qua ngrok (kiểm tra cả đường tunnel): thêm `--base-url https://<ten-mien-tinh>.ngrok-free.dev` (mặc định `http://localhost:8080`).
 
 Trang QR tự chuyển sang thành công như webhook thật. Cần `.env` có `STYLEMIND_SEPAY_WEBHOOK_SECRET` (script đọc lúc chạy, không in). Chi tiết tùy chọn ở `TEST_ACCOUNTS.md`.
 
