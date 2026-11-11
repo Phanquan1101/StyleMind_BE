@@ -15,7 +15,7 @@
     Set-Content scripts\.demo.local 'NGROK_DOMAIN=ten-cua-ban.ngrok-free.dev'   # luu lai (da bi gitignore)
 
   Chay:  powershell -ExecutionPolicy Bypass -File scripts\start-demo.ps1
-  Tuy chon: -SkipNgrok (chi bat stack), -ProjectName stylemind
+  Bat ca FE (:3000) neu chua chay. Tuy chon: -SkipNgrok (chi bat stack), -ProjectName stylemind
 #>
 [CmdletBinding()]
 param(
@@ -126,6 +126,25 @@ if (-not $SkipNgrok) {
   elseif ($status -eq 0) { Warn "Khong ket noi duoc $webhookUrl - kiem tra cua so ngrok (loi authtoken/domain?) va http://127.0.0.1:4040" }
   elseif ($status -eq 404) { Warn "Webhook tra 404: tunnel toi duoc ngrok nhung khong thay endpoint (domain tro sai may/cong?)" }
   else { Warn "Webhook tra HTTP $status (mong doi 401). Neu 200: payment-service dang de AUTH_MODE=none - kiem tra STYLEMIND_SEPAY_WEBHOOK_AUTH_MODE=hmac trong .env." }
+}
+
+# ---- 5b. Giao dien (FE) :3000 -------------------------------------------------------------------------
+Step 'Giao dien (FE) :3000'
+$feDir = Join-Path (Split-Path $repo -Parent) 'StyleMind_FE'
+if ((Get-HttpStatus 'http://localhost:3000') -ne 0) {
+  Ok 'FE da chay tren :3000 - khong mo them'
+} elseif (-not (Test-Path (Join-Path $feDir 'package.json'))) {
+  Warn "Khong tim thay StyleMind_FE ($feDir): bo qua bat FE."
+} else {
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Stop-Demo 'Chua cai Node.js/npm. Cai Node roi chay lai.' }
+  # Cua so moi: tu npm install neu thieu node_modules, roi npm run dev (giu cua so de xem log).
+  $feCommand = "Set-Location -LiteralPath '$feDir'; if (-not (Test-Path node_modules)) { npm install }; npm run dev"
+  Start-Process powershell -ArgumentList '-NoExit', '-Command', $feCommand
+  Ok "Da mo FE trong cua so PowerShell moi ($feDir): npm run dev"
+  Write-Host '  Cho :3000 phan hoi (toi da 5 phut, lan dau co the phai npm install)...'
+  $feDeadline = (Get-Date).AddMinutes(5)
+  while ((Get-Date) -lt $feDeadline -and (Get-HttpStatus 'http://localhost:3000') -eq 0) { Start-Sleep -Seconds 3 }
+  if ((Get-HttpStatus 'http://localhost:3000') -ne 0) { Ok 'FE :3000 da phan hoi' } else { Warn 'FE :3000 chua phan hoi sau 5 phut - xem cua so npm run dev.' }
 }
 
 # ---- 6. khoi dong nong ----------------------------------------------------------------------------
