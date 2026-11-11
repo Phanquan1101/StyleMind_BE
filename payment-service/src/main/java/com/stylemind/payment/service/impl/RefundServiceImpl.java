@@ -1,0 +1,223 @@
+package com.stylemind.payment.service.impl;
+
+import com.stylemind.payment.client.CommerceRefundSource;
+import com.stylemind.payment.client.RestCommerceRefundClient;
+import com.stylemind.payment.dto.RefundRequests.Completion;
+import com.stylemind.payment.dto.RefundRequests.Destination;
+import com.stylemind.payment.dto.RefundRequests.Failure;
+import com.stylemind.payment.dto.RefundResponse;
+import com.stylemind.payment.dto.RefundSourceType;
+import com.stylemind.payment.entity.RefundAuditEntity;
+import com.stylemind.payment.entity.RefundAuditEntity.Action;
+import com.stylemind.payment.entity.RefundCaseEntity;
+import com.stylemind.payment.entity.RefundCaseEntity.Status;
+import com.stylemind.payment.entity.RefundResultOutboxEntity;
+import com.stylemind.payment.errors.RefundErrorCode;
+import com.stylemind.payment.mapper.RefundMapper;
+import com.stylemind.payment.repository.RefundAuditRepository;
+import com.stylemind.payment.repository.RefundCaseRepository;
+import com.stylemind.payment.repository.RefundLedgerRepository;
+import com.stylemind.payment.repository.RefundResultOutboxRepository;
+import com.stylemind.payment.security.RefundDestinationCipher;
+import com.stylemind.payment.service.PaymentAuthorizationService.RefundActor;
+import com.stylemind.payment.service.RefundService;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@Service
+public class RefundServiceImpl implements RefundService {
+
+    private final RestCommerceRefundClient commerce;
+    private final RefundCaseRepository refunds;
+    private final RefundLedgerRepository ledger;
+    private final RefundAuditRepository audit;
+    private final RefundResultOutboxRepository outbox;
+    private final RefundDestinationCipher cipher;
+    private final TransactionTemplate allocation;
+
+    public RefundServiceImpl(RestCommerceRefundClient commerce, RefundCaseRepository refunds,
+            RefundLedgerRepository ledger, RefundAuditRepository audit, RefundResultOutboxRepository outbox,
+            RefundDestinationCipher cipher, PlatformTransactionManager transactionManager) {
+        this.commerce = commerce;
+        this.refunds = refunds;
+        this.ledger = ledger;
+        this.audit = audit;
+        this.outbox = outbox;
+        this.cipher = cipher;
+        this.allocation = new TransactionTemplate(transactionManager);
+        // The sum must see any allocation that committed while this request was waiting for the ledger lock.
+        this.allocation.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+    }
+
+    @Override
+    public RefundResponse prepare(RefundSourceType type, UUID sourceId, RefundActor actor) {
+        var existing = refunds.findBySourceTypeAndSourceId(type, sourceId);
+        if (existing.isPresent()) {
+            requireReadAccess(existing.get().getCustomerId(), actor);
+            return RefundMapper.response(existing.get());
+        }
+        CommerceRefundSource source = commerce.getSource(type, sourceId);
+        requireReadAccess(source.customerId(), actor);
+        return allocation.execute(transaction -> allocate(source, actor.id()));
+    }
+
+    private RefundResponse allocate(CommerceRefundSource source, UUID actor) {
+        refunds.lockSource(source.type().name(), source.id());
+        var settled = ledger.lockSettledTransaction(source.paymentAttemptId(), source.orderId(), source.customerId())
+                .orElseThrow(RefundErrorCode.REFUND_LEDGER_MISMATCH::exception);
+
+        var existing = refunds.findBySourceTypeAndSourceId(source.type(), source.id());
+        if (existing.isPresent()) {
+            if (!existing.get().matchesSource(source, settled.getTransactionId())) {
+                throw RefundErrorCode.REFUND_SOURCE_CHANGED.exception();
+            }
+            return RefundMapper.response(existing.get());
+        }
+        // Failed cases can be retried, so they continue to reserve the original amount.
+        long allocated = refunds.allocatedAmount(settled.getTransactionId());
+        if (source.amountVnd() > settled.getActualAmountVnd() - allocated) {
+            throw RefundErrorCode.REFUND_AMOUNT_EXCEEDED.exception();
+        }
+        Instant now = now();
+        var refund = refunds.save(new RefundCaseEntity(source, settled.getTransactionId(), now));
+        record(refund, actor, Action.PREPARED, null, now);
+        return RefundMapper.response(refund);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RefundResponse get(RefundSourceType type, UUID sourceId, RefundActor actor) {
+        var refund = refunds.findBySourceTypeAndSourceId(type, sourceId)
+                .orElseThrow(RefundErrorCode.REFUND_NOT_FOUND::exception);
+        requireReadAccess(refund.getCustomerId(), actor);
+        return RefundMapper.response(refund);
+    }
+
+    @Override
+    @Transactional
+    public RefundResponse saveDestination(RefundSourceType type, UUID sourceId, RefundActor actor, Destination destination) {
+        var refund = lock(type, sourceId);
+        if (!actor.customer() || !refund.getCustomerId().equals(actor.id())) {
+            throw RefundErrorCode.REFUND_NOT_FOUND.exception();
+        }
+        Status status = refund.getStatus();
+        if (status != Status.AWAITING_DETAILS && status != Status.PENDING) {
+            throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+        }
+        Instant now = now();
+        refund.saveDestination(cipher.encrypt(refund.getId(), destination), now);
+        record(refund, actor.id(), Action.DESTINATION_SAVED, null, now);
+        return RefundMapper.response(refund);
+    }
+
+    @Override
+    @Transactional
+    public RefundResponse start(RefundSourceType type, UUID sourceId, UUID admin) {
+        var refund = lock(type, sourceId);
+        Status status = refund.getStatus();
+        if (status == Status.PROCESSING) {
+            requireAssigned(refund, admin);
+            return RefundMapper.response(refund);
+        }
+        if (status != Status.PENDING && status != Status.FAILED) {
+            throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+        }
+        cipher.decrypt(refund.getId(), refund.getDestinationCiphertext());
+        Instant now = now();
+        refund.start(admin, now);
+        record(refund, admin, status == Status.FAILED ? Action.RETRIED : Action.STARTED, null, now);
+        return RefundMapper.response(refund);
+    }
+
+    @Override
+    @Transactional
+    public Destination getDestination(RefundSourceType type, UUID sourceId, UUID admin) {
+        var refund = lock(type, sourceId);
+        requireProcessing(refund);
+        requireAssigned(refund, admin);
+        var destination = cipher.decrypt(refund.getId(), refund.getDestinationCiphertext());
+        record(refund, admin, Action.DESTINATION_VIEWED, null, now());
+        return destination;
+    }
+
+    @Override
+    @Transactional
+    public RefundResponse complete(RefundSourceType type, UUID sourceId, UUID admin, Completion evidence) {
+        var refund = lock(type, sourceId);
+        if (refund.getStatus() == Status.REFUNDED) {
+            requireAssigned(refund, admin);
+            if (!refund.matchesEvidence(evidence.transferReference(), evidence.proofReference())) {
+                throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+            }
+            return RefundMapper.response(refund);
+        }
+
+        requireProcessing(refund);
+        requireAssigned(refund, admin);
+        refunds.lockTransferReference(evidence.transferReference());
+        if (refunds.existsByTransferReference(evidence.transferReference())) {
+            throw RefundErrorCode.REFUND_TRANSFER_REFERENCE_IN_USE.exception();
+        }
+        Instant now = now();
+        refund.complete(evidence.transferReference(), evidence.proofReference(), now);
+        record(refund, admin, Action.REFUNDED, null, now);
+        outbox.save(new RefundResultOutboxEntity(refund, now));
+        return RefundMapper.response(refund);
+    }
+
+    @Override
+    @Transactional
+    public RefundResponse fail(RefundSourceType type, UUID sourceId, UUID admin, Failure failure) {
+        var refund = lock(type, sourceId);
+        if (refund.getStatus() == Status.FAILED) {
+            requireAssigned(refund, admin);
+            if (!failure.reason().equals(refund.getFailureReason())) {
+                throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+            }
+            return RefundMapper.response(refund);
+        }
+
+        requireProcessing(refund);
+        requireAssigned(refund, admin);
+        Instant now = now();
+        refund.fail(failure.reason(), now);
+        record(refund, admin, Action.FAILED, failure.reason(), now);
+        return RefundMapper.response(refund);
+    }
+
+    private RefundCaseEntity lock(RefundSourceType type, UUID id) {
+        return refunds.lockCase(type, id).orElseThrow(RefundErrorCode.REFUND_NOT_FOUND::exception);
+    }
+
+    private void record(RefundCaseEntity refund, UUID actor, Action action, String reason, Instant now) {
+        audit.save(new RefundAuditEntity(refund, actor, action, reason, now));
+    }
+
+    private void requireReadAccess(UUID customerId, RefundActor actor) {
+        if (!actor.admin() && !customerId.equals(actor.id())) {
+            throw RefundErrorCode.REFUND_NOT_FOUND.exception();
+        }
+    }
+
+    private void requireProcessing(RefundCaseEntity refund) {
+        if (refund.getStatus() != Status.PROCESSING) {
+            throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+        }
+    }
+
+    private void requireAssigned(RefundCaseEntity refund, UUID admin) {
+        if (!admin.equals(refund.getAssignedAdminId())) {
+            throw RefundErrorCode.ACCESS_DENIED.exception();
+        }
+    }
+
+    private Instant now() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
+}

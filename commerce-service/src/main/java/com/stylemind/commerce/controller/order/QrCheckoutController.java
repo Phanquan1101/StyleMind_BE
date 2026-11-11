@@ -5,6 +5,7 @@ import com.stylemind.commerce.client.payment.OrderPaymentRequest;
 import com.stylemind.commerce.client.payment.PaymentAttemptResponse;
 import com.stylemind.commerce.client.payment.PaymentClient;
 import com.stylemind.commerce.errors.ApiOperationException;
+import com.stylemind.commerce.dto.order.QrCheckoutListResponse;
 import com.stylemind.commerce.security.CurrentUser;
 import com.stylemind.commerce.service.order.OrderService;
 import com.stylemind.commerce.service.order.QrCheckoutReservationService;
@@ -45,6 +46,12 @@ public class QrCheckoutController {
     public ResponseEntity<QrCheckoutReservationService.PaymentContext> status(Authentication auth, @PathVariable String id) {
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(checkouts.paymentContext(validator.pathId(id), subject(auth)));
+    }
+
+    @GetMapping("/api/v1/qr-checkouts/pending")
+    public ResponseEntity<QrCheckoutListResponse> pending(Authentication auth, HttpServletRequest request) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(orders.listPendingQrCheckouts(subject(auth), validator.pendingQrList(request)));
     }
 
     @PostMapping(path = "/api/v1/qr-checkouts/recover", consumes = "application/json")

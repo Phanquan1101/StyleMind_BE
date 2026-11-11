@@ -31,7 +31,8 @@ public class PaymentServiceSecurity {
     @Order(1)
     SecurityFilterChain paymentEventFilterChain(HttpSecurity http, ObjectMapper mapper,
             @Value("${stylemind.payment.ingress-token:}") String token) throws Exception {
-        return http.securityMatcher("/internal/v1/payment-events")
+        return http.securityMatcher("/internal/v1/payment-events", "/internal/v1/refund-sources/**",
+                        "/internal/v1/refund-results")
                 .csrf(AbstractHttpConfigurer::disable).requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(new TokenFilter(token, mapper), AnonymousAuthenticationFilter.class)

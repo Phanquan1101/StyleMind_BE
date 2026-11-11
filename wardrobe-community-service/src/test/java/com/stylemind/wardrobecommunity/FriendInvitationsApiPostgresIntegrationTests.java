@@ -92,7 +92,17 @@ class FriendInvitationsApiPostgresIntegrationTests {
         UUID id=UUID.fromString(result.path("friend_invitation_id").asText());
         assertThat(result.path("delivery_status").asText()).isEqualTo("SMTP_ACCEPTED");
         assertThat(friendships.count()).isZero();assertThat(emails).hasSize(1);
-        call(get(PATH+"/incoming"),B,null).andExpect(status().isOk()).andExpect(jsonPath("$.total_elements").value(1));
+        call(get(PATH+"/incoming"),B,null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.total_elements").value(1))
+            .andExpect(jsonPath("$.items[0].sender_email").value(email(A)))
+            .andExpect(jsonPath("$.items[0].sender_display_name").value("Test user"));
+        call(get(PATH+"/incoming"),C,null).andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+
+        when(directory.lookup(List.of(A))).thenReturn(Map.of());
+        when(identity.lookupMany(List.of(A))).thenAnswer(x->{outside();return Map.of(A,accounts.get(A));});
+        call(get(PATH+"/incoming"),B,null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].sender_email").value(email(A)))
+            .andExpect(jsonPath("$.items[0].sender_display_name").value(org.hamcrest.Matchers.nullValue()));
         call(post(PATH+"/"+id+"/accept"),B,"{}").andExpect(status().isOk())
             .andExpect(jsonPath("$.outcome").value("FRIENDSHIP_ACCEPTED")).andExpect(header().string("Cache-Control","no-store"));
         assertThat(friendships.countActiveForAccount(A)).isEqualTo(1);

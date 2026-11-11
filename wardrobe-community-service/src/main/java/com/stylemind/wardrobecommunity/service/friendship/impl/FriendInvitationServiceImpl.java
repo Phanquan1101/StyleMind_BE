@@ -2,6 +2,7 @@ package com.stylemind.wardrobecommunity.service.friendship.impl;
 
 import com.stylemind.wardrobecommunity.client.identity.*;
 import com.stylemind.wardrobecommunity.client.identity.payload.AccountEmailVerificationItem;
+import com.stylemind.wardrobecommunity.client.identity.payload.AccountLookupItem;
 import com.stylemind.wardrobecommunity.client.notification.FriendInvitationMailClient;
 import com.stylemind.wardrobecommunity.client.notification.payload.FriendInvitationEmailRequest;
 import com.stylemind.wardrobecommunity.dto.friendship.*;
@@ -13,6 +14,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /** Orchestrates remote facts/delivery outside the persistence bean's transaction. */
 @Service
@@ -48,12 +50,23 @@ public class FriendInvitationServiceImpl implements FriendInvitationService {
     }
 
     @Override public IncomingFriendInvitationListResponse incoming(UUID actor,FriendPageCriteria criteria) {
-        var page=persistence.incoming(actor,actor(actor).email(),criteria);
-        var names=page.items().isEmpty()?Map.<UUID,com.stylemind.wardrobecommunity.client.identity.payload.AccountLookupItem>of()
-                :directory.lookup(page.items().stream().map(IncomingFriendInvitationResponse::senderAccountId).distinct().toList());
-        var items=page.items().stream().map(row->new IncomingFriendInvitationResponse(row.friendInvitationId(),
-                row.senderAccountId(),names.containsKey(row.senderAccountId())?names.get(row.senderAccountId()).displayName():null,
-                row.createdAt(),row.expiresAt())).toList();
+        var page = persistence.incoming(actor, actor(actor).email(), criteria);
+        var senderIds = page.items().stream().map(IncomingFriendInvitationResponse::senderAccountId).distinct().toList();
+        var profiles = senderIds.isEmpty() ? Map.<UUID, AccountLookupItem>of() : directory.lookup(senderIds);
+        var missingEmailIds = senderIds.stream()
+                .filter(id -> !profiles.containsKey(id) || !StringUtils.hasText(profiles.get(id).email())).toList();
+        var accounts = missingEmailIds.isEmpty() ? Map.<UUID, AccountEmailVerificationItem>of()
+                : identity.lookupMany(missingEmailIds);
+        var items = page.items().stream().map(row -> {
+            var profile = profiles.get(row.senderAccountId());
+            var account = accounts.get(row.senderAccountId());
+            String email = account == null ? null : account.email();
+            if (profile != null && StringUtils.hasText(profile.email())) {
+                email = profile.email();
+            }
+            return new IncomingFriendInvitationResponse(row.friendInvitationId(), row.senderAccountId(), email,
+                    profile == null ? null : profile.displayName(), row.createdAt(), row.expiresAt());
+        }).toList();
         return new IncomingFriendInvitationListResponse(items,criteria.page(),criteria.size(),page.total(),
                 page.total()==0?0:(page.total()-1)/criteria.size()+1);
     }

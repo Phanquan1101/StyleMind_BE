@@ -7,6 +7,7 @@ import java.util.UUID;
 public record IncomingFriendInvitationResponse(
         @JsonProperty("friend_invitation_id") UUID friendInvitationId,
         @JsonProperty("sender_account_id") UUID senderAccountId,
+        @JsonProperty("sender_email") String senderEmail,
         @JsonProperty("sender_display_name") String senderDisplayName,
         @JsonProperty("created_at") OffsetDateTime createdAt,
         @JsonProperty("expires_at") OffsetDateTime expiresAt) {}

@@ -46,5 +46,17 @@ class PaidCancellationMigrationPostgresTests {
         jdbc.update(insert, request, order, event, 100000, "PENDING_REFUND");
         assertThatThrownBy(() -> jdbc.update(insert, request, order, event, 100000, "PENDING_REFUND"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(Flyway.configure().dataSource(source).target("16").load().migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT obligation_status FROM cancellation_refund_obligation WHERE cancellation_request_id=?",
+                String.class, request)).isEqualTo("PENDING_REFUND");
+        assertThat(jdbc.queryForObject("SELECT payment_event_id FROM cancellation_refund_obligation WHERE cancellation_request_id=?",
+                UUID.class, request)).isEqualTo(event);
+        assertThat(jdbc.queryForObject("SELECT amount_vnd FROM cancellation_refund_obligation WHERE cancellation_request_id=?",
+                Long.class, request)).isEqualTo(100_000);
+        jdbc.update("UPDATE cancellation_refund_obligation SET obligation_status='REFUNDED' WHERE cancellation_request_id=?",
+                request);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM return_request", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_result_inbox", Integer.class)).isZero();
     }
 }

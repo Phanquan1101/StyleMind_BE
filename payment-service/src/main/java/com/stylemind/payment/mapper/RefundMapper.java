@@ -1,0 +1,14 @@
+package com.stylemind.payment.mapper;
+
+import com.stylemind.payment.dto.RefundResponse;
+import com.stylemind.payment.entity.RefundCaseEntity;
+
+public final class RefundMapper {
+    private RefundMapper() { }
+
+    public static RefundResponse response(RefundCaseEntity refund) {
+        return new RefundResponse(refund.getId(), refund.getSourceType(), refund.getSourceId(), refund.getOrderId(),
+                refund.getAmountVnd(), refund.getStatus().name(), refund.getTransferReference(),
+                refund.getFailureReason(), refund.getRefundedAt(), refund.getUpdatedAt());
+    }
+}

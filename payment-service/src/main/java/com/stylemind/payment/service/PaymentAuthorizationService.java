@@ -6,4 +6,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 public interface PaymentAuthorizationService {
     UUID customerSubject(Jwt jwt);
     UUID adminSubject(Jwt jwt);
+    RefundActor refundActor(Jwt jwt);
+
+    record RefundActor(UUID id, boolean customer, boolean admin) { }
 }
+

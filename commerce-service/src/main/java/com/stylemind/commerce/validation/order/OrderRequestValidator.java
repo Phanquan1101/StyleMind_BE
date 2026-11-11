@@ -82,6 +82,14 @@ public class OrderRequestValidator {
         return uuid(raw);
     }
 
+    public ListCriteria pendingQrList(HttpServletRequest request) {
+        ListCriteria criteria = list(request);
+        if (criteria.status() != null) {
+            throw invalidRequest();
+        }
+        return criteria;
+    }
+
     public record CheckoutCommand(String checkoutKey, UUID shippingAddressId, PaymentMethod paymentMethod) {
     }
 

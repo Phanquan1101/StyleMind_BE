@@ -10,6 +10,7 @@ import com.stylemind.commerce.dto.order.OrderHistoryResponse;
 import com.stylemind.commerce.dto.order.OrderItemResponse;
 import com.stylemind.commerce.dto.order.OrderListResponse;
 import com.stylemind.commerce.dto.order.OrderResponse;
+import com.stylemind.commerce.dto.order.QrCheckoutListResponse;
 import com.stylemind.commerce.errors.ApiOperationException;
 import com.stylemind.commerce.dto.cart.CartItem;
 import com.stylemind.commerce.dto.cart.CartOwner;
@@ -30,6 +31,7 @@ import com.stylemind.commerce.repository.order.OrderHistoryRepository;
 import com.stylemind.commerce.repository.order.OrderItemRepository;
 import com.stylemind.commerce.repository.order.OrderRepository;
 import com.stylemind.commerce.repository.order.PaymentEventRepository;
+import com.stylemind.commerce.repository.order.QrCheckoutRepository;
 import com.stylemind.commerce.service.order.VariantQuantityService;
 import com.stylemind.commerce.service.order.IdentityAddressClient;
 import com.stylemind.commerce.service.order.OrderService;
@@ -43,6 +45,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -63,6 +67,7 @@ public class OrderServiceImpl implements OrderService {
     private final CancellationRepository cancellationRepository;
     private final com.stylemind.commerce.repository.order.CancellationRefundRepository cancellationRefunds;
     private final PaymentEventRepository paymentEventRepository;
+    private final QrCheckoutRepository qrCheckoutRepository;
     private final VariantQuantityService quantityService;
     private final IdentityAddressClient identityAddressClient;
     private final ApplicationEventPublisher events;
@@ -267,6 +272,18 @@ public class OrderServiceImpl implements OrderService {
                 .stream().map(summary -> response(detail(summary))).toList();
         long totalPages = total == 0 ? 0 : (total + criteria.size() - 1) / criteria.size();
         return new OrderListResponse(items, criteria.page(), criteria.size(), total, totalPages);
+    }
+
+    @Transactional(readOnly = true)
+    public QrCheckoutListResponse listPendingQrCheckouts(UUID customerId, OrderRequestValidator.ListCriteria criteria) {
+        var pageable = PageRequest.of(criteria.page(), criteria.size(),
+                Sort.by(Sort.Direction.DESC, "createdAt", "checkoutId"));
+        var result = qrCheckoutRepository.findPending(customerId, OffsetDateTime.now(), pageable);
+        var items = result.getContent().stream().map(checkout -> new QrCheckoutListResponse.Item(
+                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getTotalVnd(),
+                checkout.getCreatedAt(), checkout.getExpiresAt())).toList();
+        return new QrCheckoutListResponse(items, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
     }
 
     @Transactional(readOnly = true)

@@ -5,6 +5,7 @@ import com.stylemind.commerce.dto.order.CheckoutPriceResponse;
 import com.stylemind.commerce.dto.order.OrderListResponse;
 import com.stylemind.commerce.dto.order.OrderResponse;
 import com.stylemind.commerce.dto.order.CheckoutSelection;
+import com.stylemind.commerce.dto.order.QrCheckoutListResponse;
 import com.stylemind.commerce.validation.order.OrderRequestValidator;
 import java.util.UUID;
 
@@ -32,6 +33,8 @@ public interface OrderService {
             OrderRequestValidator.CheckoutCommand command);
 
     OrderListResponse list(UUID customerId, boolean admin, OrderRequestValidator.ListCriteria criteria);
+
+    QrCheckoutListResponse listPendingQrCheckouts(UUID customerId, OrderRequestValidator.ListCriteria criteria);
 
     OrderResponse get(UUID customerId, boolean admin, UUID orderId);
 
