@@ -2,7 +2,7 @@
   "info": {
     "name": "StyleMind - US-04.02 Confirm Payment",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Synthetic fixtures only on disposable local Orders. Run guide: US-04.02_CONFIRM_PAYMENT_RUN_GUIDE.md. HTTP 200 webhook may acknowledge an exception; verify ledger/Order results. No real credentials included."
+    "description": "Synthetic fixtures only on disposable local Orders. Run guide: US-04.02_CONFIRM_PAYMENT_RUN_GUIDE.md. HTTP 200 webhook may acknowledge an exception; verify ledger/Order results. No real credentials included. Exact and duplicate fixtures exercise null code with a content reference."
   },
   "variable": [
     {
@@ -76,7 +76,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"id\": {{confirmedProviderEventId}},\n  \"gateway\": \"TESTBANK\",\n  \"accountNumber\": \"000-test-only\",\n  \"code\": \"{{paymentReference}}\",\n  \"transferType\": \"in\",\n  \"transferAmount\": {{amountVnd}}\n}",
+          "raw": "{\n  \"id\": {{confirmedProviderEventId}},\n  \"gateway\": \"TESTBANK\",\n  \"accountNumber\": \"000-test-only\",\n  \"code\": null,\n  \"content\": \"test-{{paymentReference}}-transfer\",\n  \"transferType\": \"in\",\n  \"transferAmount\": {{amountVnd}}\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -137,7 +137,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"id\": {{confirmedProviderEventId}},\n  \"gateway\": \"TESTBANK\",\n  \"accountNumber\": \"000-test-only\",\n  \"code\": \"{{paymentReference}}\",\n  \"transferType\": \"in\",\n  \"transferAmount\": {{amountVnd}}\n}",
+          "raw": "{\n  \"id\": {{confirmedProviderEventId}},\n  \"gateway\": \"TESTBANK\",\n  \"accountNumber\": \"000-test-only\",\n  \"code\": null,\n  \"content\": \"test-{{paymentReference}}-transfer\",\n  \"transferType\": \"in\",\n  \"transferAmount\": {{amountVnd}}\n}",
           "options": {
             "raw": {
               "language": "json"
