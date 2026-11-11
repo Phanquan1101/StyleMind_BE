@@ -92,7 +92,8 @@ class ReturnPostgresIntegrationTests {
         mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer("admin"))).andExpect(status().isForbidden());
         mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer("unprivileged"))).andExpect(status().isForbidden());
         mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false))
+                .andExpect(jsonPath("$.ineligible_reason").value("PAYMENT_NOT_CONFIRMED"));
         payment(order, OTHER, "COD", 200_000);
         mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false));

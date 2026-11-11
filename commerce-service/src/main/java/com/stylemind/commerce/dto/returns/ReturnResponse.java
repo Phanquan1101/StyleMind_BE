@@ -41,7 +41,8 @@ public record ReturnResponse(
     public record OrderReturns(
             @JsonProperty("eligible") boolean eligible,
             @JsonProperty("available_items") List<Item> availableItems,
-            @JsonProperty("items") List<ReturnResponse> items) { }
+            @JsonProperty("items") List<ReturnResponse> items,
+            @JsonProperty("ineligible_reason") String ineligibleReason) { }
 
     public record AdminPage(
             @JsonProperty("items") List<ReturnResponse> items,

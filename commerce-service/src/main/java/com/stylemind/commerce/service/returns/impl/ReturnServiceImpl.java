@@ -48,7 +48,14 @@ public class ReturnServiceImpl implements ReturnService {
         List<Item> items = canOpenReturn(order, Instant.now()) && repository.remainingAmount(orderId) > 0
                 ? repository.availableItems(orderId) : List.of();
         boolean eligible = items.stream().anyMatch(item -> item.unitPriceVnd() > 0);
-        return new OrderReturns(eligible, eligible ? items : List.of(), repository.findForOrder(orderId));
+        String reason = null;
+        if (!eligible) {
+            if (!"COMPLETED".equals(order.status()) || order.completedAt() == null) reason = "NOT_DELIVERED";
+            else if (Instant.now().isAfter(order.completedAt().toInstant().plus(RETURN_WINDOW))) reason = "RETURN_WINDOW_EXPIRED";
+            else if (order.paymentEventId() == null) reason = "PAYMENT_NOT_CONFIRMED";
+            else reason = "NO_RETURNABLE_ITEMS";
+        }
+        return new OrderReturns(eligible, eligible ? items : List.of(), repository.findForOrder(orderId), reason);
     }
 
     @Override

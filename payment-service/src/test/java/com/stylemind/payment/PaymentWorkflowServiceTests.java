@@ -185,6 +185,40 @@ class PaymentWorkflowServiceTests {
         verify(outbox, never()).recordPaymentConfirmed(any(), any(Long.class), any());
     }
 
+    @Test
+    void deliveredCodUsesOriginalAttemptAndSettledReplayDoesNotCollectAgain() {
+        var repository = org.mockito.Mockito.mock(PaymentAttemptRepository.class);
+        var outbox = org.mockito.Mockito.mock(PaymentOutboxService.class);
+        var commerce = org.mockito.Mockito.mock(CommerceOrderClient.class);
+        var service = attemptService(repository, outbox, commerce);
+        var attempt = snapshot("COD", "PENDING", null, 120_000);
+        when(repository.findCodForOrder(ORDER_ID)).thenReturn(Optional.of(attempt));
+        when(repository.findByIdForUpdate(ATTEMPT_ID)).thenReturn(Optional.of(attempt));
+        when(commerce.getPaymentSnapshot(ORDER_ID)).thenReturn(orderSnapshot(PaymentMethod.COD, 120_000, "COMPLETED"));
+        when(repository.insertManualCodTransaction(attempt, 120_000, "DELIVERED-COD-" + ORDER_ID, ADMIN_ID, NOW)).thenReturn(true);
+        assertThat(service.confirmDeliveredCod(ORDER_ID, ADMIN_ID, NOW).status()).isEqualTo("PAID");
+        when(repository.findCodForOrder(ORDER_ID)).thenReturn(Optional.of(snapshot("COD", "SETTLED", null, 120_000)));
+        assertThat(service.confirmDeliveredCod(ORDER_ID, ADMIN_ID, NOW).status()).isEqualTo("PAID");
+        verify(repository).insertManualCodTransaction(attempt, 120_000, "DELIVERED-COD-" + ORDER_ID, ADMIN_ID, NOW);
+        verify(outbox).recordPaymentConfirmed(attempt, 120_000, NOW);
+    }
+
+    @Test
+    void deliveredCodRejectsUndeliveredWrongAmountAndMissingAttempts() {
+        var repository = org.mockito.Mockito.mock(PaymentAttemptRepository.class);
+        var outbox = org.mockito.Mockito.mock(PaymentOutboxService.class);
+        var commerce = org.mockito.Mockito.mock(CommerceOrderClient.class);
+        var service = attemptService(repository, outbox, commerce);
+        when(repository.findCodForOrder(ORDER_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.confirmDeliveredCod(ORDER_ID, ADMIN_ID, NOW)).isInstanceOf(PaymentApiException.class);
+        when(repository.findCodForOrder(ORDER_ID)).thenReturn(Optional.of(snapshot("COD", "PENDING", null, 120_000)));
+        when(commerce.getPaymentSnapshot(ORDER_ID)).thenReturn(orderSnapshot(PaymentMethod.COD, 120_000, "SHIPPED"));
+        assertThatThrownBy(() -> service.confirmDeliveredCod(ORDER_ID, ADMIN_ID, NOW)).isInstanceOf(PaymentApiException.class);
+        when(commerce.getPaymentSnapshot(ORDER_ID)).thenReturn(orderSnapshot(PaymentMethod.COD, 1, "COMPLETED"));
+        assertThatThrownBy(() -> service.confirmDeliveredCod(ORDER_ID, ADMIN_ID, NOW)).isInstanceOf(PaymentApiException.class);
+        verify(outbox, never()).recordPaymentConfirmed(any(), org.mockito.ArgumentMatchers.anyLong(), any());
+    }
+
     private PaymentAttemptService attemptService(
             PaymentAttemptRepository repository,
             PaymentOutboxService outbox,

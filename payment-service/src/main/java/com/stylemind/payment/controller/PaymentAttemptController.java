@@ -64,4 +64,12 @@ public class PaymentAttemptController {
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(paymentAttemptService.listExceptions(status, limit, offset));
     }
+
+    @PostMapping(value = "/api/v1/admin/orders/{orderId}/cod-collection", produces = "application/json")
+    ResponseEntity<PaymentAttemptResponse> confirmDeliveredCod(
+            @org.springframework.web.bind.annotation.PathVariable java.util.UUID orderId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(
+                paymentAttemptService.confirmDeliveredCod(orderId, authorizationService.adminSubject(jwt), Instant.now()));
+    }
 }
