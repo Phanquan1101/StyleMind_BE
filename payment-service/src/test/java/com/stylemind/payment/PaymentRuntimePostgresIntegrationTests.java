@@ -94,6 +94,33 @@ class PaymentRuntimePostgresIntegrationTests {
     }
 
     @Test
+    void nullCodeContentFallbackAuthenticatesAndConcurrentReplaysCreditOnce() throws Exception {
+        var attempt = push(UUID.randomUUID(), UUID.randomUUID(), "SEPAY_VIETQR");
+        var payload = new java.util.HashMap<>(webhook(attempt.path("reference").asText(), 125000));
+        payload.put("code", null);
+        payload.put("content", "156271567364-" + attempt.path("reference").asText() + "-CHUYEN TIEN");
+        assertThat(post(WEBHOOK, payload, "Authorization", "Apikey wrong").getStatusCode().value()).isEqualTo(401);
+        assertThat(count("financial_transaction")).isZero();
+        // A previously recorded missing-reference exception must not block an authentic retry.
+        var missing = new java.util.HashMap<>(payload);
+        missing.remove("content");
+        assertThat(post(WEBHOOK, missing, "Authorization", "Apikey runtime-test-only-sepay").getStatusCode().value())
+                .isEqualTo(200);
+        assertThat(count("payment_exception")).isEqualTo(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(3)) {
+            var jobs = new java.util.ArrayList<java.util.concurrent.Future<ResponseEntity<JsonNode>>>();
+            for (int i = 0; i < 3; i++) jobs.add(pool.submit(() -> post(WEBHOOK, payload,
+                    "Authorization", "Apikey runtime-test-only-sepay")));
+            for (var job : jobs) assertThat(job.get(30, java.util.concurrent.TimeUnit.SECONDS).getStatusCode().value())
+                    .isEqualTo(200);
+        }
+        assertThat(attemptStatus()).isEqualTo("SETTLED");
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+        assertThat(count("payment_exception")).isEqualTo(1); // Preserve historical audit record.
+    }
+
+    @Test
     void invalidWebhookCredentialsAndMalformedJsonCannotChangePayment() {
         var attempt = push(UUID.randomUUID(), UUID.randomUUID(), "SEPAY_VIETQR");
         var payload = webhook(attempt.path("reference").asText(), 125000);
