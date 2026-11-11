@@ -3,6 +3,8 @@ package com.stylemind.payment.errors;
 import org.springframework.http.HttpStatus;
 
 public enum RefundErrorCode {
+    INVALID_REFUND_RECEIPT(HttpStatus.BAD_REQUEST, "Upload one real JPEG or PNG image, at most 5 MiB and 16 megapixels"),
+    REFUND_RECEIPT_CONFLICT(HttpStatus.CONFLICT, "A different receipt is already saved for this refund"),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "Refund request is invalid"),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "You do not have access to this refund action"),
     REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "Refund or eligible Commerce source was not found"),

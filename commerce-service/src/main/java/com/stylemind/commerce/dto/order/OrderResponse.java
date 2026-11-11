@@ -19,5 +19,8 @@ public record OrderResponse(
         List<OrderItemResponse> items,
         List<OrderHistoryResponse> history,
         @JsonProperty("cancellation_request") CancellationRequestResponse cancellationRequest,
-        @JsonProperty("confirmation_state") String confirmationState) {
+        @JsonProperty("confirmation_state") String confirmationState,
+        @JsonProperty("payment_status") String paymentStatus,
+        @JsonProperty("refunded_amount_vnd") long refundedAmountVnd,
+        @JsonProperty("refund_status") String refundStatus) {
 }

@@ -32,6 +32,17 @@ class GuestPaymentMigrationPostgresTests {
         assertThat(jdbc.queryForObject("SELECT customer_id FROM public.payment_attempt WHERE payment_attempt_id=?", UUID.class, id)).isEqualTo(customer);
         assertThat(jdbc.queryForObject("SELECT customer_id FROM public.payment_attempt WHERE payment_attempt_id=?", UUID.class, guest)).isNull();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM public.refund_case", Long.class)).isZero();
+        UUID transaction = UUID.randomUUID(), refund = UUID.randomUUID();
+        jdbc.update("UPDATE payment_attempt SET attempt_status='SETTLED',confirmed_at=now() WHERE payment_attempt_id=?", id);
+        jdbc.update("INSERT INTO financial_transaction(transaction_id,payment_attempt_id,actual_amount_vnd,settled_at) VALUES (?,?,125000,now())", transaction, id);
+        jdbc.update("""
+                INSERT INTO refund_case(refund_id,source_type,source_id,order_id,customer_id,transaction_id,amount_vnd,status,updated_at)
+                SELECT ?,'RETURN',?,order_id,customer_id,?,50000,'AWAITING_DETAILS',now() FROM payment_attempt WHERE payment_attempt_id=?
+                """, refund, UUID.randomUUID(), transaction, id);
+        assertThat(Flyway.configure().dataSource(source).target("4").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM refund_case WHERE refund_id=?", String.class, refund)).isEqualTo("AWAITING_DETAILS");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_transfer_receipt", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT actual_amount_vnd FROM financial_transaction WHERE transaction_id=?", Long.class, transaction)).isEqualTo(125000);
     }
 
     private UUID insert(JdbcTemplate jdbc, UUID customer) {

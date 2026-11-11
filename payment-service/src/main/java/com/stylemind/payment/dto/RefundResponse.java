@@ -14,5 +14,6 @@ public record RefundResponse(
         @JsonProperty("transfer_reference") String transferReference,
         @JsonProperty("failure_reason") String failureReason,
         @JsonProperty("refunded_at") Instant refundedAt,
-        @JsonProperty("updated_at") Instant updatedAt) {
+        @JsonProperty("updated_at") Instant updatedAt,
+        @JsonProperty("has_receipt") boolean hasReceipt) {
 }

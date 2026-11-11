@@ -701,6 +701,106 @@
           }
         }
       ]
+    },
+    {
+      "name": "05 Transfer receipt",
+      "item": [
+        {
+          "name": "Admin uploads immutable transfer receipt (optional, PROCESSING or REFUNDED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Receipt saved',()=> { pm.response.to.have.status(200); pm.expect(pm.response.json().has_receipt).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          }
+        },
+        {
+          "name": "Customer reads private receipt after refund completion",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Private image',()=> { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); pm.expect(pm.response.headers.get('Content-Type')).to.match(/^image\\/(jpeg|png)/); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin reads private receipt",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          }
+        }
+      ]
     }
   ]
 }

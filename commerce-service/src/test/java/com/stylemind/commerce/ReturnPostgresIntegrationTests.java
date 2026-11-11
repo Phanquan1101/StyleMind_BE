@@ -225,6 +225,28 @@ class ReturnPostgresIntegrationTests {
     }
 
     @Test
+    void orderListsProjectCollectedCodAndPartialThenFullRefundWithoutChangingDeliveryState() throws Exception {
+        var order = paidCodOrder();
+        String detail = "/api/v1/orders/" + order.id();
+        mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.payment_status").value("PAID"))
+                .andExpect(jsonPath("$.refunded_amount_vnd").value(0));
+        for (int i = 1; i <= 2; i++) {
+            UUID id = uuid(read(create(order, UUID.randomUUID(), 1, "Damaged", evidence())), "return_id");
+            decision(id, "APPROVE_PICKUP", null).andExpect(status().isOk());
+            decision(id, "PASS_INSPECTION", null).andExpect(status().isOk());
+            callback(UUID.randomUUID(), "RETURN", id, order.id(), 100_000,
+                    Instant.now().truncatedTo(ChronoUnit.MICROS).toString()).andExpect(status().isNoContent());
+            mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("COMPLETED"))
+                    .andExpect(jsonPath("$.refunded_amount_vnd").value(i * 100_000))
+                    .andExpect(jsonPath("$.refund_status").value(i == 1 ? "PARTIALLY_REFUNDED" : "REFUNDED"));
+        }
+        mvc.perform(get("/api/v1/orders").header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[?(@.order_id=='" + order.id() + "')].refund_status").value(org.hamcrest.Matchers.contains("REFUNDED")));
+    }
+
+    @Test
     void cancellationCompletionUpdatesExistingObligationAndCannotBeReusedForAnotherSource() throws Exception {
         var order = order(OWNER, "SEPAY_VIETQR", "CANCELLED", null);
         UUID event = payment(order, OWNER, "SEPAY_VIETQR", 200_000);
@@ -316,6 +338,7 @@ class ReturnPostgresIntegrationTests {
                     payment_method,accepted_total_vnd,placed_at,completed_at)
                 VALUES (?,?,?,?,?,?,200000,now()-interval '10 days',?)
                 """, order.id(), order.id().toString(), owner, order.id().toString(), state, method, completedAt);
+        jdbc.update("INSERT INTO order_address_snapshot(order_id,recipient_name,recipient_phone,address_line) VALUES (?,'Test Owner','+84900000000','Synthetic address')", order.id());
         jdbc.update("""
                 INSERT INTO order_item(order_item_id,order_id,variant_id,sku_snapshot,product_name_snapshot,
                     brand_name_snapshot,color_snapshot,size_snapshot,quantity,unit_price_vnd)

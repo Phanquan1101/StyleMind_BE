@@ -77,7 +77,7 @@ class RefundWorkflowPostgresTests {
     @BeforeEach
     void credentialsAndStub() {
         SOURCES.clear();
-        jdbc.execute("TRUNCATE TABLE public.refund_result_outbox, public.refund_audit, public.refund_case");
+        jdbc.execute("TRUNCATE TABLE public.refund_transfer_receipt, public.refund_result_outbox, public.refund_audit, public.refund_case");
         RESULT_REQUESTS.set(0);
         RESULT_STATUS.set(503);
         RESULT_BODY.set(null);
@@ -269,6 +269,96 @@ class RefundWorkflowPostgresTests {
         mvc.perform(auth(post(path("RETURN", source("RETURN", ledger, 25_001)) + "/prepare"), customer))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REFUND_AMOUNT_EXCEEDED"));
         prepare(path("RETURN", source("RETURN", ledger, 25_000)), customer);
+    }
+
+    @Test
+    void receiptIsPrivateImmutableAndDoesNotCompleteTheRefund() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), other = user(UUID.randomUUID(), "ROLE_CUSTOMER");
+        String admin = user(UUID.randomUUID(), "ROLE_ADMIN"), otherAdmin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepare(refund, customer);
+        byte[] image = receiptImage(1);
+        mvc.perform(multipart(processing + "/receipt").file(receiptFile(image))).andExpect(status().isUnauthorized());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(image)), customer)).andExpect(status().isForbidden());
+        mvc.perform(auth(put(refund + "/destination"), customer, DESTINATION)).andExpect(status().isOk());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(image)), admin)).andExpect(status().isConflict());
+        mvc.perform(auth(post(processing + "/start"), admin)).andExpect(status().isOk());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(image)), otherAdmin)).andExpect(status().isForbidden());
+        for (int i = 0; i < 2; i++) mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(image)), admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.has_receipt").value(true));
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(receiptImage(2))), admin)).andExpect(status().isConflict());
+        mvc.perform(auth(get(refund), customer)).andExpect(jsonPath("$.has_receipt").value(false));
+        mvc.perform(auth(get(refund + "/receipt"), customer)).andExpect(status().isNotFound());
+        mvc.perform(auth(get(refund + "/receipt"), other)).andExpect(status().isNotFound());
+        mvc.perform(auth(get(refund + "/receipt"), admin)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store, private"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(content().bytes(image));
+        assertThat(jdbc.queryForObject("SELECT status FROM refund_case WHERE refund_id=?", String.class, UUID.fromString(id))).isEqualTo("PROCESSING");
+        String evidence = "{\"transfer_reference\":\"receipt-transfer\",\"proof_reference\":\"receipt-proof\"}";
+        mvc.perform(auth(post(processing + "/complete"), admin, evidence)).andExpect(status().isOk());
+        mvc.perform(auth(get(refund), customer)).andExpect(jsonPath("$.has_receipt").value(true));
+        mvc.perform(auth(get(refund + "/receipt"), customer)).andExpect(status().isOk()).andExpect(content().bytes(image));
+        mvc.perform(auth(get(refund + "/receipt"), other)).andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_transfer_receipt WHERE refund_id=?", Integer.class, UUID.fromString(id))).isEqualTo(1);
+    }
+
+    @Test
+    void completedRefundAcceptsReceiptAndRejectsCounterfeitOrOversizedImages() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("CANCELLATION", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("CANCELLATION", source), processing = adminPath("CANCELLATION", source);
+        prepare(refund, customer);
+        mvc.perform(auth(put(refund + "/destination"), customer, DESTINATION)).andExpect(status().isOk());
+        mvc.perform(auth(post(processing + "/start"), admin)).andExpect(status().isOk());
+        mvc.perform(auth(post(processing + "/complete"), admin,
+                "{\"transfer_reference\":\"late-receipt\",\"proof_reference\":\"proof\"}")).andExpect(status().isOk());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(new byte[]{1,2,3})), admin)).andExpect(status().isBadRequest());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(new byte[5242881])), admin)).andExpect(status().isBadRequest());
+        var jpegLie = new org.springframework.mock.web.MockMultipartFile("image", "fake.jpg", "image/jpeg", receiptImage(1));
+        mvc.perform(auth(multipart(processing + "/receipt").file(jpegLie), admin)).andExpect(status().isBadRequest());
+        mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(receiptImage(1))), admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.has_receipt").value(true));
+    }
+
+    @Test
+    void concurrentReceiptUploadsKeepOneImmutableImage() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepare(refund, customer);
+        mvc.perform(auth(put(refund + "/destination"), customer, DESTINATION)).andExpect(status().isOk());
+        mvc.perform(auth(post(processing + "/start"), admin)).andExpect(status().isOk());
+        byte[] image = receiptImage(1);
+        var together = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(3)) {
+            var jobs = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int i = 0; i < 3; i++) jobs.add(executor.submit(() -> {
+                together.await();
+                return mvc.perform(auth(multipart(processing + "/receipt").file(receiptFile(image)), admin))
+                        .andReturn().getResponse().getStatus();
+            }));
+            together.countDown();
+            for (var job : jobs) assertThat(job.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_transfer_receipt WHERE refund_id=?", Integer.class, UUID.fromString(id))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_result_outbox WHERE refund_id=?", Integer.class, UUID.fromString(id))).isZero();
+    }
+
+    private static byte[] receiptImage(int color) throws Exception {
+        var image = new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, color);
+        var bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(image, "png", bytes);
+        return bytes.toByteArray();
+    }
+
+    private static org.springframework.mock.web.MockMultipartFile receiptFile(byte[] bytes) {
+        return new org.springframework.mock.web.MockMultipartFile("image", "receipt.png", "image/png", bytes);
     }
 
     private int prepareConcurrently(String path, String customer, CountDownLatch together) throws Exception {

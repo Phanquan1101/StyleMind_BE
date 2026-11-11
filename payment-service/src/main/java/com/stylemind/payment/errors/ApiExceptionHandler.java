@@ -26,6 +26,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
             MissingServletRequestParameterException.class, SepayWebhookMalformedException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
@@ -36,6 +37,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<ProblemDetail> paymentApiException(PaymentApiException exception, HttpServletRequest request) {
         return response(exception.status(), exception.status().getReasonPhrase(),
                 exception.detail(), exception.code(), request);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ProblemDetail> uploadTooLarge(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large", "Receipt image exceeds the upload limit",
+                "INVALID_REFUND_RECEIPT", request);
     }
 
     @ExceptionHandler(SepayWebhookUnauthorizedException.class)

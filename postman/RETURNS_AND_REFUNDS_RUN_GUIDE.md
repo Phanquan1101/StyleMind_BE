@@ -56,6 +56,20 @@ Chọn một yêu cầu hủy đã duyệt có khoản chờ hoàn. Đặt `refu
 
 ## Các trường hợp cần đối chiếu
 
+### Ảnh biên nhận chuyển khoản (Payment V4)
+
+Trong thư mục **05 Transfer receipt**, admin phụ trách chọn một ảnh JPG/PNG thật, tối đa 5 MiB/16 megapixel vào field `image`. Có thể lưu khi PROCESSING hoặc sau REFUNDED, kể cả hồ sơ cũ đã hoàn tiền. Ảnh là tùy chọn và không tự ghi nhận chuyển tiền. Chỉ lưu một ảnh mỗi hồ sơ; gửi lại cùng ảnh an toàn, ảnh khác trả 409. Khách chỉ đọc được ảnh sau REFUNDED; khách khác không đọc được. Ảnh được tải với Authorization, no-store/private; không có URL ảnh công khai. FE có chọn ảnh, xem trước, bỏ ảnh chưa lưu, lưu và xem lại.
+
+Khi khoản hoàn mới là PENDING, tài khoản nhận tiền đã được khách gửi. Admin cần **Bắt đầu hoàn tiền → Xem tài khoản nhận tiền**; đây là bước nhận xử lý và kiểm tra quyền xem, không phải lỗi thất lạc thông tin.
+
+### Trạng thái trên danh sách đơn
+
+Commerce đọc các sự kiện đã tiếp nhận và bổ sung `payment_status` (PAID/PENDING), `refunded_amount_vnd`, `refund_status` (PENDING_REFUND/PARTIALLY_REFUNDED/REFUNDED hoặc null) cho API danh sách và chi tiết. Không thay order_status giao hàng. FE hiển thị nhãn hoàn tiền và số đã hoàn riêng, nút thu COD ẩn khi payment_status=PAID kể cả sau F5. Kết quả phụ thuộc sự kiện Payment→Commerce được chuyển thành công; dữ liệu chưa đồng bộ không được giả lập thành đã hoàn.
+
+Rebuild `payment-service commerce-service` bằng bộ env/Compose hiện dùng. Flyway Payment áp dụng V4 khi khởi động; Commerce không cần migration mới. Trong quá trình triển khai, chỉ đọc DB đang dùng để chẩn đoán và chạy migration/test trên PostgreSQL cô lập. Collection đã được kiểm tra JSON/script, chưa chạy upload trên hồ sơ thật.
+
+Chi tiết code: Payment `RefundTransferReceiptEntity`, `RefundTransferReceiptRepository`, `RefundReceiptValidator`, `RefundReceiptImage`, mở rộng `RefundService`, `RefundServiceImpl`, `RefundController`, `RefundResponse`, `RefundMapper`, `RefundErrorCode`, `ApiExceptionHandler`, multipart configuration và V4. Commerce mở rộng `OrderResponse`, `OrderRepository.paymentProgress`, `OrderServiceImpl.response`. FE thêm `RefundReceipt`, cập nhật `RefundPanel`, `returnsApi`, kiểu dữ liệu/adapter Order, `AccountOrdersPage`, `AdminOrdersPanel`, `orderRefundStatus`. Các test liên quan nằm trong `RefundWorkflowPostgresTests`, `GuestPaymentMigrationPostgresTests`, `ReturnPostgresIntegrationTests`, `RefundReceipt.test.tsx`, `AccountOrdersLive.test.tsx`, `AdminCancellationActions.test.tsx`, `commerceOrderPaymentStatus.test.ts`.
+
 - Đơn đã quá 7 ngày, đơn của tài khoản khác và số lượng vượt số đã mua phải bị từ chối.
 - Với cùng một đơn, thử hai yêu cầu có số lượng chồng nhau. Tổng số lượng được chấp nhận không vượt số đã mua.
 - Với một yêu cầu riêng đã duyệt lấy hàng, dùng bước **Shop rejects a pickup after inspection** trong thư mục **04**. Trạng thái chuyển sang từ chối, khách không có khoản chờ hoàn.

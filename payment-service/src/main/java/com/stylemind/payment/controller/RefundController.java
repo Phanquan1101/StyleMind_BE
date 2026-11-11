@@ -79,6 +79,22 @@ public class RefundController {
                 Failure.parse(body)));
     }
 
+    @PostMapping(path = ADMIN + "/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<RefundResponse> saveReceipt(@PathVariable RefundSourceType sourceType, @PathVariable String sourceId,
+            @AuthenticationPrincipal Jwt jwt,
+            @org.springframework.web.bind.annotation.RequestPart("image") org.springframework.web.multipart.MultipartFile image) {
+        return noStore(refunds.saveReceipt(sourceType, RefundSourceType.parseId(sourceId), authorization.adminSubject(jwt), image));
+    }
+
+    @GetMapping(PUBLIC + "/receipt")
+    ResponseEntity<byte[]> receipt(@PathVariable RefundSourceType sourceType, @PathVariable String sourceId,
+            @AuthenticationPrincipal Jwt jwt) {
+        var image = refunds.receipt(sourceType, RefundSourceType.parseId(sourceId), authorization.refundActor(jwt));
+        return ResponseEntity.ok().header("Cache-Control", "no-store, private")
+                .header("X-Content-Type-Options", "nosniff").contentType(MediaType.parseMediaType(image.contentType()))
+                .body(image.content());
+    }
+
     private static <T> ResponseEntity<T> noStore(T response) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
     }

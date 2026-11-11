@@ -39,17 +39,23 @@ public class RefundServiceImpl implements RefundService {
     private final RefundAuditRepository audit;
     private final RefundResultOutboxRepository outbox;
     private final RefundDestinationCipher cipher;
+    private final com.stylemind.payment.repository.RefundTransferReceiptRepository receipts;
+    private final com.stylemind.payment.validation.RefundReceiptValidator receiptValidator;
     private final TransactionTemplate allocation;
 
     public RefundServiceImpl(RestCommerceRefundClient commerce, RefundCaseRepository refunds,
             RefundLedgerRepository ledger, RefundAuditRepository audit, RefundResultOutboxRepository outbox,
-            RefundDestinationCipher cipher, PlatformTransactionManager transactionManager) {
+            RefundDestinationCipher cipher, PlatformTransactionManager transactionManager,
+            com.stylemind.payment.repository.RefundTransferReceiptRepository receipts,
+            com.stylemind.payment.validation.RefundReceiptValidator receiptValidator) {
         this.commerce = commerce;
         this.refunds = refunds;
         this.ledger = ledger;
         this.audit = audit;
         this.outbox = outbox;
         this.cipher = cipher;
+        this.receipts = receipts;
+        this.receiptValidator = receiptValidator;
         this.allocation = new TransactionTemplate(transactionManager);
         // The sum must see any allocation that committed while this request was waiting for the ledger lock.
         this.allocation.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
@@ -60,7 +66,7 @@ public class RefundServiceImpl implements RefundService {
         var existing = refunds.findBySourceTypeAndSourceId(type, sourceId);
         if (existing.isPresent()) {
             requireReadAccess(existing.get().getCustomerId(), actor);
-            return RefundMapper.response(existing.get());
+            return response(existing.get(), actor.admin());
         }
         CommerceRefundSource source = commerce.getSource(type, sourceId);
         requireReadAccess(source.customerId(), actor);
@@ -77,7 +83,7 @@ public class RefundServiceImpl implements RefundService {
             if (!existing.get().matchesSource(source, settled.getTransactionId())) {
                 throw RefundErrorCode.REFUND_SOURCE_CHANGED.exception();
             }
-            return RefundMapper.response(existing.get());
+            return response(existing.get(), false);
         }
         // Failed cases can be retried, so they continue to reserve the original amount.
         long allocated = refunds.allocatedAmount(settled.getTransactionId());
@@ -87,7 +93,7 @@ public class RefundServiceImpl implements RefundService {
         Instant now = now();
         var refund = refunds.save(new RefundCaseEntity(source, settled.getTransactionId(), now));
         record(refund, actor, Action.PREPARED, null, now);
-        return RefundMapper.response(refund);
+        return response(refund);
     }
 
     @Override
@@ -96,7 +102,7 @@ public class RefundServiceImpl implements RefundService {
         var refund = refunds.findBySourceTypeAndSourceId(type, sourceId)
                 .orElseThrow(RefundErrorCode.REFUND_NOT_FOUND::exception);
         requireReadAccess(refund.getCustomerId(), actor);
-        return RefundMapper.response(refund);
+        return response(refund, actor.admin());
     }
 
     @Override
@@ -113,7 +119,7 @@ public class RefundServiceImpl implements RefundService {
         Instant now = now();
         refund.saveDestination(cipher.encrypt(refund.getId(), destination), now);
         record(refund, actor.id(), Action.DESTINATION_SAVED, null, now);
-        return RefundMapper.response(refund);
+        return response(refund);
     }
 
     @Override
@@ -123,7 +129,7 @@ public class RefundServiceImpl implements RefundService {
         Status status = refund.getStatus();
         if (status == Status.PROCESSING) {
             requireAssigned(refund, admin);
-            return RefundMapper.response(refund);
+            return response(refund);
         }
         if (status != Status.PENDING && status != Status.FAILED) {
             throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
@@ -132,7 +138,7 @@ public class RefundServiceImpl implements RefundService {
         Instant now = now();
         refund.start(admin, now);
         record(refund, admin, status == Status.FAILED ? Action.RETRIED : Action.STARTED, null, now);
-        return RefundMapper.response(refund);
+        return response(refund);
     }
 
     @Override
@@ -155,7 +161,7 @@ public class RefundServiceImpl implements RefundService {
             if (!refund.matchesEvidence(evidence.transferReference(), evidence.proofReference())) {
                 throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
             }
-            return RefundMapper.response(refund);
+            return response(refund);
         }
 
         requireProcessing(refund);
@@ -168,7 +174,7 @@ public class RefundServiceImpl implements RefundService {
         refund.complete(evidence.transferReference(), evidence.proofReference(), now);
         record(refund, admin, Action.REFUNDED, null, now);
         outbox.save(new RefundResultOutboxEntity(refund, now));
-        return RefundMapper.response(refund);
+        return response(refund);
     }
 
     @Override
@@ -180,7 +186,7 @@ public class RefundServiceImpl implements RefundService {
             if (!failure.reason().equals(refund.getFailureReason())) {
                 throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
             }
-            return RefundMapper.response(refund);
+            return response(refund);
         }
 
         requireProcessing(refund);
@@ -188,7 +194,46 @@ public class RefundServiceImpl implements RefundService {
         Instant now = now();
         refund.fail(failure.reason(), now);
         record(refund, admin, Action.FAILED, failure.reason(), now);
-        return RefundMapper.response(refund);
+        return response(refund);
+    }
+
+    @Override
+    @Transactional
+    public RefundResponse saveReceipt(RefundSourceType type, UUID sourceId, UUID admin,
+            org.springframework.web.multipart.MultipartFile image) {
+        var refund = lock(type, sourceId);
+        if (refund.getStatus() != Status.PROCESSING && refund.getStatus() != Status.REFUNDED) {
+            throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+        }
+        requireAssigned(refund, admin);
+        var validated = receiptValidator.validate(image);
+        String hash;
+        try { hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(validated.content())); }
+        catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        var existing = receipts.findById(refund.getId());
+        if (existing.isPresent()) {
+            if (!hash.equals(existing.get().getContentSha256())) throw RefundErrorCode.REFUND_RECEIPT_CONFLICT.exception();
+        } else {
+            receipts.saveAndFlush(new com.stylemind.payment.entity.RefundTransferReceiptEntity(
+                    refund.getId(), validated.contentType(), validated.content(), hash, admin, now()));
+        }
+        return response(refund);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.stylemind.payment.dto.RefundReceiptImage receipt(RefundSourceType type, UUID sourceId, RefundActor actor) {
+        var refund = refunds.findBySourceTypeAndSourceId(type, sourceId).orElseThrow(RefundErrorCode.REFUND_NOT_FOUND::exception);
+        requireReadAccess(refund.getCustomerId(), actor);
+        if (!actor.admin() && refund.getStatus() != Status.REFUNDED) throw RefundErrorCode.REFUND_NOT_FOUND.exception();
+        var image = receipts.findById(refund.getId()).orElseThrow(RefundErrorCode.REFUND_NOT_FOUND::exception);
+        return new com.stylemind.payment.dto.RefundReceiptImage(image.getContentType(), image.getContent());
+    }
+
+    private RefundResponse response(RefundCaseEntity refund) { return response(refund, true); }
+
+    private RefundResponse response(RefundCaseEntity refund, boolean admin) {
+        return RefundMapper.response(refund, (admin || refund.getStatus() == Status.REFUNDED) && receipts.existsById(refund.getId()));
     }
 
     private RefundCaseEntity lock(RefundSourceType type, UUID id) {

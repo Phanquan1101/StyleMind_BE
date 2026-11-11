@@ -6,9 +6,9 @@ import com.stylemind.payment.entity.RefundCaseEntity;
 public final class RefundMapper {
     private RefundMapper() { }
 
-    public static RefundResponse response(RefundCaseEntity refund) {
+    public static RefundResponse response(RefundCaseEntity refund, boolean hasReceipt) {
         return new RefundResponse(refund.getId(), refund.getSourceType(), refund.getSourceId(), refund.getOrderId(),
                 refund.getAmountVnd(), refund.getStatus().name(), refund.getTransferReference(),
-                refund.getFailureReason(), refund.getRefundedAt(), refund.getUpdatedAt());
+                refund.getFailureReason(), refund.getRefundedAt(), refund.getUpdatedAt(), hasReceipt);
     }
 }

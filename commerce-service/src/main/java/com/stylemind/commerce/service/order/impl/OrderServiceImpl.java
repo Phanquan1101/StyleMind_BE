@@ -701,12 +701,14 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderResponse response(OrderDetail detail) {
         OrderSummary s = detail.summary();
+        var payment = orderRepository.paymentProgress(s.orderId());
         return new OrderResponse(s.orderId(), s.orderNumber(), s.customerId(), s.checkoutKey(),
                 s.orderStatus().name(), s.paymentMethod().name(), s.acceptedTotalVnd(), s.placedAt(),
                 s.completedAt(), addressResponse(detail.address()),
                 detail.items().stream().map(this::orderItemResponse).toList(),
                 detail.history().stream().map(this::historyResponse).toList(),
-                detail.cancellationRequest() == null ? null : cancellationResponse(detail.cancellationRequest()), s.confirmationState());
+                detail.cancellationRequest() == null ? null : cancellationResponse(detail.cancellationRequest()), s.confirmationState(),
+                payment.getPaymentStatus(), payment.getRefundedAmountVnd(), payment.getRefundStatus());
     }
 
     private CartItemResponse cartItemResponse(CartItem item) {
