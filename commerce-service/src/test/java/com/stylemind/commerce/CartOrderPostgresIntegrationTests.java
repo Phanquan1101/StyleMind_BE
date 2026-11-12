@@ -1061,6 +1061,46 @@ class CartOrderPostgresIntegrationTests {
     }
 
     @Test
+    void cartItemCanChangeVariantAndMergesWhenTheTargetIsAlreadyInTheCart() throws Exception {
+        UUID targetVariantId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO public.product_variant(variant_id, product_id, sku, color, size, unit_price_vnd, quantity, variant_status)
+                SELECT ?, product_id, 'SKU-BLACK-L', 'Black', 'L', 200000, 20, 'ACTIVE'
+                FROM public.product_variant WHERE variant_id = ?
+                """, targetVariantId, variantId);
+
+        JsonNode cart = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}"));
+        String sourceItemId = cart.path("items").get(0).path("cart_item_id").asText();
+        mockMvc.perform(put("/api/v1/cart/items/{id}", sourceItemId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"variant_id\":\"" + targetVariantId + "\",\"quantity\":3,\"guest_session_key\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].variant_id").value(targetVariantId.toString()))
+                .andExpect(jsonPath("$.items[0].color").value("Black"))
+                .andExpect(jsonPath("$.items[0].size").value("L"))
+                .andExpect(jsonPath("$.items[0].quantity").value(3))
+                .andExpect(jsonPath("$.total_vnd").value(600000));
+
+        JsonNode twoLines = json(postJson("/api/v1/cart/items", customerToken(),
+                "{\"variant_id\":\"" + variantId + "\",\"quantity\":2,\"guest_session_key\":null}"));
+        String newSourceItemId = java.util.stream.StreamSupport.stream(twoLines.path("items").spliterator(), false)
+                .filter(item -> item.path("variant_id").asText().equals(variantId.toString()))
+                .findFirst().orElseThrow().path("cart_item_id").asText();
+        mockMvc.perform(put("/api/v1/cart/items/{id}", newSourceItemId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"variant_id\":\"" + targetVariantId + "\",\"quantity\":2,\"guest_session_key\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].variant_id").value(targetVariantId.toString()))
+                .andExpect(jsonPath("$.items[0].quantity").value(5))
+                .andExpect(jsonPath("$.total_vnd").value(1000000));
+    }
+
+    @Test
     void mergeCombinesDuplicateVariantsAndRollsBackInvalidGuestCart() throws Exception {
         postJson("/api/v1/cart/items", null, """
                 {"variant_id":"%s","quantity":1,"guest_session_key":"guest-session-0002"}

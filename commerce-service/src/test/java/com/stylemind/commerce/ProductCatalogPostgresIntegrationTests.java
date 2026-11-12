@@ -238,6 +238,41 @@ class ProductCatalogPostgresIntegrationTests {
     }
 
     @Test
+    void publicProductsSortByLowestActiveVariantPriceBeforePagination() throws Exception {
+        UUID cheap = product("Cheap Product", "ACTIVE", null);
+        variant(cheap, "SKU-CHEAP", 100000, "ACTIVE");
+        variant(cheap, "SKU-CHEAP-INACTIVE", 1000, "INACTIVE");
+        UUID middle = product("Middle Product", "ACTIVE", null);
+        variant(middle, "SKU-MIDDLE-HIGH", 400000, "ACTIVE");
+        variant(middle, "SKU-MIDDLE-LOW", 200000, "ACTIVE");
+        UUID expensive = product("Expensive Product", "ACTIVE", null);
+        variant(expensive, "SKU-EXPENSIVE", 300000, "ACTIVE");
+
+        mockMvc.perform(get("/api/v1/products")
+                        .queryParam("sort", "price_asc")
+                        .queryParam("page", "0")
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_elements").value(3))
+                .andExpect(jsonPath("$.total_pages").value(2))
+                .andExpect(jsonPath("$.items[0].product_id").value(cheap.toString()))
+                .andExpect(jsonPath("$.items[1].product_id").value(middle.toString()));
+
+        mockMvc.perform(get("/api/v1/products")
+                        .queryParam("sort", "price_desc")
+                        .queryParam("page", "0")
+                        .queryParam("size", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].product_id").value(expensive.toString()))
+                .andExpect(jsonPath("$.items[1].product_id").value(middle.toString()))
+                .andExpect(jsonPath("$.items[2].product_id").value(cheap.toString()));
+
+        mockMvc.perform(get("/api/v1/products").queryParam("sort", "newest"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
     void variantImagesUploadReorderDeleteAndRejectInvalidFiles() throws Exception {
         UUID productId = product("Image Product", "ACTIVE", null);
         UUID variantId = variant(productId, "SKU-IMG", 100000, "ACTIVE");

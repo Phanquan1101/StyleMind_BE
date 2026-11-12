@@ -62,7 +62,7 @@ Valid variant body:
 | PRD-05 | Create/update a variant with same SKU, regardless of product. | `409 DUPLICATE_SKU`; SKU is globally unique and remains reserved after soft delete. |
 | PRD-06 | Variant boundary values: price 0 and 1,000,000,000; quantity 0; then price -1/over max/non-integer and quantity -1/non-integer. | Boundary values succeed; invalid values return `400`. Quantity must be non-negative, price is an integer within `[0, 1,000,000,000]`. |
 | PRD-07 | Invalid SKU (`"a"`, spaces, >64 chars), invalid status, strings >64 for size/color/material. | `400`; SKU pattern is `[A-Za-z0-9][A-Za-z0-9_-]{0,63}`. |
-| PRD-08 | `GET /products` with keyword, category, demographic, min/max price, pages; include active/inactive products and variants. | `200`; only active products with an active variant are listed. Filters apply; sort is name then ID; defaults `page=0,size=20`, maximum size 100. |
+| PRD-08 | `GET /products` with keyword, category, demographic, min/max price, `sort=price_asc|price_desc`, and pages; include active/inactive products and variants. | `200`; only active products with an active variant are listed. Price sort uses each product's lowest active-variant price before pagination; without `sort`, order is name then ID. Defaults `page=0,size=20`, maximum size 100. |
 | PRD-09 | `GET /products/{id}` for active product with active variant, inactive product, or product with all variants inactive. | `200` only for the first; otherwise `404`. Admin product detail still returns all variants/statuses. |
 | PRD-10 | List query invalidity: unsupported key, `min>max`, negative price/page, size 0/101, malformed category UUID, repeated value. | `400 INVALID_REQUEST`. |
 | PRD-11 | `POST /variants/batch-lookup` with 1–100 unique IDs including active/inactive/non-existent IDs. | `200`; response contains only active variants belonging to active products, with current quantity/price. Empty, >100 or duplicate IDs returns `400`. |
@@ -85,7 +85,7 @@ For anonymous cart calls put `guest_session_key` in JSON (POST/PUT) and `X-Guest
 | CART-02 | Guest and customer each `POST /cart/items` for V1 quantity 2. | `200`; an active cart is created; current price is stored and total is 200,000. Customer identity wins over an optional guest key in body. |
 | CART-03 | Add V1 quantity 2 twice. | One line item with quantity 4, not two lines; add is an upsert/increment. |
 | CART-04 | Add/update inactive/nonexistent V2. | `409 VARIANT_NOT_ACTIVE`; cart accepts only active variants on active products. |
-| CART-05 | Add 11 V1, update to 11, or add to an existing line above stock. | `409 INSUFFICIENT_STOCK`; cart quantity cannot exceed current available quantity. Cart does not reserve stock. |
+| CART-05 | Add 11 V1, update to 11, change an item to another active variant, or add to an existing line above stock. | Variant and quantity update together; an existing target-variant line is merged. `409 INSUFFICIENT_STOCK` when the resulting quantity exceeds current stock. Cart does not reserve stock. |
 | CART-06 | Add/update quantity 0, -1, 1000, decimal/string; invalid or missing guest key. | `400`; quantity is integer 1–999; guest key must match the stated 16–128 pattern when unauthenticated. |
 | CART-07 | Admin changes V1 price; GET cart and checkout preview. | Cart response/preview uses current variant price, not stale `last_seen_price_vnd`. |
 | CART-08 | Update/remove a cart item using CUSTOMER_B or different guest key. | `404`, not ownership leakage. |

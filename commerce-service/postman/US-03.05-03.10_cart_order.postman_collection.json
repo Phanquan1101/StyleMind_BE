@@ -9,6 +9,7 @@
     {"key": "adminToken", "value": ""},
     {"key": "guestSessionKey", "value": "guest-session-00000001"},
     {"key": "variantId", "value": ""},
+    {"key": "replacementVariantId", "value": ""},
     {"key": "cartItemId", "value": ""},
     {"key": "shippingAddressId", "value": ""},
     {"key": "orderId", "value": ""},
@@ -45,7 +46,7 @@
             "method": "PUT",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "url": "{{baseUrl}}/api/v1/cart/items/{{cartItemId}}",
-            "body": {"mode": "raw", "raw": "{\n  \"quantity\": 3,\n  \"guest_session_key\": \"{{guestSessionKey}}\"\n}"}
+            "body": {"mode": "raw", "raw": "{\n  \"variant_id\": \"{{replacementVariantId}}\",\n  \"quantity\": 3,\n  \"guest_session_key\": \"{{guestSessionKey}}\"\n}"}
           }
         },
         {
