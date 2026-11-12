@@ -26,7 +26,8 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
                     join public.image_asset a on a.image_asset_id = i.image_asset_id
                     where i.variant_id = v.variant_id
                     order by i.is_primary desc, i.display_order asc, i.image_id asc limit 1),
-                   (v.variant_status = 'ACTIVE' and p.product_status = 'ACTIVE' and c.is_active and b.is_active)
+                   (v.variant_status = 'ACTIVE' and p.product_status = 'ACTIVE' and c.is_active and b.is_active),
+                   c.category_id, c.name
             from public.product_variant v
             join public.product p on p.product_id = v.product_id
             join public.category c on c.category_id = p.category_id

@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 public interface OutfitItemRepository extends JpaRepository<OutfitItem, UUID> {
     List<OutfitItem> findByOutfitIdOrderByDisplayOrderAscOutfitItemIdAsc(UUID outfitId);
 
+    List<OutfitItem> findByOutfitIdIn(java.util.Collection<UUID> outfitIds);
+
     Optional<OutfitItem> findByOutfitItemIdAndOutfitId(UUID outfitItemId, UUID outfitId);
 
     @Query("select coalesce(max(i.displayOrder), -1) from OutfitItem i where i.outfitId = :outfitId")

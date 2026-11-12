@@ -22,7 +22,7 @@ public class InternalVariantLookupServiceImpl implements InternalVariantLookupSe
                 .map(row -> new InternalVariantItem(
                         (UUID) row[0], (UUID) row[1], (String) row[2], (String) row[3], (String) row[4],
                         (String) row[5], (String) row[6], ((Number) row[7]).longValue(), (String) row[8],
-                        (Boolean) row[9]))
+                        (Boolean) row[9], (UUID) row[10], (String) row[11]))
                 .toList());
     }
 }
