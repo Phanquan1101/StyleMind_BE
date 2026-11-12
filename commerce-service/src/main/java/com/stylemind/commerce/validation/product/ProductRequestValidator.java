@@ -35,7 +35,8 @@ public class ProductRequestValidator {
     private static final Set<String> VARIANT_FIELDS = Set.of(
             "sku", "size", "color", "material", "unit_price_vnd", "quantity", "variant_status");
     private static final Set<String> LIST_QUERY_FIELDS = Set.of(
-            "keyword", "category_id", "min_price_vnd", "max_price_vnd", "demographic_segment", "page", "size", "status");
+            "keyword", "category_id", "min_price_vnd", "max_price_vnd", "demographic_segment", "page", "size", "status", "sort");
+    private static final Set<String> PUBLIC_SORTS = Set.of("price_asc", "price_desc");
     private static final Set<String> IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
     private static final String SKU_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,63}";
@@ -123,6 +124,10 @@ public class ProductRequestValidator {
         } else {
             status = null;
         }
+        String sort = parameter(parameters, "sort");
+        if (sort != null && (admin || !PUBLIC_SORTS.contains(sort))) {
+            throw invalidRequest();
+        }
         Long minPrice = parseLong(parameter(parameters, "min_price_vnd"));
         Long maxPrice = parseLong(parameter(parameters, "max_price_vnd"));
         if ((minPrice != null && minPrice < 0) || (maxPrice != null && maxPrice < 0)
@@ -134,7 +139,7 @@ public class ProductRequestValidator {
         if (page < 0 || size < 1 || size > 100) {
             throw invalidRequest();
         }
-        return new ProductListCriteria(keyword, List.copyOf(categoryIds), minPrice, maxPrice, demographic, status, page, size);
+        return new ProductListCriteria(keyword, List.copyOf(categoryIds), minPrice, maxPrice, demographic, status, sort, page, size);
     }
 
     public List<UUID> variantIds(VariantBatchLookupRequest request) {

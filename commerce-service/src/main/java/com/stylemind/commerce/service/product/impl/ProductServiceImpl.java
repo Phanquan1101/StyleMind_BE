@@ -83,10 +83,14 @@ public class ProductServiceImpl implements ProductService {
     public ProductListResponse listPublicProducts(ProductListCriteria criteria) {
         String keyword = criteria.keyword() == null ? null
                 : "%" + criteria.keyword().toLowerCase(java.util.Locale.ROOT) + "%";
-        Page<Product> page = products.searchPublic(keyword, criteria.categoryIds().size(), categoryIdsOrNil(criteria), criteria.demographicSegment(),
-                criteria.minPriceVnd(), criteria.maxPriceVnd(),
-                PageRequest.of(criteria.page(), criteria.size(),
-                        Sort.by(Sort.Order.asc("name"), Sort.Order.asc("productId"))));
+        PageRequest pageable = PageRequest.of(criteria.page(), criteria.size());
+        Page<Product> page = criteria.sort() == null
+                ? products.searchPublic(keyword, criteria.categoryIds().size(), categoryIdsOrNil(criteria), criteria.demographicSegment(),
+                        criteria.minPriceVnd(), criteria.maxPriceVnd(), pageable.withSort(
+                                Sort.by(Sort.Order.asc("name"), Sort.Order.asc("productId"))))
+                : products.searchPublicByPrice(keyword, criteria.categoryIds().size(), categoryIdsOrNil(criteria),
+                        criteria.demographicSegment(), criteria.minPriceVnd(), criteria.maxPriceVnd(),
+                        criteria.sort(), pageable);
         List<ProductResponse> items = productResponses(page.getContent(), true);
         return new ProductListResponse(items, criteria.page(), criteria.size(), page.getTotalElements(),
                 page.getTotalPages());

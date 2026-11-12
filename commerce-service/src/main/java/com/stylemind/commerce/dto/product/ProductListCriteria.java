@@ -10,6 +10,7 @@ public record ProductListCriteria(
         Long maxPriceVnd,
         String demographicSegment,
         String status,
+        String sort,
         int page,
         int size) {
 

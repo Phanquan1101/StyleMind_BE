@@ -48,7 +48,8 @@ public class ProductController {
     @GetMapping(path = "/api/v1/products", produces = MediaType.APPLICATION_JSON_VALUE)
     @SecurityRequirements
     @Operation(summary = "List active products",
-            description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, page and size filters.")
+            description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, "
+                    + "sort (price_asc or price_desc), page and size filters.")
     public ProductListResponse listProducts(HttpServletRequest request) {
         ProductListCriteria criteria = validator.listCriteria(request);
         return productService.listPublicProducts(criteria);

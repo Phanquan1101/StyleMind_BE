@@ -112,7 +112,7 @@
             "method": "GET",
             "header": [],
             "auth": {"type": "noauth"},
-            "url": "{{baseUrl}}/api/v1/products?keyword=linen&category_id={{categoryId}}&min_price_vnd=100000&max_price_vnd=300000&demographic_segment=WOMEN&page=0&size=20"
+            "url": "{{baseUrl}}/api/v1/products?keyword=linen&category_id={{categoryId}}&min_price_vnd=100000&max_price_vnd=300000&demographic_segment=WOMEN&sort=price_asc&page=0&size=20"
           },
           "event": [{
             "listen": "test",

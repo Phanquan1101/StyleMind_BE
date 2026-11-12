@@ -55,10 +55,26 @@ public class CartServiceImpl implements CartService {
         requireItemOwner(owner, cartItemId);
         CartItem existing = items(cartId).stream()
                 .filter(item -> item.cartItemId().equals(cartItemId)).findFirst().orElseThrow(this::notFound);
-        VariantPurchaseInfo variant = activeVariant(existing.variantId());
-        requireAvailable(command.quantity(), variant.availableQuantity());
-        if (updateItem(cartItemId, command.quantity(), variant.unitPriceVnd()) != 1) {
-            throw notFound();
+        UUID targetVariantId = command.variantId() == null ? existing.variantId() : command.variantId();
+        VariantPurchaseInfo variant = activeVariant(targetVariantId);
+        if (existing.variantId().equals(targetVariantId)) {
+            requireAvailable(command.quantity(), variant.availableQuantity());
+            if (updateItem(cartItemId, targetVariantId, command.quantity(), variant.unitPriceVnd()) != 1) {
+                throw notFound();
+            }
+        } else {
+            var target = cartItems.findByCartIdAndVariantId(cartId, targetVariantId);
+            if (target.isPresent() && !target.get().getCartItemId().equals(cartItemId)) {
+                int mergedQuantity = target.get().getQuantity() + command.quantity();
+                requireAvailable(mergedQuantity, variant.availableQuantity());
+                updateItem(target.get().getCartItemId(), targetVariantId, mergedQuantity, variant.unitPriceVnd());
+                deleteItem(cartItemId);
+            } else {
+                requireAvailable(command.quantity(), variant.availableQuantity());
+                if (updateItem(cartItemId, targetVariantId, command.quantity(), variant.unitPriceVnd()) != 1) {
+                    throw notFound();
+                }
+            }
         }
         return response(cart(cartId));
     }
@@ -174,9 +190,9 @@ public class CartServiceImpl implements CartService {
         item.setLastSeenPriceVnd(price); item.setUpdatedAt(OffsetDateTime.now()); cartItems.saveAndFlush(item); touch(cartId);
     }
 
-    private int updateItem(UUID id, int quantity, long price) {
+    private int updateItem(UUID id, UUID variantId, int quantity, long price) {
         var found = cartItems.findById(id); if (found.isEmpty()) return 0;
-        var item = found.get(); item.setQuantity(quantity); item.setLastSeenPriceVnd(price); item.setUpdatedAt(OffsetDateTime.now()); cartItems.saveAndFlush(item); touch(item.getCartId()); return 1;
+        var item = found.get(); item.setVariantId(variantId); item.setQuantity(quantity); item.setLastSeenPriceVnd(price); item.setUpdatedAt(OffsetDateTime.now()); cartItems.saveAndFlush(item); touch(item.getCartId()); return 1;
     }
 
     private int deleteItem(UUID id) { if (!cartItems.existsById(id)) return 0; cartItems.deleteById(id); return 1; }
