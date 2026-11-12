@@ -83,7 +83,7 @@ class FriendsPersistencePostgresTests {
         assertThat(jdbc.queryForList("""
                 SELECT version FROM public.flyway_schema_history
                 WHERE version IS NOT NULL AND success ORDER BY installed_rank
-                """, String.class)).containsExactly("1", "2", "3", "4", "5", "6");
+                """, String.class)).containsExactly("1", "2", "3", "4", "5", "6", "7");
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history' ORDER BY table_name

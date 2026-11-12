@@ -201,6 +201,13 @@ class ChatImagesApiPostgresIntegrationTests {
         var badSubject=new HttpHeaders();badSubject.setBearerAuth(token("bad-subject",List.of("CUSTOMER")));
         assertThat(http.exchange(readPath,HttpMethod.GET,new HttpEntity<>(badSubject),String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+    @Test void realMultipartAcceptsTenMiBAndReturnsItsPrivateMetadata() throws Exception {
+        png=Arrays.copyOf(png,10 * 1024 * 1024);
+        var response=upload(A,UUID.randomUUID(),null,1);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(mapper.readTree(response.getBody()).path("attachments").get(0).path("size_bytes").asLong())
+                .isEqualTo(10 * 1024 * 1024);
+    }
     @Test void realMultipartServletLimitReturnsSanitized413BeforeCloudUpload(){
         png=Arrays.copyOf(png,com.stylemind.wardrobecommunity.validation.chat.ChatImageRequestValidator.MAX_BYTES+1);
         var response=upload(A,UUID.randomUUID(),null,1);

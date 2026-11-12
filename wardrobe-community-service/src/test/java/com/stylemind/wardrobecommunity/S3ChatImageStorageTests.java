@@ -40,7 +40,7 @@ class S3ChatImageStorageTests {
             }
             request.close();
         });server.start();
-        byte[] bytes=ChatImageRequestValidatorTests.picture("png");
+        byte[] bytes=java.util.Arrays.copyOf(ChatImageRequestValidatorTests.picture("png"),10 * 1024 * 1024);
         try(var storage=new CloseableStorage(configured())){
             storage.value.put("chat/v1/test-image.png",new ChatImage(bytes,"image/png",ChatImageRequestValidator.sha256(bytes)));
             assertThat(storage.value.get("chat/v1/test-image.png").bytes()).isEqualTo(bytes);
