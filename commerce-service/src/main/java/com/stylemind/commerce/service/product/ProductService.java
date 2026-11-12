@@ -23,6 +23,8 @@ public interface ProductService {
 
     ProductListResponse listPublicProducts(ProductListCriteria criteria);
 
+    ProductListResponse listAdminProducts(ProductListCriteria criteria);
+
     ProductResponse getPublicProduct(UUID productId);
 
     ProductResponse getAdminProduct(UUID productId);

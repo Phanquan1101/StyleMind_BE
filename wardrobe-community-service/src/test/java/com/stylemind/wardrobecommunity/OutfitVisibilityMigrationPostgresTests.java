@@ -250,7 +250,7 @@ class OutfitVisibilityMigrationPostgresTests {
 
     private int migrate(DriverManagerDataSource source, String target) {
         var config = Flyway.configure().dataSource(source);
-        if (target != null) config.target(MigrationVersion.fromVersion(target));
+        config.target(MigrationVersion.fromVersion(target == null ? "6" : target));
         return config.load().migrate().migrationsExecuted;
     }
 

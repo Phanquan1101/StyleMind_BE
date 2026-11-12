@@ -48,7 +48,8 @@ public class ProductController {
     @GetMapping(path = "/api/v1/products", produces = MediaType.APPLICATION_JSON_VALUE)
     @SecurityRequirements
     @Operation(summary = "List active products",
-            description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, page and size filters.")
+            description = "Supports keyword, category_id, min_price_vnd, max_price_vnd, demographic_segment, "
+                    + "sort (price_asc or price_desc), page and size filters.")
     public ProductListResponse listProducts(HttpServletRequest request) {
         ProductListCriteria criteria = validator.listCriteria(request);
         return productService.listPublicProducts(criteria);
@@ -67,6 +68,13 @@ public class ProductController {
     @Operation(summary = "Batch lookup active variants with current prices")
     public VariantBatchLookupResponse batchLookup(@RequestBody VariantBatchLookupRequest request) {
         return productService.activeVariantLookup(validator.variantIds(request));
+    }
+
+    @GetMapping(path = "/api/v1/admin/products", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List products of every status (ADMIN only)",
+            description = "Filters: keyword (name or SKU), category_id (repeatable), status, page, size (max 100).")
+    public ProductListResponse listAdminProducts(HttpServletRequest request) {
+        return productService.listAdminProducts(validator.adminListCriteria(request));
     }
 
     @PostMapping(path = "/api/v1/admin/products", consumes = MediaType.APPLICATION_JSON_VALUE,

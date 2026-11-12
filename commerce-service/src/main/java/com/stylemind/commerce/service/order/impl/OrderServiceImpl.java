@@ -286,6 +286,19 @@ public class OrderServiceImpl implements OrderService {
                 result.getTotalElements(), result.getTotalPages());
     }
 
+    /** Open QR checkouts plus the ones that expired in the last 24 hours, so the order list can show "Đã hết hạn". */
+    @Transactional(readOnly = true)
+    public QrCheckoutListResponse listRecentUnpaidQrCheckouts(UUID customerId, OrderRequestValidator.ListCriteria criteria) {
+        var pageable = PageRequest.of(criteria.page(), criteria.size(),
+                Sort.by(Sort.Direction.DESC, "createdAt", "checkoutId"));
+        var result = qrCheckoutRepository.findRecentUnpaid(customerId, OffsetDateTime.now().minusHours(24), pageable);
+        var items = result.getContent().stream().map(checkout -> new QrCheckoutListResponse.Item(
+                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getTotalVnd(),
+                checkout.getCreatedAt(), checkout.getExpiresAt())).toList();
+        return new QrCheckoutListResponse(items, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
+    }
+
     @Transactional(readOnly = true)
     public OrderResponse get(UUID customerId, boolean admin, UUID orderId) {
         OrderSummary summary = findSummary(orderId).orElseThrow(this::notFound);

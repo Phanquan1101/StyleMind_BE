@@ -1,0 +1,12 @@
+# Local demo override: send all e-mail to Mailpit instead of a real SMTP provider.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.mailpit.yml --project-name stylemind-task4 up -d
+# Read the e-mails (OTP, invitations) at http://localhost:8025. Local use only.
+services:
+  notification-service:
+    environment:
+      STYLEMIND_SMTP_HOST: mailpit
+      STYLEMIND_SMTP_PORT: "1025"
+      STYLEMIND_SMTP_USERNAME: ""
+      STYLEMIND_SMTP_PASSWORD: ""
+      STYLEMIND_SMTP_AUTH: "false"
+      STYLEMIND_SMTP_STARTTLS: "false"

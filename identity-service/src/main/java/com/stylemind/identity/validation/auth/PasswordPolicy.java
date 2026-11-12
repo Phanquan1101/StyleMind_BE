@@ -14,7 +14,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface PasswordPolicy {
 
-    String message() default "Password does not meet the registration length requirements";
+    String message() default "Mật khẩu phải có từ 12 ký tự trở lên (tối đa 72 byte)";
 
     Class<?>[] groups() default {};
 

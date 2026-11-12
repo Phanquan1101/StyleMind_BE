@@ -15,5 +15,15 @@ public record VariantLookupItem(
         String size,
         @JsonProperty("unit_price_vnd") long unitPriceVnd,
         @JsonProperty("primary_image_url") String primaryImageUrl,
-        boolean purchasable) {
+        boolean purchasable,
+        @JsonProperty("category_id") UUID categoryId,
+        @JsonProperty("category_name") String categoryName) {
+
+    /** Convenience for callers (and older Commerce replies) without category data. */
+    public VariantLookupItem(UUID variantId, UUID productId, String productName, String productStatus,
+            String variantStatus, String color, String size, long unitPriceVnd, String primaryImageUrl,
+            boolean purchasable) {
+        this(variantId, productId, productName, productStatus, variantStatus, color, size, unitPriceVnd,
+                primaryImageUrl, purchasable, null, null);
+    }
 }

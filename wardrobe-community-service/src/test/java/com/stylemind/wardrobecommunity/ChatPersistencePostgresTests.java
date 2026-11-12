@@ -92,8 +92,8 @@ class ChatPersistencePostgresTests {
     }
 
     @Test
-    void freshV6AndAllJpaMappingsValidateWithOnlyLocalNonCascadingForeignKeys() {
-        assertThat(versions(jdbc)).containsExactly("1", "2", "3", "4", "5", "6");
+    void freshV7AndAllJpaMappingsValidateWithOnlyLocalNonCascadingForeignKeys() {
+        assertThat(versions(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
                 JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -346,10 +346,20 @@ class ChatPersistencePostgresTests {
     }
 
     @Test
+    void imageSizeAllowsTenMiBAndPreservesExistingFiveMiBMetadata() {
+        ChatSession ab = conversation(A, B);
+        ChatMessage saved = messages.saveAndFlush(message(ab.getChatSessionId(), A, 1, null));
+        attachments.saveAndFlush(attachment(saved.getChatMessageId(), 1, "image/png", 5 * 1024 * 1024));
+        attachments.saveAndFlush(attachment(saved.getChatMessageId(), 2, "image/png", 10 * 1024 * 1024));
+        assertThat(attachments.findByChatMessageIdOrderByDisplayOrderAsc(saved.getChatMessageId()))
+                .extracting(ChatAttachment::getSizeBytes).containsExactly(5242880L, 10485760L);
+    }
+
+    @Test
     void imageMetadataRejectsZeroNegativeOversizedUnsupportedMimeAndMissingMessage() {
         ChatSession ab = conversation(A, B);
         ChatMessage saved = messages.saveAndFlush(message(ab.getChatSessionId(), A, 1, null));
-        for (long size : new long[] {0, -1, 5242881}) {
+        for (long size : new long[] {0, -1, 10485761}) {
             violation("23514", () -> attachments.saveAndFlush(attachment(saved.getChatMessageId(), 1, "image/jpeg", size)));
         }
         for (String type : List.of("image/gif", "image/svg+xml", "application/octet-stream", "image/jpg", "IMAGE/PNG")) {
@@ -402,7 +412,7 @@ class ChatPersistencePostgresTests {
             sessions.saveAndFlush(locked);
             ChatMessage saved = messages.saveAndFlush(message(ab.getChatSessionId(), A, 1, null));
             attachments.saveAndFlush(attachment(saved.getChatMessageId(), 1, "image/png", 1));
-            attachments.saveAndFlush(attachment(saved.getChatMessageId(), 2, "image/png", 5242881));
+            attachments.saveAndFlush(attachment(saved.getChatMessageId(), 2, "image/png", 10485761));
         }));
         assertThat(sessions.findById(ab.getChatSessionId()).orElseThrow().getLastSequenceNumber()).isZero();
         assertThat(sessions.findById(ab.getChatSessionId()).orElseThrow().getUpdatedAt()).isEqualTo(NOW);

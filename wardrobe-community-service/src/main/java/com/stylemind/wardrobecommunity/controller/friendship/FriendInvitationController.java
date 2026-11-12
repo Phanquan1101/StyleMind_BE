@@ -75,6 +75,22 @@ public class FriendInvitationController {
         return result(service.accept(actor,common.friendAccountId(invitationId),null));
     }
 
+    @PostMapping(path="/{invitationId}/cancel",consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary="Withdraw a pending invitation",description="Body {}. Sender only. The invitation becomes INVALIDATED and a new one can be sent afterwards.")
+    public ResponseEntity<FriendInvitationActionResponse> cancel(Authentication authentication,
+            @PathVariable String invitationId,@RequestBody String body,HttpServletRequest request) {
+        UUID actor=actor(authentication); common.noQuery(request); validator.empty(body);
+        return result(service.cancel(actor,common.friendAccountId(invitationId)));
+    }
+
+    @PostMapping(path="/{invitationId}/decline",consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary="Decline an incoming invitation",description="Body {}. Recipient (current verified email) only.")
+    public ResponseEntity<FriendInvitationActionResponse> decline(Authentication authentication,
+            @PathVariable String invitationId,@RequestBody String body,HttpServletRequest request) {
+        UUID actor=actor(authentication); common.noQuery(request); validator.empty(body);
+        return result(service.decline(actor,common.friendAccountId(invitationId)));
+    }
+
     @PostMapping(path="/accept",consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="Accept using an emailed credential",description="Current verified recipient is required even with a valid link. Opening an email or GET never accepts.",
         requestBody=@io.swagger.v3.oas.annotations.parameters.RequestBody(required=true,

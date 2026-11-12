@@ -19,6 +19,10 @@ allowChatImageTest=false và allowUnfriendTest=false mặc định. Cờ đầu 
 
 imagePath dùng PNG vì collection cố ý kiểm tra PNG signature và case giả MIME image/jpeg. JPEG/WebP và size/40MP boundaries có automated backend tests; không dùng ảnh cá nhân. Thay imagePath trong script file part bằng path môi trường sau guards, không gắn cứng file máy tác giả.
 
+## Cập nhật 12/11/2026
+
+Wardrobe V7 nâng giới hạn lên 10 MiB/ảnh, tối đa 5 ảnh và multipart tổng 52 MiB. Chạy lại Wardrobe để Flyway áp dụng V7 trước khi thử file lớn hơn 5 MiB. Kiểm thử giới hạn sử dụng PostgreSQL cô lập.
+
 ## Multipart contract
 
 POST /api/v1/chats/{chatId}/messages, multipart/form-data:
@@ -28,7 +32,7 @@ POST /api/v1/chats/{chatId}/messages, multipart/form-data:
 | message | JSON, Content-Type application/json; client_message_id UUID và content string tùy chọn/null |
 | images | File part lặp 1–5 lần; thứ tự upload là display order |
 
-metadata không cần filename. Ảnh tối đa 5 MiB và 40 megapixel; JPG/JPEG/PNG/WebP được nhận dạng/decode từ bytes. Omit/null content để image-only; supplied caption phải nonblank và <=4.000 code points. Không nhận URL/key/sender từ client. JSON text endpoint vẫn giữ contract riêng; client key chung namespace theo chat + sender.
+metadata không cần filename. Ảnh tối đa 10 MiB và 40 megapixel; JPG/JPEG/PNG/WebP được nhận dạng/decode từ bytes. Omit/null content để image-only; supplied caption phải nonblank và <=4.000 code points. Không nhận URL/key/sender từ client. JSON text endpoint vẫn giữ contract riêng; client key chung namespace theo chat + sender.
 
 201 mới, 200 identical ordered retry, 409 IDEMPOTENCY_CONFLICT; 400 malformed image/metadata/count/40MP; 413 servlet multipart size; 401/403 auth; 404 inaccessible image/chat; 503 private storage unavailable hoặc processor busy.
 

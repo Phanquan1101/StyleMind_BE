@@ -13,5 +13,7 @@ public record InternalVariantItem(
         String size,
         @JsonProperty("unit_price_vnd") long unitPriceVnd,
         @JsonProperty("primary_image_url") String primaryImageUrl,
-        boolean purchasable) {
+        boolean purchasable,
+        @JsonProperty("category_id") UUID categoryId,
+        @JsonProperty("category_name") String categoryName) {
 }

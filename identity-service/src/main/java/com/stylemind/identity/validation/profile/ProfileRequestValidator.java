@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.identity.dto.profile.PatchMyProfileRequest;
 import com.stylemind.identity.dto.profile.ReplaceStyleProfileRequest;
 import com.stylemind.identity.errors.ApiOperationException;
+import com.stylemind.identity.errors.FieldError;
 import com.stylemind.identity.dto.profile.StyleProfileUpdateRequest;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import com.stylemind.identity.errors.ErrorCode;
 import org.springframework.stereotype.Component;
@@ -22,17 +24,41 @@ public final class ProfileRequestValidator {
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]{0,63}");
     private static final Pattern HYPHENATED_UUID = Pattern.compile(
             "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-    private static final BigDecimal MIN_HEIGHT_CM = new BigDecimal("50.0");
-    private static final BigDecimal MAX_HEIGHT_CM = new BigDecimal("250.0");
-    private static final BigDecimal MIN_WEIGHT_KG = new BigDecimal("20.0");
-    private static final BigDecimal MAX_WEIGHT_KG = new BigDecimal("300.0");
+    private static final BigDecimal MIN_HEIGHT_CM = new BigDecimal("100");
+    private static final BigDecimal MAX_HEIGHT_CM = new BigDecimal("230");
+    private static final BigDecimal MIN_WEIGHT_KG = new BigDecimal("30");
+    private static final BigDecimal MAX_WEIGHT_KG = new BigDecimal("200");
     private static final int MAX_COLLECTION_SIZE = 50;
+
+    // Allowed clothing/shoe sizes. Keep in sync with the dropdowns in the web app (profile form).
+    private static final List<String> TOP_SIZES = List.of("XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL");
+    private static final Set<String> BOTTOM_SIZES = buildBottomSizes();
+    private static final Set<String> SHOE_SIZES = buildRange(34, 46, 1);
+
+    private static Set<String> buildRange(int from, int to, int step) {
+        Set<String> values = new java.util.LinkedHashSet<>();
+        for (int value = from; value <= to; value += step) {
+            values.add(Integer.toString(value));
+        }
+        return values;
+    }
+
+    private static Set<String> buildBottomSizes() {
+        Set<String> values = new java.util.LinkedHashSet<>(TOP_SIZES);
+        values.addAll(buildRange(24, 40, 1));
+        values.addAll(buildRange(0, 18, 2));
+        return values;
+    }
 
     public String validatePatch(PatchMyProfileRequest request) {
         if (request == null || !request.getUnknownProperties().isEmpty() || !request.isDisplayNamePresent()) {
             throw invalidRequest();
         }
-        return displayName(request.getDisplayName());
+        List<FieldError> errors = new ArrayList<>();
+        String name = collect(errors, "display_name", "Tên hiển thị phải từ 1 đến 100 ký tự và không chứa ký tự điều khiển",
+                () -> displayName(request.getDisplayName()));
+        throwIfAny(errors);
+        return name;
     }
 
     public StyleProfileUpdateRequest validateReplacement(ReplaceStyleProfileRequest request) {
@@ -44,16 +70,59 @@ public final class ProfileRequestValidator {
             throw invalidRequest();
         }
 
-        return new StyleProfileUpdateRequest(
-                optionalCode(request.getFitPreference()),
-                height(request.getHeightCm()),
-                weight(request.getWeightKg()),
-                optionalLabel(request.getUsualTopSize(), 32),
-                optionalLabel(request.getUsualBottomSize(), 32),
-                optionalLabel(request.getShoeSize(), 32),
-                codes(request.getStyleCodes()),
-                codes(request.getColorCodes()),
-                brandIds(request.getBrandIds()));
+        List<FieldError> errors = new ArrayList<>();
+        String fit = collect(errors, "fit_preference", "Dáng mặc vừa không hợp lệ", () -> optionalCode(request.getFitPreference()));
+        BigDecimal height = collect(errors, "height_cm", "Chiều cao phải từ 100 đến 230 cm (tối đa 1 chữ số thập phân)",
+                () -> height(request.getHeightCm()));
+        BigDecimal weight = collect(errors, "weight_kg", "Cân nặng phải từ 30 đến 200 kg (tối đa 1 chữ số thập phân)",
+                () -> weight(request.getWeightKg()));
+        String top = collect(errors, "usual_top_size", "Cỡ áo phải là một trong: " + String.join(", ", TOP_SIZES),
+                () -> size(request.getUsualTopSize(), new java.util.LinkedHashSet<>(TOP_SIZES)));
+        String bottom = collect(errors, "usual_bottom_size", "Cỡ quần/váy phải là chữ (XS–4XL), số 24–40 hoặc số chẵn 0–18",
+                () -> size(request.getUsualBottomSize(), BOTTOM_SIZES));
+        String shoe = collect(errors, "shoe_size", "Cỡ giày phải là số nguyên từ 34 đến 46",
+                () -> size(request.getShoeSize(), SHOE_SIZES));
+        List<String> styles = collect(errors, "style_codes", "Danh sách phong cách không hợp lệ", () -> codes(request.getStyleCodes()));
+        List<String> colors = collect(errors, "color_codes", "Danh sách màu không hợp lệ", () -> codes(request.getColorCodes()));
+        List<UUID> brands = collect(errors, "brand_ids", "Danh sách thương hiệu không hợp lệ", () -> brandIds(request.getBrandIds()));
+        throwIfAny(errors);
+        return new StyleProfileUpdateRequest(fit, height, weight, top, bottom, shoe, styles, colors, brands);
+    }
+
+    private <T> T collect(List<FieldError> errors, String field, String message, Supplier<T> parser) {
+        try {
+            return parser.get();
+        } catch (ApiOperationException exception) {
+            errors.add(new FieldError(field, "INVALID_VALUE", message));
+            return null;
+        }
+    }
+
+    private static void throwIfAny(List<FieldError> errors) {
+        if (!errors.isEmpty()) {
+            throw ApiOperationException.invalidFields(errors);
+        }
+    }
+
+    /** A size from a fixed list; JSON null means "not set". Common aliases (XXL, XXXL) are normalised. */
+    private String size(JsonNode node, Set<String> allowed) {
+        if (isJsonNull(node)) {
+            return null;
+        }
+        if (!node.isTextual()) {
+            throw invalidRequest();
+        }
+        String value = trimUnicodeWhitespace(node.textValue()).toUpperCase(Locale.ROOT);
+        value = switch (value) {
+            case "XXL" -> "2XL";
+            case "XXXL" -> "3XL";
+            case "XXXXL" -> "4XL";
+            default -> value;
+        };
+        if (!allowed.contains(value)) {
+            throw invalidRequest();
+        }
+        return value;
     }
 
     private String displayName(JsonNode node) {

@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.Locale;
 
 public record RegisterRequest(
-        @NotBlank @Email String email,
-        @NotBlank @PasswordPolicy String password) {
+        @NotBlank(message = "Vui lòng nhập email") @Email(message = "Email không hợp lệ") String email,
+        @NotBlank(message = "Vui lòng nhập mật khẩu") @PasswordPolicy String password) {
 
     public RegisterRequest {
         email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);

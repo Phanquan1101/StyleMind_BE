@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import java.util.List;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,7 +25,17 @@ public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ProblemDetail> invalidFields(MethodArgumentNotValidException exception, HttpServletRequest request) {
+        List<FieldError> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldError(error.getField(), error.getCode() == null ? "INVALID" : error.getCode(),
+                        error.getDefaultMessage() == null ? "Giá trị không hợp lệ" : error.getDefaultMessage()))
+                .toList();
+        return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
+                "INVALID_REQUEST", request, errors);
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class,
             MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
     public ResponseEntity<ProblemDetail> invalidRequest(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Bad Request", "Request is missing or malformed",
@@ -56,7 +67,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<ProblemDetail> operationFailure(
             ApiOperationException exception, HttpServletRequest request) {
         return response(exception.status(), exception.status().getReasonPhrase(), exception.detail(),
-                exception.code(), request);
+                exception.code(), request, exception.fieldErrors());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -77,10 +88,24 @@ public class ApiExceptionHandler {
             String detail,
             String code,
             HttpServletRequest request) {
+        return response(status, title, detail, code, request, List.of());
+    }
+
+    private ResponseEntity<ProblemDetail> response(
+            HttpStatus status,
+            String title,
+            String detail,
+            String code,
+            HttpServletRequest request,
+            List<FieldError> fieldErrors) {
+        ProblemDetail body = ApiProblemDetails.create(status, title, detail, code, request);
+        if (!fieldErrors.isEmpty()) {
+            body.setProperty("errors", fieldErrors);
+        }
         return ResponseEntity.status(status)
                 .headers(headers -> {
                     if (request.getRequestURI().startsWith("/api/v1/guest/")) headers.setCacheControl("no-store");
                 })
-                .body(ApiProblemDetails.create(status, title, detail, code, request));
+                .body(body);
     }
 }

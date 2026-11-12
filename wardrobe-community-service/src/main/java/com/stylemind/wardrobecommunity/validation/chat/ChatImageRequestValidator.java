@@ -30,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Component
 public class ChatImageRequestValidator {
-    public static final int MAX_BYTES = 5 * 1024 * 1024;
+    public static final int MAX_BYTES = 10 * 1024 * 1024;
     public static final long MAX_PIXELS = 40_000_000;
     private final ObjectReader reader;
     private final ChatSessionRequestValidator sessions;

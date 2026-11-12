@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 public class CartRequestValidator {
 
     private static final Set<String> ITEM_FIELDS = Set.of("variant_id", "quantity", "guest_session_key");
-    private static final Set<String> UPDATE_FIELDS = Set.of("quantity", "guest_session_key");
+    private static final Set<String> UPDATE_FIELDS = Set.of("variant_id", "quantity", "guest_session_key");
+    private static final Set<String> LEGACY_UPDATE_FIELDS = Set.of("quantity", "guest_session_key");
     private static final Set<String> MERGE_FIELDS = Set.of("guest_session_key");
     private static final String GUEST_PATTERN = "[A-Za-z0-9._:-]{16,128}";
 
@@ -47,8 +48,16 @@ public class CartRequestValidator {
     }
 
     public CartItemCommand updateCommand(JsonNode body) {
-        requireFields(body, UPDATE_FIELDS);
-        return new CartItemCommand(null, quantity(body.get("quantity")), optionalGuestKey(body));
+        if (body == null || !body.isObject()) {
+            throw invalidRequest();
+        }
+        Set<String> actual = new java.util.HashSet<>();
+        body.fieldNames().forEachRemaining(actual::add);
+        if (!actual.equals(UPDATE_FIELDS) && !actual.equals(LEGACY_UPDATE_FIELDS)) {
+            throw invalidRequest();
+        }
+        UUID variantId = actual.contains("variant_id") ? uuid(text(body, "variant_id", false)) : null;
+        return new CartItemCommand(variantId, quantity(body.get("quantity")), optionalGuestKey(body));
     }
 
     public String mergeGuestKey(JsonNode body) {

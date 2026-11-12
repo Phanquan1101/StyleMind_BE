@@ -24,7 +24,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 /** Private S3-compatible storage. Configuration is operator-owned; no account/bucket creation or local fallback. */
 @Component
 public class S3ChatImageStorage implements ChatImageStorage {
-    private static final int MAX_BYTES = 5 * 1024 * 1024;
+    private static final int MAX_BYTES = com.stylemind.wardrobecommunity.validation.chat.ChatImageRequestValidator.MAX_BYTES;
     private final boolean enabled;
     private final String bucket;
     private final String endpoint;
@@ -41,6 +41,7 @@ public class S3ChatImageStorage implements ChatImageStorage {
         this.endpoint = endpoint;
         this.region = region;
     }
+    @Override public boolean isAvailable() { return enabled && !bucket.isBlank() && !region.isBlank(); }
     @Override public void requireAvailable() {
         if (!enabled || bucket.isBlank() || region.isBlank()) { throw unavailable(); }
     }

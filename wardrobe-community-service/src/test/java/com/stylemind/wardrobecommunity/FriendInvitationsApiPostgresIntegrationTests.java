@@ -136,7 +136,9 @@ class FriendInvitationsApiPostgresIntegrationTests {
     @Test void recipientCanRegisterLaterAndOnlyTheMatchingVerifiedAccountCanAccept() throws Exception {
         accounts.remove(B);var first=create(A,email(B),201);UUID id=UUID.fromString(first.path("friend_invitation_id").asText());
         String linkBody=linkBody(id,emails.getFirst());
-        call(post(PATH+"/accept"),C,linkBody).andExpect(status().isNotFound());
+        // A valid link opened by another account is refused with a hint (masked) that it belongs to a different address.
+        call(post(PATH+"/accept"),C,linkBody).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("INVITATION_WRONG_ACCOUNT")).andExpect(jsonPath("$.recipient_hint").exists());
         accounts.put(B,new AccountEmailVerificationItem(B,email(B),"ACTIVE",null));
         call(post(PATH+"/accept"),B,linkBody).andExpect(status().isForbidden());
         accounts.put(B,facts(B,email(B)));

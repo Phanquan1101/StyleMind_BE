@@ -120,7 +120,11 @@ public class FriendInvitationPersistenceService {
             if(active(pair))return result(row,"ALREADY_FRIENDS",true,200,now());
             throw failure(HttpStatus.CONFLICT,"INVITATION_ALREADY_USED",0,null);
         }
-        if(!currentEmail.equals(row.getRecipientEmail()))throw notFound();
+        if(!currentEmail.equals(row.getRecipientEmail())) {
+            // With a valid link credential the holder may be told the invitation is meant for another account (masked address).
+            if(token!=null)throw new FriendInvitationFailure(HttpStatus.FORBIDDEN,"INVITATION_WRONG_ACCOUNT",0,null,mask(row.getRecipientEmail()));
+            throw notFound();
+        }
         OffsetDateTime now=later(now(),row.getTokenIssuedAt());
         Friendship pair=pair(actor,row.getSenderAccountId());
         if("INVALIDATED".equals(row.getStatus()) || invalidated(row,pair))
@@ -139,6 +143,40 @@ public class FriendInvitationPersistenceService {
         pair.setEstablishedAt(now); pair.setUnfriendedAt(null); pair.setUpdatedAt(later(now,pair.getUpdatedAt()));
         friendships.saveAndFlush(pair); invitations.saveAndFlush(row);
         return result(row,"FRIENDSHIP_ACCEPTED",true,200,now);
+    }
+
+    /** Sender withdraws a pending invitation. Reuses the INVALIDATED state, so no schema change; a new invitation can be sent afterwards. */
+    @Transactional
+    public InvitationActionResult cancel(UUID actor,UUID id) {
+        mutationLock.acquire();
+        FriendInvitation row=invitations.findLockedByFriendInvitationIdAndSenderAccountId(id,actor)
+                .orElseThrow(FriendInvitationPersistenceService::notFound);
+        return close(row,"INVITATION_CANCELLED");
+    }
+
+    /** Recipient (current verified email) refuses a pending invitation. */
+    @Transactional
+    public InvitationActionResult decline(UUID actor,String currentEmail,UUID id) {
+        mutationLock.acquire();
+        FriendInvitation row=invitations.findLockedByFriendInvitationId(id).orElseThrow(FriendInvitationPersistenceService::notFound);
+        if(actor.equals(row.getSenderAccountId()) || !currentEmail.equals(row.getRecipientEmail()))throw notFound();
+        return close(row,"INVITATION_DECLINED");
+    }
+
+    private InvitationActionResult close(FriendInvitation row,String outcome) {
+        OffsetDateTime now=later(now(),row.getTokenIssuedAt());
+        if("ACCEPTED".equals(row.getStatus()))throw failure(HttpStatus.CONFLICT,"INVITATION_ALREADY_USED",0,row.getFriendInvitationId());
+        if("PENDING".equals(row.getStatus()) && now.isBefore(row.getExpiresAt())) {
+            row.setStatus("INVALIDATED"); row.setUpdatedAt(later(now,row.getUpdatedAt())); invitations.saveAndFlush(row);
+            return result(row,outcome,false,200,now);
+        }
+        return result(row,"INVITATION_ALREADY_CLOSED",false,200,now);
+    }
+
+    private static String mask(String email) {
+        int at=email.indexOf('@');
+        if(at<=0)return "***";
+        return email.charAt(0)+"***"+email.substring(at);
     }
 
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)

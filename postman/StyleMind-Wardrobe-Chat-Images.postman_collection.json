@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "StyleMind — Chat Images",
-    "description": "Private image upload/read through backend. Explicit fixture/upload/unfriend opt-ins; real cloud setup is separate. See EP06_CHAT_IMAGES_RUN_GUIDE.md.",
+    "description": "Private image upload/read through backend. Up to 5 JPEG/PNG/WebP images, 10 MiB each, 40 megapixels each, 52 MiB multipart request. Explicit fixture/upload/unfriend opt-ins; real cloud setup is separate. See EP06_CHAT_IMAGES_RUN_GUIDE.md.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

@@ -2,6 +2,7 @@ package com.stylemind.wardrobecommunity.service.outfit;
 
 import com.stylemind.wardrobecommunity.client.commerce.CommerceCatalogClient;
 import com.stylemind.wardrobecommunity.client.commerce.payload.VariantLookupItem;
+import com.stylemind.wardrobecommunity.dto.outfit.OutfitCategoryCount;
 import com.stylemind.wardrobecommunity.dto.outfit.OutfitCreateCommand;
 import com.stylemind.wardrobecommunity.dto.outfit.OutfitDetailResponse;
 import com.stylemind.wardrobecommunity.dto.outfit.OutfitItemResponse;
@@ -44,14 +45,19 @@ public class OutfitService {
     private final CommerceCatalogClient catalog;
     private final TransactionTemplate transaction;
 
-    @Transactional(readOnly = true)
+    /** Not one transaction: the category counts call Commerce, which never runs inside a database transaction. */
     public OutfitListResponse list(UUID ownerId, OutfitListCriteria criteria) {
         long total = outfits.countByOwnerAccountId(ownerId);
         long offset = (long) criteria.page() * criteria.size();
-        List<OutfitSummaryResponse> items = offset > Integer.MAX_VALUE ? List.of()
-                : outfits.findPageWithItemCount(ownerId, PageRequest.of(criteria.page(), criteria.size())).stream()
-                        .map(row -> summary((Outfit) row[0], (Long) row[1]))
-                        .toList();
+        List<Object[]> rows = offset > Integer.MAX_VALUE ? List.of()
+                : outfits.findPageWithItemCount(ownerId, PageRequest.of(criteria.page(), criteria.size()));
+        Map<UUID, List<OutfitCategoryCount>> counts = categoryCounts(rows);
+        List<OutfitSummaryResponse> items = rows.stream()
+                .map(row -> {
+                    Outfit outfit = (Outfit) row[0];
+                    return summary(outfit, (Long) row[1], counts.get(outfit.getOutfitId()));
+                })
+                .toList();
         long totalPages = total == 0 ? 0 : (total + criteria.size() - 1) / criteria.size();
         return new OutfitListResponse(items, criteria.page(), criteria.size(), total, totalPages);
     }
@@ -219,8 +225,49 @@ public class OutfitService {
     }
 
     private OutfitSummaryResponse summary(Outfit outfit, long itemCount) {
+        return summary(outfit, itemCount, null);
+    }
+
+    private OutfitSummaryResponse summary(Outfit outfit, long itemCount, List<OutfitCategoryCount> categoryCounts) {
         return new OutfitSummaryResponse(outfit.getOutfitId(), outfit.getName(), outfit.getCreationSource(),
-                itemCount, outfit.getCreatedAt(), outfit.getUpdatedAt(), outfit.getVisibility());
+                itemCount, outfit.getCreatedAt(), outfit.getUpdatedAt(), outfit.getVisibility(), categoryCounts);
+    }
+
+    /**
+     * Items per category for the outfits of one page, using a single Commerce lookup for all their variants.
+     * Any failure (or a variant Commerce no longer returns) only drops the counts; the list itself still works.
+     */
+    private Map<UUID, List<OutfitCategoryCount>> categoryCounts(List<Object[]> rows) {
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            List<UUID> outfitIds = rows.stream().map(row -> ((Outfit) row[0]).getOutfitId()).toList();
+            List<OutfitItem> allItems = outfitItems.findByOutfitIdIn(outfitIds);
+            Map<UUID, VariantLookupItem> catalogItems = catalog.lookup(
+                    allItems.stream().map(OutfitItem::getVariantId).collect(java.util.stream.Collectors.toSet()));
+            Map<UUID, List<OutfitCategoryCount>> result = new java.util.HashMap<>();
+            for (UUID outfitId : outfitIds) {
+                Map<UUID, OutfitCategoryCount> byCategory = new java.util.LinkedHashMap<>();
+                allItems.stream()
+                        .filter(item -> item.getOutfitId().equals(outfitId))
+                        .sorted(java.util.Comparator.comparingInt(OutfitItem::getDisplayOrder))
+                        .forEach(item -> {
+                            VariantLookupItem variant = catalogItems.get(item.getVariantId());
+                            if (variant == null || variant.categoryId() == null) {
+                                return;
+                            }
+                            byCategory.merge(variant.categoryId(),
+                                    new OutfitCategoryCount(variant.categoryId(), variant.categoryName(), 1),
+                                    (left, right) -> new OutfitCategoryCount(left.categoryId(), left.categoryName(),
+                                            left.count() + 1));
+                        });
+                result.put(outfitId, List.copyOf(byCategory.values()));
+            }
+            return result;
+        } catch (RuntimeException exception) {
+            return Map.of();
+        }
     }
 
     private OutfitDetailResponse detail(Outfit outfit, List<OutfitItem> rows, Map<UUID, VariantLookupItem> catalogItems) {
@@ -241,7 +288,8 @@ public class OutfitService {
         }
         return new OutfitItemResponse(row.getOutfitItemId(), row.getVariantId(), row.getDisplayOrder(),
                 variant.productId(), variant.productName(), variant.color(), variant.size(),
-                variant.unitPriceVnd(), variant.primaryImageUrl(), variant.purchasable());
+                variant.unitPriceVnd(), variant.primaryImageUrl(), variant.purchasable(),
+                variant.categoryId(), variant.categoryName());
     }
 
     private OffsetDateTime now() {

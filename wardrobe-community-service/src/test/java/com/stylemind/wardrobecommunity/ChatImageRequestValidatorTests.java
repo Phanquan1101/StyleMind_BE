@@ -40,9 +40,9 @@ class ChatImageRequestValidatorTests {
         assertInvalid(()->validator.image(new MockMultipartFile("images","x.jpg","image/jpeg",picture("png"))));
         assertInvalid(()->validator.image(new MockMultipartFile("images","x.png","image/png",Arrays.copyOf(picture("png"),20))));
     }
-    @Test void exactFiveMiBImageIsAcceptedButOneMoreByteIsRejected() throws Exception {
-        byte[] png=Arrays.copyOf(picture("png"),ChatImageRequestValidator.MAX_BYTES);
-        assertThat(validator.image(new MockMultipartFile("images","x.png","image/png",png)).sizeBytes()).isEqualTo(ChatImageRequestValidator.MAX_BYTES);
+    @Test void exactTenMiBImageIsAcceptedButOneMoreByteIsRejected() throws Exception {
+        byte[] png=Arrays.copyOf(picture("png"),10 * 1024 * 1024);
+        assertThat(validator.image(new MockMultipartFile("images","x.png","image/png",png)).sizeBytes()).isEqualTo(10 * 1024 * 1024);
         assertInvalid(()->validator.image(new MockMultipartFile("images","x.png","image/png",Arrays.copyOf(png,png.length+1))));
     }
     @Test void oversizedDeclaredDimensionsAreRejectedBeforeAllocatingThePixelBuffer() throws Exception {

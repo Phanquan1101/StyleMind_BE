@@ -1,13 +1,16 @@
 package com.stylemind.commerce.dto.product;
 
+import java.util.List;
 import java.util.UUID;
 
 public record ProductListCriteria(
         String keyword,
-        UUID categoryId,
+        List<UUID> categoryIds,
         Long minPriceVnd,
         Long maxPriceVnd,
         String demographicSegment,
+        String status,
+        String sort,
         int page,
         int size) {
 

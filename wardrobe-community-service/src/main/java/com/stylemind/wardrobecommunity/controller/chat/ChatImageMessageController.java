@@ -48,7 +48,7 @@ public class ChatImageMessageController {
 
     @PostMapping(path="/api/v1/chats/{chatId}/messages",consumes=MediaType.MULTIPART_FORM_DATA_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="Send 1–5 private chat images with an optional caption",
-            description="Each image <= 5 MiB and <= 40 megapixels; JPEG/PNG/WebP bytes validated. Same sender/client key shares text API idempotency.")
+            description="Each image <= 10 MiB and <= 40 megapixels; JPEG/PNG/WebP bytes validated. Same sender/client key shares text API idempotency.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required=true,content=@Content(
             mediaType=MediaType.MULTIPART_FORM_DATA_VALUE,schema=@Schema(implementation=SendChatImagesRequest.class),
             encoding=@Encoding(name="message",contentType=MediaType.APPLICATION_JSON_VALUE)))
