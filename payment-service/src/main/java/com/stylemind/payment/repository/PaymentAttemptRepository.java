@@ -34,7 +34,7 @@ public class PaymentAttemptRepository {
         return executeUpdate(entityManager.createNativeQuery("""
                         UPDATE public.payment_attempt
                         SET attempt_status = 'EXPIRED'
-                        WHERE payment_method = 'SEPAY_VIETQR'
+                        WHERE payment_method IN ('SEPAY_VIETQR', 'VNPAY')
                           AND attempt_status = 'PENDING'
                           AND expires_at <= :now
                         """)
@@ -63,7 +63,7 @@ public class PaymentAttemptRepository {
     }
 
     public boolean existsPendingOnlineAttempt(UUID orderId) {
-        return entityManager.createQuery("SELECT count(a) FROM PaymentAttemptEntity a WHERE a.orderId=:id AND a.paymentMethod='SEPAY_VIETQR' AND a.attemptStatus='PENDING'", Long.class)
+        return entityManager.createQuery("SELECT count(a) FROM PaymentAttemptEntity a WHERE a.orderId=:id AND a.paymentMethod IN ('SEPAY_VIETQR','VNPAY') AND a.attemptStatus='PENDING'", Long.class)
                 .setParameter("id", orderId).getSingleResult() > 0;
     }
 

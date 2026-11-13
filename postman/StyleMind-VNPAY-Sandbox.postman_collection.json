@@ -1,0 +1,73 @@
+{
+  "info": {
+    "name": "StyleMind VNPAY Sandbox",
+    "description": "Create a VNPAY order, obtain its hosted sandbox payment URL, and read order status. VNPAY IPN is provider-to-server and must not be forged from this collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "shippingAddressId", "value": "" },
+    { "key": "checkoutKey", "value": "vnpay-sandbox-001" },
+    { "key": "guestSessionKey", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Create VNPAY order (customer)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"checkout_key\": \"{{checkoutKey}}\",\n  \"shipping_address_id\": \"{{shippingAddressId}}\",\n  \"payment_method\": \"VNPAY\"\n}" },
+        "url": "{{gatewayUrl}}/commerce/api/v1/orders"
+      }
+    },
+    {
+      "name": "Create VNPAY order (guest)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Guest-Session-Key", "value": "{{guestSessionKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"checkout_key\": \"{{checkoutKey}}\",\n  \"payment_method\": \"VNPAY\",\n  \"shipping_address\": {\n    \"recipient_name\": \"Sandbox Customer\",\n    \"recipient_phone\": \"0900000000\",\n    \"address_line\": \"Test address\"\n  }\n}" },
+        "url": "{{gatewayUrl}}/commerce/api/v1/guest/orders"
+      }
+    },
+    {
+      "name": "Create or recover payment URL (customer)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+        "url": "{{gatewayUrl}}/commerce/api/v1/orders/{{orderId}}/payment-attempt"
+      }
+    },
+    {
+      "name": "Create or recover payment URL (guest)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "X-Guest-Session-Key", "value": "{{guestSessionKey}}" } ],
+        "url": "{{gatewayUrl}}/commerce/api/v1/guest/orders/{{orderId}}/payment-attempt"
+      }
+    },
+    {
+      "name": "Read customer order status",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+        "url": "{{gatewayUrl}}/commerce/api/v1/orders/{{orderId}}"
+      }
+    },
+    {
+      "name": "Read guest order status",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "X-Guest-Session-Key", "value": "{{guestSessionKey}}" } ],
+        "url": "{{gatewayUrl}}/commerce/api/v1/guest/orders/{{orderId}}"
+      }
+    }
+  ]
+}

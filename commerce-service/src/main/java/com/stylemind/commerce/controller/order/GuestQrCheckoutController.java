@@ -61,7 +61,7 @@ public class GuestQrCheckoutController {
         var attempt = payments.create(new OrderPaymentRequest(checkoutId, null, "SEPAY_VIETQR", context.totalVnd(), "PENDING_PAYMENT", "initial-" + checkoutId));
         if (!checkouts.recordPaymentAttempt(checkoutId, null, hash, attempt, OffsetDateTime.now())) throw unavailable();
         var expires = attempt.expiresAt().isBefore(context.expiresAt().toInstant()) ? attempt.expiresAt() : context.expiresAt().toInstant();
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new PaymentAttemptResponse(attempt.id(), attempt.orderId(), attempt.method(), attempt.amountVnd(), attempt.reference(), attempt.status(), expires, attempt.transferContent(), attempt.qrPayload()));
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new PaymentAttemptResponse(attempt.id(), attempt.orderId(), attempt.method(), attempt.amountVnd(), attempt.reference(), attempt.status(), expires, attempt.transferContent(), attempt.qrPayload(), attempt.paymentUrl()));
     }
 
     @PostMapping("/api/v1/guest/qr-checkouts/{id}/cancel")

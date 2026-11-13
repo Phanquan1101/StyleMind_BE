@@ -238,6 +238,11 @@ public class OrderServiceImpl implements OrderService {
         }
         AddressSnapshot address = addressSupplier.get();
         long total = items.stream().mapToLong(CartItem::lineTotalVnd).sum();
+        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.VNPAY
+                && (total < 5_000 || total > 9_999_999_999L)) {
+            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "VNPAY_AMOUNT_INVALID",
+                    "VNPAY payment supports order totals from 5000 through 9999999999 VND");
+        }
         UUID orderId = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
         try {
@@ -312,7 +317,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse updateStatus(UUID actorId, UUID orderId, OrderRequestValidator.StatusCommand command) {
         OrderSummary current = summary(orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound));
         if (command.orderStatus() == OrderStatus.CANCELLED
-                && (current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                && ((current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                    || current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.VNPAY)
                     || paymentEventRepository.hasAppliedPayment(orderId))) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED",
                     "Payment and refund must be resolved before cancelling");
@@ -370,7 +376,7 @@ public class OrderServiceImpl implements OrderService {
             throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                     "Cancellation is not allowed for this order state");
         }
-        if ("SEPAY_VIETQR".equals(locked.getPaymentMethod())) {
+        if ("SEPAY_VIETQR".equals(locked.getPaymentMethod()) || "VNPAY".equals(locked.getPaymentMethod())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_CHECK_UNAVAILABLE", "Payment must be reconciled before cancellation");
         }
         OffsetDateTime now = OffsetDateTime.now();

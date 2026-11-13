@@ -70,7 +70,7 @@ erDiagram
         string guest_session_hash "SHA-256 guest owner; NULL for customer"
         string checkout_key "UQ with customer_id or guest_session_hash"
         string order_status
-        string payment_method "COD or SEPAY_VIETQR"
+        string payment_method "COD, SEPAY_VIETQR or VNPAY sandbox"
         bigint accepted_total_vnd "Immutable purchase commitment"
         datetime placed_at
         datetime completed_at "NULL"

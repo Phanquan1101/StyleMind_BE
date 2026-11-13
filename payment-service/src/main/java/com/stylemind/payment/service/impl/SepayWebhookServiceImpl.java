@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
     private final SepayWebhookAuthenticationService authenticationService;
     private final PaymentReconciliationRepository repository;
     private final PaymentOutboxService outboxService;
+    private final Pattern contentReferencePattern;
 
     public SepayWebhookServiceImpl(
             ObjectMapper objectMapper,
@@ -52,6 +54,8 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
         this.authenticationService = authenticationService;
         this.repository = repository;
         this.outboxService = outboxService;
+        this.contentReferencePattern = Pattern.compile("(?<![\\p{L}\\p{N}])"
+                + Pattern.quote(properties.paymentCodePrefix()) + "[0-9A-F]{12}(?![\\p{L}\\p{N}])");
     }
 
     @Transactional
@@ -226,6 +230,24 @@ public class SepayWebhookServiceImpl implements SepayWebhookService {
 
     private String normalizeBlankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String paymentReference(SepayWebhookRequest request) {
+        String code = normalizeBlankToNull(request.code());
+        if (code != null || !StringUtils.hasText(request.content())) {
+            return code;
+        }
+        var matcher = contentReferencePattern.matcher(request.content());
+        String reference = null;
+        while (matcher.find()) {
+            String candidate = matcher.group();
+            // Never choose between different payment references in one transfer.
+            if (reference != null && !reference.equals(candidate)) {
+                return null;
+            }
+            reference = candidate;
+        }
+        return reference;
     }
 
 }

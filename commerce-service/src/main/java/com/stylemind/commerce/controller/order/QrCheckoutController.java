@@ -82,7 +82,7 @@ public class QrCheckoutController {
                 ? attempt.expiresAt() : context.expiresAt().toInstant();
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(new PaymentAttemptResponse(attempt.id(), attempt.orderId(), attempt.method(), attempt.amountVnd(),
-                        attempt.reference(), attempt.status(), expiresAt, attempt.transferContent(), attempt.qrPayload()));
+                        attempt.reference(), attempt.status(), expiresAt, attempt.transferContent(), attempt.qrPayload(), attempt.paymentUrl()));
     }
 
     @PostMapping("/api/v1/qr-checkouts/{id}/cancel")

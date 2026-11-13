@@ -17,7 +17,7 @@ public class InventoryExpiryTransaction {
     @Transactional
     public void expire(UUID orderId, OffsetDateTime now) {
         var order = quantityService.lockOrder(orderId);
-        if (order.isEmpty() || !"SEPAY_VIETQR".equals(order.get().paymentMethod())
+        if (order.isEmpty() || !java.util.Set.of("SEPAY_VIETQR", "VNPAY").contains(order.get().paymentMethod())
                 || !"PENDING_PAYMENT".equals(order.get().orderStatus())) {
             return;
         }

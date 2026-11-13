@@ -44,7 +44,8 @@ public class OrderPaymentController {
         // Both Admin and Customer are self-only. Read transaction ends before calling Payment.
         var order = orders.get(CurrentUser.subject(authentication), false, validator.pathId(orderId));
         boolean payable = (order.paymentMethod().equals("COD") && java.util.Set.of("PENDING_PAYMENT", "PLACED").contains(order.orderStatus()))
-                || (order.paymentMethod().equals("SEPAY_VIETQR") && order.orderStatus().equals("PENDING_PAYMENT"));
+                || ((order.paymentMethod().equals("SEPAY_VIETQR") || order.paymentMethod().equals("VNPAY"))
+                    && order.orderStatus().equals("PENDING_PAYMENT"));
         if (!payable || order.acceptedTotalVnd() <= 0) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_NOT_PAYABLE", "Order is not in an initial payable state");
         }

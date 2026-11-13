@@ -35,7 +35,8 @@ public record OrderPaymentRequest(CommerceOrderPaymentSnapshot order, String req
             String key = body.get("request_key").textValue();
             if (!key.equals("initial-" + orderId)
                     || !(method == PaymentMethod.COD && Set.of("PENDING_PAYMENT", "PLACED").contains(status)
-                    || method == PaymentMethod.SEPAY_VIETQR && status.equals("PENDING_PAYMENT"))) {
+                    || (method == PaymentMethod.SEPAY_VIETQR || method == PaymentMethod.VNPAY)
+                        && status.equals("PENDING_PAYMENT"))) {
                 throw new IllegalArgumentException();
             }
             return new OrderPaymentRequest(new CommerceOrderPaymentSnapshot(orderId, customerId, method,
