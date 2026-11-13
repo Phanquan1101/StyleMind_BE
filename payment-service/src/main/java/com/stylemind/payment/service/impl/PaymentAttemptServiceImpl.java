@@ -39,22 +39,35 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
     private final PaymentOutboxService outboxService;
     private final SepayQrPayloadBuilder qrPayloadBuilder;
     private final SepayPaymentProperties sepayProperties;
+    private final com.stylemind.payment.service.VnpayPaymentUrlBuilder vnpayUrlBuilder;
     private final CommerceOrderClient commerceOrderClient;
     private final PaymentMapper mapper;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PaymentAttemptServiceImpl(
             PaymentAttemptRepository repository,
             PaymentOutboxService outboxService,
             SepayQrPayloadBuilder qrPayloadBuilder,
             SepayPaymentProperties sepayProperties,
+            com.stylemind.payment.service.VnpayPaymentUrlBuilder vnpayUrlBuilder,
             CommerceOrderClient commerceOrderClient,
             PaymentMapper mapper) {
         this.repository = repository;
         this.outboxService = outboxService;
         this.qrPayloadBuilder = qrPayloadBuilder;
         this.sepayProperties = sepayProperties;
+        this.vnpayUrlBuilder = vnpayUrlBuilder;
         this.commerceOrderClient = commerceOrderClient;
         this.mapper = mapper;
+    }
+
+    public PaymentAttemptServiceImpl(PaymentAttemptRepository repository, PaymentOutboxService outboxService,
+            SepayQrPayloadBuilder qrPayloadBuilder, SepayPaymentProperties sepayProperties,
+            CommerceOrderClient commerceOrderClient, PaymentMapper mapper) {
+        this(repository, outboxService, qrPayloadBuilder, sepayProperties,
+                new com.stylemind.payment.service.VnpayPaymentUrlBuilder(
+                        new com.stylemind.payment.config.VnpayPaymentProperties("", "", null, "")),
+                commerceOrderClient, mapper);
     }
 
     @Transactional
@@ -178,17 +191,24 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             CommerceOrderPaymentSnapshot order,
             String requestKey,
             Instant now) {
+        if (order.paymentMethod() == PaymentMethod.VNPAY
+                && (order.acceptedTotalVnd() < 5_000 || order.acceptedTotalVnd() > 9_999_999_999L)) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "VNPAY_AMOUNT_INVALID",
+                    "VNPAY payment supports order totals from 5000 through 9999999999 VND");
+        }
         if (repository.existsSettledAttempt(order.orderId())) {
             throw new PaymentApiException(HttpStatus.CONFLICT, "ORDER_ALREADY_PAID", "Order already has a settled payment");
         }
-        if (order.paymentMethod() == PaymentMethod.SEPAY_VIETQR && repository.existsPendingOnlineAttempt(order.orderId())) {
+        if ((order.paymentMethod() == PaymentMethod.SEPAY_VIETQR || order.paymentMethod() == PaymentMethod.VNPAY)
+                && repository.existsPendingOnlineAttempt(order.orderId())) {
             throw new PaymentApiException(HttpStatus.CONFLICT, "PENDING_PAYMENT_ATTEMPT_EXISTS",
                     "Order already has a pending online payment attempt");
         }
 
         UUID paymentAttemptId = UUID.randomUUID();
         String paymentReference = buildPaymentReference(paymentAttemptId);
-        Instant expiresAt = order.paymentMethod() == PaymentMethod.SEPAY_VIETQR ? now.plus(ONLINE_ATTEMPT_TTL) : null;
+        boolean online = order.paymentMethod() == PaymentMethod.SEPAY_VIETQR || order.paymentMethod() == PaymentMethod.VNPAY;
+        Instant expiresAt = online ? now.plus(ONLINE_ATTEMPT_TTL) : null;
         String transferContent = order.paymentMethod() == PaymentMethod.SEPAY_VIETQR
                 ? qrPayloadBuilder.buildTransferContent(paymentReference)
                 : null;
@@ -216,7 +236,11 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             throw new PaymentApiException(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST",
                     "Duplicate payment attempt request");
         }
-        return mapper.toResponse(creation);
+        var response = mapper.toResponse(creation);
+        if (order.paymentMethod() == PaymentMethod.VNPAY) {
+            return withVnpayUrl(response, paymentReference, order.acceptedTotalVnd(), now, expiresAt);
+        }
+        return response;
     }
 
     private PaymentAttemptResponse existingAttemptResponse(
@@ -229,7 +253,19 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
             throw new PaymentApiException(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST_MISMATCH",
                     "Duplicate request key does not match the original payment attempt");
         }
-        return mapper.toResponse(existing);
+        var response = mapper.toResponse(existing);
+        if (PaymentMethod.VNPAY.name().equals(existing.paymentMethod())) {
+            return withVnpayUrl(response, existing.paymentReference(), existing.expectedAmountVnd(),
+                    existing.generatedAt(), existing.expiresAt());
+        }
+        return response;
+    }
+
+    private PaymentAttemptResponse withVnpayUrl(PaymentAttemptResponse response, String reference, long amount,
+            Instant generatedAt, Instant expiresAt) {
+        return new PaymentAttemptResponse(response.id(), response.orderId(), response.method(), response.amountVnd(),
+                response.reference(), response.status(), response.expiresAt(), response.transferContent(), response.qrPayload(),
+                vnpayUrlBuilder.build(reference, amount, generatedAt, expiresAt));
     }
 
     private void validateCreateRequest(CreatePaymentAttemptRequest request) {

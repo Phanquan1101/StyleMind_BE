@@ -18,7 +18,7 @@ public record PaymentConfirmedEvent(UUID event_id, String event_type, UUID payme
             if (node == null || !node.isObject() || node.size() != FIELDS.size() || !node.has("customer_id")) throw invalid();
             node.fieldNames().forEachRemaining(key -> { if (!FIELDS.contains(key)) throw invalid(); });
             if (!"PaymentConfirmed".equals(text(node, "event_type"))
-                    || !Set.of("SEPAY_VIETQR", "COD").contains(text(node, "payment_method"))) throw invalid();
+                    || !Set.of("SEPAY_VIETQR", "COD", "VNPAY").contains(text(node, "payment_method"))) throw invalid();
             var amount = node.path("amount_vnd");
             if (!amount.isIntegralNumber() || !amount.canConvertToLong() || amount.longValue() <= 0) throw invalid();
             String reference = text(node, "payment_reference");

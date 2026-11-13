@@ -27,7 +27,7 @@ public class PaymentOutboxRepository {
                 FROM PaymentOutboxEntity o, PaymentAttemptEntity a, FinancialTransactionEntity f
                 WHERE a.paymentAttemptId=o.aggregateId AND f.paymentAttemptId=a.paymentAttemptId
                   AND o.publishedAt IS NULL AND o.eventType='PaymentConfirmed'
-                  AND a.paymentMethod IN ('SEPAY_VIETQR','COD') AND a.attemptStatus='SETTLED'
+                  AND a.paymentMethod IN ('SEPAY_VIETQR','VNPAY','COD') AND a.attemptStatus='SETTLED'
                 """ + after + " ORDER BY o.createdAt,o.outboxEventId", PendingEvent.class);
         if (cursor != null) query.setParameter("created", cursor.createdAt()).setParameter("id", cursor.id());
         return query.setMaxResults(limit).getResultList();

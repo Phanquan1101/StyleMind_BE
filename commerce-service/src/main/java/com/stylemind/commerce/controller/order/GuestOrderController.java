@@ -90,7 +90,8 @@ public class GuestOrderController {
         if (body != null) throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body is not accepted");
         var order = orders.getGuest(key, ids.pathId(orderId));
         boolean payable = ("COD".equals(order.paymentMethod()) && Set.of("PENDING_PAYMENT", "PLACED").contains(order.orderStatus()))
-                || ("SEPAY_VIETQR".equals(order.paymentMethod()) && "PENDING_PAYMENT".equals(order.orderStatus()));
+                || (("SEPAY_VIETQR".equals(order.paymentMethod()) || "VNPAY".equals(order.paymentMethod()))
+                    && "PENDING_PAYMENT".equals(order.orderStatus()));
         if (!payable || order.acceptedTotalVnd() <= 0) throw new ApiOperationException(HttpStatus.CONFLICT,
                 "ORDER_NOT_PAYABLE", "Order is not in an initial payable state");
         var snapshot = OrderPaymentRequest.from(order);

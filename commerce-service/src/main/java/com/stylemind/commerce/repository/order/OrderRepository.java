@@ -32,5 +32,5 @@ public interface OrderRepository extends JpaRepository<Order,UUID> {
  List<Order> findByOrderStatusOrderByPlacedAtDescOrderIdDesc(String status,Pageable pageable);
  List<Order> findAllByOrderByPlacedAtDescOrderIdDesc(Pageable pageable);
  @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<Order> findLockedByOrderId(UUID orderId);
- @Query("select o.orderId from Order o where o.orderStatus='PENDING_PAYMENT' and o.paymentMethod='SEPAY_VIETQR' and o.placedAt<=:expiresAt order by o.placedAt,o.orderId") List<UUID> findExpiredPendingSepayOrderIds(@Param("expiresAt") OffsetDateTime expiresAt, Pageable pageable);
+ @Query("select o.orderId from Order o where o.orderStatus='PENDING_PAYMENT' and o.paymentMethod in ('SEPAY_VIETQR','VNPAY') and o.placedAt<=:expiresAt order by o.placedAt,o.orderId") List<UUID> findExpiredPendingSepayOrderIds(@Param("expiresAt") OffsetDateTime expiresAt, Pageable pageable);
 }

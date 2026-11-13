@@ -7,7 +7,7 @@ erDiagram
         uuid customer_id "REF identity.ACCOUNT.account_id; NULL for guest checkout"
         string payment_reference UK
         string request_key "UQ with order_id"
-        string payment_method "COD or SEPAY_VIETQR"
+        string payment_method "COD, SEPAY_VIETQR or VNPAY sandbox"
         bigint expected_amount_vnd "Whole VND"
         string attempt_status
         datetime generated_at

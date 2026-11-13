@@ -30,7 +30,7 @@ public class SecurityConfiguration {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**")
                         .permitAll()
-                        .requestMatchers("/internal/v1/sepay/webhooks").permitAll()
+                        .requestMatchers("/internal/v1/sepay/webhooks", "/api/v1/payments/vnpay/ipn").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions

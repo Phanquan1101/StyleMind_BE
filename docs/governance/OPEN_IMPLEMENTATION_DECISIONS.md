@@ -54,3 +54,7 @@ The owner requested completion of COD PaymentConfirmed delivery and explicitly a
 The owner attachment “STYLEMIND — ACCELERATED DELIVERY 2” resolves the prior implementation gates only for the implementation recorded in the [Wave 2 contract](../planning/stylist/EP-07_WAVE_2_CONTRACT.md): Spring AI 1.1-compatible line, exact OpenAI model IDs, generation/recommendation APIs, V3's two recommendation tables/lifecycle, runtime Qdrant/Neo4j adapters, reviewed catalog/knowledge gates, and scoped verification. It does not resolve P08 catalog event transport, R95 owner-source producers, live Commerce mapping or production deployment. No persistent V3 migration is approved.
 
 Current evidence is in [the implementation report](../planning/stylist/EP-07_WAVE_2_IMPLEMENTATION_REPORT.md). Provider smoke was not executed because the configured API key was absent; no API key value was read. Gateway/Newman and live cross-service acceptance remain unverified. EP-07 remains incomplete.
+
+## VNPAY sandbox integration — approved 2026-11-13
+
+The owner explicitly requested an additive VNPAY sandbox method and confirmed Payment V5 plus Commerce V17 as the exact migration scope. Callback, amount, lifecycle and configuration rules are recorded in [VNPAY_SANDBOX_CONTRACT.md](../planning/VNPAY_SANDBOX_CONTRACT.md). Sandbox credentials remain operator-supplied secrets. Persistent migration, production configuration, refunds and paid-cancellation behavior remain out of scope/TBD.

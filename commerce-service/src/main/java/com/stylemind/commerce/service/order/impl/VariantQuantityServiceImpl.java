@@ -44,8 +44,9 @@ public class VariantQuantityServiceImpl implements VariantQuantityService {
     @Override public List<UUID> expiredPendingSepayOrderIds(OffsetDateTime now) { return orders.findExpiredPendingSepayOrderIds(now.minusMinutes(15), PageRequest.of(0, 100)); }
     @Override public Optional<LockedOrder> lockOrder(UUID orderId) { return orders.findLockedByOrderId(orderId).map(o -> new LockedOrder(o.getPaymentMethod(), o.getOrderStatus())); }
     @Override public boolean cancelExpiredOrder(UUID orderId, OffsetDateTime now) {
-        return orders.findLockedByOrderId(orderId).filter(o -> "PENDING_PAYMENT".equals(o.getOrderStatus()) && "SEPAY_VIETQR".equals(o.getPaymentMethod())).map(o -> {
-            o.setOrderStatus("CANCELLED"); orders.saveAndFlush(o); OrderStatusHistory entry = new OrderStatusHistory(); entry.setHistoryId(UUID.randomUUID()); entry.setOrderId(orderId); entry.setFromStatus("PENDING_PAYMENT"); entry.setToStatus("CANCELLED"); entry.setChangedAt(now); entry.setReason("SePay payment window expired"); history.save(entry); return true;
+        return orders.findLockedByOrderId(orderId).filter(o -> "PENDING_PAYMENT".equals(o.getOrderStatus())
+                && java.util.Set.of("SEPAY_VIETQR", "VNPAY").contains(o.getPaymentMethod())).map(o -> {
+            o.setOrderStatus("CANCELLED"); orders.saveAndFlush(o); OrderStatusHistory entry = new OrderStatusHistory(); entry.setHistoryId(UUID.randomUUID()); entry.setOrderId(orderId); entry.setFromStatus("PENDING_PAYMENT"); entry.setToStatus("CANCELLED"); entry.setChangedAt(now); entry.setReason("Online payment window expired"); history.save(entry); return true;
         }).orElse(false);
     }
 }

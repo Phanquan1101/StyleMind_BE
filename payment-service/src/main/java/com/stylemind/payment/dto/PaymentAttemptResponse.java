@@ -15,5 +15,10 @@ public record PaymentAttemptResponse(
         @JsonProperty("status") String status,
         @JsonProperty("expiresAt") Instant expiresAt,
         @JsonProperty("transferContent") String transferContent,
-        @JsonProperty("qrPayload") String qrPayload) {
+        @JsonProperty("qrPayload") String qrPayload,
+        @JsonProperty("paymentUrl") String paymentUrl) {
+    public PaymentAttemptResponse(UUID id, UUID orderId, String method, long amountVnd, String reference, String status,
+            Instant expiresAt, String transferContent, String qrPayload) {
+        this(id, orderId, method, amountVnd, reference, status, expiresAt, transferContent, qrPayload, null);
+    }
 }
