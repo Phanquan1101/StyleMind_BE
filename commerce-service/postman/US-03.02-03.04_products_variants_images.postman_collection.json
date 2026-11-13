@@ -53,7 +53,7 @@
           }
         },
         {
-          "name": "Soft-delete Product (sets product_status=INACTIVE)",
+          "name": "Delete Product Permanently from Catalog (non-restorable soft delete)",
           "request": {"method": "DELETE", "header": [], "url": "{{baseUrl}}/api/v1/admin/products/{{productId}}"}
         }
       ]

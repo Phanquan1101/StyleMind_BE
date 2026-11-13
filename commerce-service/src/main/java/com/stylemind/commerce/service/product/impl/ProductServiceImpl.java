@@ -45,6 +45,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
+    private static final String DELETED_STATUS = "DELETED";
+
     private final ProductRepository products;
     private final ProductVariantRepository variants;
     private final VariantImageRepository images;
@@ -65,7 +67,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public ProductResponse replaceProduct(UUID productId, ProductCommand command) {
         validateReferences(command);
-        Product product = products.findById(productId).orElseThrow(this::notFound);
+        Product product = activeOrInactiveProduct(productId);
         apply(product, command);
         return productResponse(products.saveAndFlush(product), false);
     }
@@ -73,8 +75,8 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public void deleteProduct(UUID productId) {
         Product product = products.findById(productId).orElseThrow(this::notFound);
-        if (!"INACTIVE".equals(product.getProductStatus())) {
-            product.setProductStatus("INACTIVE");
+        if (!DELETED_STATUS.equals(product.getProductStatus())) {
+            product.setProductStatus(DELETED_STATUS);
             products.saveAndFlush(product);
         }
     }
@@ -125,14 +127,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Transactional(readOnly = true)
     public ProductResponse getAdminProduct(UUID productId) {
-        return productResponse(products.findById(productId).orElseThrow(this::notFound), false);
+        return productResponse(activeOrInactiveProduct(productId), false);
     }
 
     @Transactional
     public VariantResponse createVariant(UUID productId, VariantCommand command) {
-        if (!products.existsById(productId)) {
-            throw notFound();
-        }
+        activeOrInactiveProduct(productId);
         ProductVariant variant = new ProductVariant();
         variant.setVariantId(UUID.randomUUID());
         variant.setProductId(productId);
@@ -265,6 +265,12 @@ public class ProductServiceImpl implements ProductService {
         return "ACTIVE".equals(product.getProductStatus())
                 && categories.findById(product.getCategoryId()).map(Category::isActive).orElse(false)
                 && brands.findById(product.getBrandId()).map(Brand::isActive).orElse(false);
+    }
+
+    private Product activeOrInactiveProduct(UUID productId) {
+        return products.findById(productId)
+                .filter(product -> !DELETED_STATUS.equals(product.getProductStatus()))
+                .orElseThrow(this::notFound);
     }
 
     private ProductResponse productResponse(Product product, boolean activeVariantsOnly) {
