@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -100,15 +101,20 @@ public class BrandController {
     }
 
     @DeleteMapping("/api/v1/admin/brands/{brandId}")
-    @Operation(summary = "Soft-delete brand by marking it inactive (ADMIN only)",
+    @Operation(summary = "Delete or soft-delete a brand (ADMIN only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Brand marked inactive"),
+                    @ApiResponse(responseCode = "204", description = "Brand deleted or marked inactive"),
                     @ApiResponse(responseCode = "400", description = "Malformed UUID"),
                     @ApiResponse(responseCode = "401", description = "JWT missing or invalid"),
                     @ApiResponse(responseCode = "403", description = "ADMIN role required"),
                     @ApiResponse(responseCode = "404", description = "Brand not found")
             })
-    public ResponseEntity<Void> delete(@PathVariable String brandId) {
+    public ResponseEntity<Void> delete(@PathVariable String brandId,
+            @RequestParam(name = "permanent", defaultValue = "false") boolean permanent) {
+        if (permanent) {
+            service.deleteBrandPermanently(id(brandId));
+            return ResponseEntity.noContent().build();
+        }
         service.delete(CatalogReferenceType.BRAND, id(brandId));
         return ResponseEntity.noContent().build();
     }

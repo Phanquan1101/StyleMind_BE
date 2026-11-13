@@ -6,7 +6,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BrandRepository extends JpaRepository<Brand, UUID> {
-    List<Brand> findAllByOrderByNameAscBrandIdAsc();
-    List<Brand> findAllByActiveTrueOrderByNameAscBrandIdAsc();
-    java.util.Optional<Brand> findByBrandIdAndActiveTrue(UUID brandId);
+    List<Brand> findAllByDeletedAtIsNullOrderByNameAscBrandIdAsc();
+    List<Brand> findAllByActiveTrueAndDeletedAtIsNullOrderByNameAscBrandIdAsc();
+    java.util.Optional<Brand> findByBrandIdAndActiveTrueAndDeletedAtIsNull(UUID brandId);
+    java.util.Optional<Brand> findByBrandIdAndDeletedAtIsNull(UUID brandId);
 }

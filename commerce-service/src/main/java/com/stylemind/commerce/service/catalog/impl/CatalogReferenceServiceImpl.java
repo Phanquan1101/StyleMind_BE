@@ -29,7 +29,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
     public CatalogReferenceListResponse list(CatalogReferenceType type) {
         return new CatalogReferenceListResponse(type == CatalogReferenceType.CATEGORY
                 ? categories.findAllByActiveTrueOrderByNameAscCategoryIdAsc().stream().map(this::response).toList()
-                : brands.findAllByActiveTrueOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
+                : brands.findAllByActiveTrueAndDeletedAtIsNullOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
@@ -37,7 +37,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
         if (type == CatalogReferenceType.CATEGORY) {
             return categories.findByCategoryIdAndActiveTrue(id).map(this::response).orElseThrow(this::notFound);
         }
-        return brands.findByBrandIdAndActiveTrue(id).map(this::response).orElseThrow(this::notFound);
+        return brands.findByBrandIdAndActiveTrueAndDeletedAtIsNull(id).map(this::response).orElseThrow(this::notFound);
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +50,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
                             entity.isActive(), counts.getOrDefault(entity.getCategoryId(), 0L)))
                     .toList());
         }
-        return new CatalogReferenceListResponse(brands.findAllByOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
+        return new CatalogReferenceListResponse(brands.findAllByDeletedAtIsNullOrderByNameAscBrandIdAsc().stream().map(this::response).toList());
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +58,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
         if (type == CatalogReferenceType.CATEGORY) {
             return categories.findById(id).map(this::response).orElseThrow(this::notFound);
         }
-        return brands.findById(id).map(this::response).orElseThrow(this::notFound);
+        return brands.findByBrandIdAndDeletedAtIsNull(id).map(this::response).orElseThrow(this::notFound);
     }
 
     @Transactional
@@ -82,7 +82,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
                 Category entity = categories.findById(id).orElseThrow(this::notFound); requireUniqueName(id, command); apply(entity, command);
                 return response(categories.saveAndFlush(entity));
             }
-            Brand entity = brands.findById(id).orElseThrow(this::notFound); apply(entity, command);
+            Brand entity = brands.findByBrandIdAndDeletedAtIsNull(id).orElseThrow(this::notFound); apply(entity, command);
             return response(brands.saveAndFlush(entity));
         } catch (DataIntegrityViolationException exception) {
             throw duplicateSlug();
@@ -101,6 +101,20 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
         categories.flush();
     }
 
+    /** Delete a brand without breaking historical product references. */
+    @Transactional
+    public void deleteBrandPermanently(UUID id) {
+        Brand entity = brands.findByBrandIdAndDeletedAtIsNull(id).orElseThrow(this::notFound);
+        if (products.countByBrandId(id) > 0) {
+            entity.setActive(false);
+            entity.setDeletedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+            brands.saveAndFlush(entity);
+            return;
+        }
+        brands.delete(entity);
+        brands.flush();
+    }
+
     @Transactional
     public void delete(CatalogReferenceType type, UUID id) {
         if (type == CatalogReferenceType.CATEGORY) {
@@ -111,7 +125,7 @@ public class CatalogReferenceServiceImpl implements CatalogReferenceService {
             }
             return;
         }
-        Brand entity = brands.findById(id).orElseThrow(this::notFound);
+        Brand entity = brands.findByBrandIdAndDeletedAtIsNull(id).orElseThrow(this::notFound);
         if (entity.isActive()) {
             entity.setActive(false);
             brands.saveAndFlush(entity);
