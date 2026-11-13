@@ -45,17 +45,19 @@ public class ReturnServiceImpl implements ReturnService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public OrderReturns forOrder(UUID owner, UUID orderId) {
         OwnedOrder order = repository.ownedOrder(orderId, owner, false).orElseThrow(this::notFound);
-        List<Item> items = canOpenReturn(order, Instant.now()) && repository.remainingAmount(orderId) > 0
+        List<ReturnResponse> requests = repository.findForOrder(orderId);
+        List<Item> items = requests.isEmpty() && canOpenReturn(order, Instant.now()) && repository.remainingAmount(orderId) > 0
                 ? repository.availableItems(orderId) : List.of();
         boolean eligible = items.stream().anyMatch(item -> item.unitPriceVnd() > 0);
         String reason = null;
         if (!eligible) {
-            if (!"COMPLETED".equals(order.status()) || order.completedAt() == null) reason = "NOT_DELIVERED";
+            if (!requests.isEmpty()) reason = "RETURN_ALREADY_REQUESTED";
+            else if (!"COMPLETED".equals(order.status()) || order.completedAt() == null) reason = "NOT_DELIVERED";
             else if (Instant.now().isAfter(order.completedAt().toInstant().plus(RETURN_WINDOW))) reason = "RETURN_WINDOW_EXPIRED";
             else if (order.paymentEventId() == null) reason = "PAYMENT_NOT_CONFIRMED";
             else reason = "NO_RETURNABLE_ITEMS";
         }
-        return new OrderReturns(eligible, eligible ? items : List.of(), repository.findForOrder(orderId), reason);
+        return new OrderReturns(eligible, eligible ? items : List.of(), requests, reason);
     }
 
     @Override
@@ -70,6 +72,9 @@ public class ReturnServiceImpl implements ReturnService {
                 throw conflict("RETURN_REQUEST_KEY_CONFLICT", "This return request key is already in use");
             }
             return response(previous.get().id());
+        }
+        if (repository.hasRequest(orderId)) {
+            throw conflict("RETURN_ALREADY_REQUESTED", "A return request already exists for this order");
         }
 
         Instant now = Instant.now();

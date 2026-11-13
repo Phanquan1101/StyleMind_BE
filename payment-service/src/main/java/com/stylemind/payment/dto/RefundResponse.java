@@ -12,6 +12,7 @@ public record RefundResponse(
         @JsonProperty("amount_vnd") long amountVnd,
         String status,
         @JsonProperty("transfer_reference") String transferReference,
+        @JsonProperty("completion_id") String completionId,
         @JsonProperty("failure_reason") String failureReason,
         @JsonProperty("refunded_at") Instant refundedAt,
         @JsonProperty("updated_at") Instant updatedAt,

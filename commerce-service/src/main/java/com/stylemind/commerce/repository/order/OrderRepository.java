@@ -1,6 +1,19 @@
 package com.stylemind.commerce.repository.order;
 import com.stylemind.commerce.entity.Order; import java.time.OffsetDateTime; import java.util.List; import java.util.Optional; import java.util.UUID; import org.springframework.data.domain.Page; import org.springframework.data.domain.Pageable; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.data.jpa.repository.Lock; import org.springframework.data.jpa.repository.Query; import org.springframework.data.repository.query.Param; import jakarta.persistence.LockModeType;
 public interface OrderRepository extends JpaRepository<Order,UUID> {
+ @Query(value = """
+   SELECT o.order_id FROM customer_order o
+   WHERE o.payment_method='COD' AND o.order_status='COMPLETED'
+     AND (CAST(:after AS uuid) IS NULL OR o.order_id>CAST(:after AS uuid))
+     AND EXISTS (SELECT 1 FROM order_status_history h WHERE h.order_id=o.order_id
+       AND h.from_status='SHIPPED' AND h.to_status='COMPLETED' AND h.actor_user_id IS NOT NULL
+       AND (h.reason='COD delivery and collection requested' OR h.reason LIKE 'COD delivery and collection requested | %'))
+     AND NOT EXISTS (SELECT 1 FROM payment_event_inbox e WHERE e.order_id=o.order_id
+       AND e.outcome='APPLIED' AND e.payment_method='COD' AND e.amount_vnd=o.accepted_total_vnd
+       AND e.customer_id IS NOT DISTINCT FROM o.customer_id)
+   ORDER BY o.order_id
+   """, nativeQuery = true)
+ List<UUID> findPendingCodCollectionOrderIds(@Param("after") UUID after, Pageable pageable);
  interface PaymentProgress {
   String getPaymentStatus();
   Long getRefundedAmountVnd();

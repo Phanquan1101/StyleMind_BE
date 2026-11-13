@@ -198,13 +198,15 @@ class ReturnPostgresIntegrationTests {
         mvc.perform(get(returns(order.id())).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].status").value("REFUNDED"))
                 .andExpect(jsonPath("$.items[0].history.length()").value(6))
-                .andExpect(jsonPath("$.available_items[0].quantity").value(1));
+                .andExpect(jsonPath("$.eligible").value(false))
+                .andExpect(jsonPath("$.ineligible_reason").value("RETURN_ALREADY_REQUESTED"))
+                .andExpect(jsonPath("$.available_items").isEmpty());
         assertThat(jdbc.queryForObject("SELECT quantity FROM product_variant WHERE variant_id=?",
                 Integer.class, order.variant())).isEqualTo(8);
     }
 
     @Test
-    void concurrentRequestsCannotReserveOverlappingQuantityAndRejectionReleasesIt() throws Exception {
+    void concurrentPartialRequestsUseLifetimeAllowanceAndRejectionCannotRestoreIt() throws Exception {
         var order = paidCodOrder();
         var start = new CountDownLatch(1);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -221,7 +223,12 @@ class ReturnPostgresIntegrationTests {
         decision(id, "APPROVE_PICKUP", null).andExpect(status().isOk());
         decision(id, "FAIL_INSPECTION", "Item differs").andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REJECTED"));
-        create(order, UUID.randomUUID(), 2, "Damaged", evidence()).andExpect(status().isCreated());
+        create(order, UUID.randomUUID(), 1, "Damaged", evidence()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RETURN_ALREADY_REQUESTED"));
+        mvc.perform(get(returns(order.id())).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false))
+                .andExpect(jsonPath("$.ineligible_reason").value("RETURN_ALREADY_REQUESTED"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM return_request WHERE order_id=?", Integer.class, order.id())).isEqualTo(1);
     }
 
     @Test
@@ -231,16 +238,18 @@ class ReturnPostgresIntegrationTests {
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.payment_status").value("PAID"))
                 .andExpect(jsonPath("$.refunded_amount_vnd").value(0));
-        for (int i = 1; i <= 2; i++) {
-            UUID id = uuid(read(create(order, UUID.randomUUID(), 1, "Damaged", evidence())), "return_id");
+        for (int quantity : List.of(1, 2)) {
+            order = paidCodOrder();
+            detail = "/api/v1/orders/" + order.id();
+            UUID id = uuid(read(create(order, UUID.randomUUID(), quantity, "Damaged", evidence())), "return_id");
             decision(id, "APPROVE_PICKUP", null).andExpect(status().isOk());
             decision(id, "PASS_INSPECTION", null).andExpect(status().isOk());
-            callback(UUID.randomUUID(), "RETURN", id, order.id(), 100_000,
+            callback(UUID.randomUUID(), "RETURN", id, order.id(), quantity * 100_000,
                     Instant.now().truncatedTo(ChronoUnit.MICROS).toString()).andExpect(status().isNoContent());
             mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("COMPLETED"))
-                    .andExpect(jsonPath("$.refunded_amount_vnd").value(i * 100_000))
-                    .andExpect(jsonPath("$.refund_status").value(i == 1 ? "PARTIALLY_REFUNDED" : "REFUNDED"));
+                    .andExpect(jsonPath("$.refunded_amount_vnd").value(quantity * 100_000))
+                    .andExpect(jsonPath("$.refund_status").value(quantity == 1 ? "PARTIALLY_REFUNDED" : "REFUNDED"));
         }
         mvc.perform(get("/api/v1/orders").header(HttpHeaders.AUTHORIZATION, bearer("owner")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[?(@.order_id=='" + order.id() + "')].refund_status").value(org.hamcrest.Matchers.contains("REFUNDED")));
@@ -311,7 +320,93 @@ class ReturnPostgresIntegrationTests {
         if (!start.await(5, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Concurrent test did not start");
         }
-        return create(order, UUID.randomUUID(), 2, "Damaged", evidence()).andReturn().getResponse().getStatus();
+        return create(order, UUID.randomUUID(), 1, "Damaged", evidence()).andReturn().getResponse().getStatus();
+    }
+
+    @Test
+    void rejectedReturnReplaysOriginalKeyAndRejectsConcurrentNewKeys() throws Exception {
+        var order = paidCodOrder();
+        UUID key = UUID.randomUUID();
+        UUID id = uuid(read(create(order, key, 1, "Damaged", evidence()).andExpect(status().isCreated())), "return_id");
+        decision(id, "REJECT", "Evidence does not support claim").andExpect(status().isOk());
+        create(order, key, 1, "Damaged", evidence()).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.return_id").value(id.toString()))
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> concurrentCreate(order, start));
+            var second = executor.submit(() -> concurrentCreate(order, start));
+            start.countDown();
+            assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS))).containsOnly(409);
+        }
+        mvc.perform(multipart("/api/v1/returns/" + id + "/evidence").file(evidence())
+                        .header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RETURN_STATE_CONFLICT"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM return_request WHERE order_id=?", Integer.class, order.id())).isEqualTo(1);
+    }
+
+    @Test
+    void deliveredVnpayReturnResolvesOnlyMatchingAppliedPaymentAndTerminalSource() throws Exception {
+        var order = order(OWNER, "VNPAY", "COMPLETED", OffsetDateTime.now().minusHours(1));
+        UUID event = payment(order, OWNER, "VNPAY", 200_000);
+        mvc.perform(get(returns(order.id())).header(HttpHeaders.AUTHORIZATION, bearer("other"))).andExpect(status().isNotFound());
+        UUID id = uuid(read(create(order, UUID.randomUUID(), 1, "Damaged", evidence()).andExpect(status().isCreated())), "return_id");
+        String path = source("RETURN", id);
+        mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isNotFound());
+        decision(id, "APPROVE_PICKUP", null).andExpect(status().isOk());
+        decision(id, "PASS_INSPECTION", null).andExpect(status().isOk());
+        mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.payment_attempt_id").value(order.attempt().toString()))
+                .andExpect(jsonPath("$.customer_id").value(OWNER.toString()))
+                .andExpect(jsonPath("$.amount_vnd").value(100_000));
+        for (String invalid : List.of("customer_id='" + OTHER + "'", "payment_method='COD'", "amount_vnd=199999", "outcome='RECONCILIATION_REQUIRED'")) {
+            jdbc.update("UPDATE payment_event_inbox SET " + invalid + " WHERE event_id=?", event);
+            mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isNotFound());
+            jdbc.update("UPDATE payment_event_inbox SET customer_id=?,payment_method='VNPAY',amount_vnd=200000,outcome='APPLIED' WHERE event_id=?", OWNER, event);
+        }
+    }
+
+    @Test
+    void vnpayReturnEligibilityRejectsWrongOwnerMethodAmountAndUnappliedEvent() throws Exception {
+        for (String invalid : List.of("customer_id='" + OTHER + "'", "payment_method='COD'", "amount_vnd=199999", "outcome='RECONCILIATION_REQUIRED'")) {
+            var order = order(OWNER, "VNPAY", "COMPLETED", OffsetDateTime.now().minusHours(1));
+            UUID event = payment(order, OWNER, "VNPAY", 200_000);
+            jdbc.update("UPDATE payment_event_inbox SET " + invalid + " WHERE event_id=?", event);
+            mvc.perform(get(returns(order.id())).header(HttpHeaders.AUTHORIZATION, bearer("owner")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.ineligible_reason").value("PAYMENT_NOT_CONFIRMED"));
+            create(order, UUID.randomUUID(), 1, "Damaged", evidence()).andExpect(status().isConflict());
+        }
+    }
+
+    @Test
+    void vnpayCancellationSourceRequiresApprovedCancelledOrderAndMatchingAppliedPayment() throws Exception {
+        var order = order(OWNER, "VNPAY", "CANCELLED", null);
+        UUID event = payment(order, OWNER, "VNPAY", 200_000);
+        UUID request = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO cancellation_request(cancellation_request_id,order_id,requested_by_user_id,reason,
+                    request_status,requested_at,reviewed_by_user_id,reviewed_at)
+                VALUES (?,?,?,'change plans','APPROVED',now(),?,now())
+                """, request, order.id(), OWNER, ADMIN);
+        jdbc.update("""
+                INSERT INTO cancellation_refund_obligation(cancellation_request_id,order_id,payment_event_id,
+                    amount_vnd,obligation_status,created_at)
+                VALUES (?,?,?,200000,'PENDING_REFUND',now())
+                """, request, order.id(), event);
+        String path = source("CANCELLATION", request);
+        mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.payment_attempt_id").value(order.attempt().toString()))
+                .andExpect(jsonPath("$.amount_vnd").value(200_000));
+        for (String invalid : List.of("customer_id='" + OTHER + "'", "payment_method='COD'", "amount_vnd=199999", "outcome='RECONCILIATION_REQUIRED'")) {
+            jdbc.update("UPDATE payment_event_inbox SET " + invalid + " WHERE event_id=?", event);
+            mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isNotFound());
+            jdbc.update("UPDATE payment_event_inbox SET customer_id=?,payment_method='VNPAY',amount_vnd=200000,outcome='APPLIED' WHERE event_id=?", OWNER, event);
+        }
+        jdbc.update("UPDATE customer_order SET order_status='PAID' WHERE order_id=?", order.id());
+        mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isNotFound());
+        jdbc.update("UPDATE customer_order SET order_status='CANCELLED' WHERE order_id=?", order.id());
+        jdbc.update("UPDATE cancellation_request SET request_status='REJECTED',decision_reason='Final review declined' WHERE cancellation_request_id=?", request);
+        mvc.perform(get(path).header(TOKEN_HEADER, TOKEN)).andExpect(status().isNotFound());
     }
 
     private TestOrder paidCodOrder() {

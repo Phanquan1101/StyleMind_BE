@@ -70,6 +70,7 @@ public class OrderServiceImpl implements OrderService {
     private final QrCheckoutRepository qrCheckoutRepository;
     private final VariantQuantityService quantityService;
     private final IdentityAddressClient identityAddressClient;
+    private final com.stylemind.commerce.client.payment.PaymentClient paymentClient;
     private final ApplicationEventPublisher events;
     private final com.stylemind.commerce.service.order.QrCheckoutReservationService qrCheckouts;
     private final com.fasterxml.jackson.databind.ObjectMapper json;
@@ -126,8 +127,9 @@ public class OrderServiceImpl implements OrderService {
     private UUID prepareQr(CartOwner owner, String guestHash, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod,
             java.util.function.Supplier<AddressSnapshot> addressSupplier, CheckoutSelection selection) {
-        if (paymentMethod != com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR) {
-            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "VietQR payment is required");
+        if (paymentMethod != com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                && paymentMethod != com.stylemind.commerce.enums.PaymentMethod.VNPAY) {
+            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Online payment is required");
         }
         UUID customerId = owner.customerId();
         qrCheckouts.lockCheckoutKey(customerId, guestHash, checkoutKey);
@@ -138,13 +140,19 @@ public class OrderServiceImpl implements OrderService {
         }
         List<CartItem> items = selectionItems(owner, selection, true);
         if (items.isEmpty()) throw emptyCart();
+        long total = items.stream().mapToLong(CartItem::lineTotalVnd).sum();
+        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.VNPAY
+                && (total < 5_000 || total > 9_999_999_999L)) {
+            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "VNPAY_AMOUNT_INVALID",
+                    "VNPAY payment supports totals from 5000 through 9999999999 VND");
+        }
         AddressSnapshot address = addressSupplier.get();
         UUID checkoutId = UUID.randomUUID();
         try {
             var snapshots = items.stream().map(item -> new com.stylemind.commerce.service.order.QrCheckoutReservationService.Item(
                     item.variantId(), item.quantity(), item.unitPriceVnd(), snapshot(item))).toList();
-            qrCheckouts.reserve(checkoutId, customerId, guestHash, checkoutKey,
-                    items.stream().mapToLong(CartItem::lineTotalVnd).sum(), snapshot(address), snapshots, OffsetDateTime.now());
+            qrCheckouts.reserve(checkoutId, customerId, guestHash, checkoutKey, paymentMethod.name(),
+                    total, snapshot(address), snapshots, OffsetDateTime.now());
             return checkoutId;
         } catch (DuplicateKeyException exception) {
             throw duplicateCheckout();
@@ -213,9 +221,10 @@ public class OrderServiceImpl implements OrderService {
     private OrderResponse createCheckout(CartOwner owner, String guestHash, String checkoutKey,
             com.stylemind.commerce.enums.PaymentMethod paymentMethod,
             java.util.function.Supplier<AddressSnapshot> addressSupplier, CheckoutSelection selection) {
-        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR) {
+        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                || paymentMethod == com.stylemind.commerce.enums.PaymentMethod.VNPAY) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "QR_CHECKOUT_REQUIRED",
-                    "Create a QR checkout before placing a VietQR order");
+                    "Create a payment session before placing an online order");
         }
         UUID customerId = owner.customerId();
         qrCheckouts.lockCheckoutKey(customerId, guestHash, checkoutKey);
@@ -238,11 +247,6 @@ public class OrderServiceImpl implements OrderService {
         }
         AddressSnapshot address = addressSupplier.get();
         long total = items.stream().mapToLong(CartItem::lineTotalVnd).sum();
-        if (paymentMethod == com.stylemind.commerce.enums.PaymentMethod.VNPAY
-                && (total < 5_000 || total > 9_999_999_999L)) {
-            throw new ApiOperationException(HttpStatus.BAD_REQUEST, "VNPAY_AMOUNT_INVALID",
-                    "VNPAY payment supports order totals from 5000 through 9999999999 VND");
-        }
         UUID orderId = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
         try {
@@ -285,7 +289,7 @@ public class OrderServiceImpl implements OrderService {
                 Sort.by(Sort.Direction.DESC, "createdAt", "checkoutId"));
         var result = qrCheckoutRepository.findPending(customerId, OffsetDateTime.now(), pageable);
         var items = result.getContent().stream().map(checkout -> new QrCheckoutListResponse.Item(
-                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getTotalVnd(),
+                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getPaymentMethod(), checkout.getTotalVnd(),
                 checkout.getCreatedAt(), checkout.getExpiresAt())).toList();
         return new QrCheckoutListResponse(items, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
@@ -298,7 +302,7 @@ public class OrderServiceImpl implements OrderService {
                 Sort.by(Sort.Direction.DESC, "createdAt", "checkoutId"));
         var result = qrCheckoutRepository.findRecentUnpaid(customerId, OffsetDateTime.now().minusHours(24), pageable);
         var items = result.getContent().stream().map(checkout -> new QrCheckoutListResponse.Item(
-                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getTotalVnd(),
+                checkout.getCheckoutId(), checkout.getCheckoutStatus(), checkout.getPaymentMethod(), checkout.getTotalVnd(),
                 checkout.getCreatedAt(), checkout.getExpiresAt())).toList();
         return new QrCheckoutListResponse(items, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
@@ -316,6 +320,13 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse updateStatus(UUID actorId, UUID orderId, OrderRequestValidator.StatusCommand command) {
         OrderSummary current = summary(orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound));
+        if (List.of(OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.COMPLETED).contains(command.orderStatus())) {
+            requireCancellationResolved(orderId);
+        }
+        if (current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.COD
+                && current.orderStatus() == OrderStatus.COMPLETED && command.orderStatus() == OrderStatus.COMPLETED) {
+            return response(detail(current));
+        }
         if (command.orderStatus() == OrderStatus.CANCELLED
                 && ((current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
                     || current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.VNPAY)
@@ -335,8 +346,12 @@ public class OrderServiceImpl implements OrderService {
                     "Order status transition is not allowed");
         }
         OffsetDateTime now = OffsetDateTime.now();
+        boolean deliveredCod = current.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.COD
+                && command.orderStatus() == OrderStatus.COMPLETED;
+        String historyReason = deliveredCod
+                ? com.stylemind.commerce.service.order.CodDeliveryRequested.historyReason(command.reason()) : command.reason();
         if (updateStatus(orderId, current.orderStatus(), command.orderStatus(), actorId,
-                command.reason(), now) != 1) {
+                historyReason, now) != 1) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_STATUS_CHANGED",
                     "Order status changed concurrently");
         }
@@ -344,12 +359,16 @@ public class OrderServiceImpl implements OrderService {
             quantityService.restoreCancelledOrder(orderId);
             qrCheckouts.releaseCancelledOrderItems(orderId);
         }
+        if (deliveredCod) {
+            events.publishEvent(new com.stylemind.commerce.service.order.CodDeliveryRequested(orderId));
+        }
         return response(detail(findSummary(orderId).orElseThrow()));
     }
 
     @Transactional
     public OrderResponse confirmOrder(UUID actorId, UUID orderId) {
         var order = orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound);
+        requireCancellationResolved(orderId);
         if (!List.of("PLACED", "PAID").contains(order.getOrderStatus())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "ORDER_CONFIRMATION_NOT_ALLOWED", "Order cannot be confirmed in its current state");
         }
@@ -376,8 +395,15 @@ public class OrderServiceImpl implements OrderService {
             throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
                     "Cancellation is not allowed for this order state");
         }
-        if ("SEPAY_VIETQR".equals(locked.getPaymentMethod()) || "VNPAY".equals(locked.getPaymentMethod())) {
+        if ("SEPAY_VIETQR".equals(locked.getPaymentMethod())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_CHECK_UNAVAILABLE", "Payment must be reconciled before cancellation");
+        }
+        if ("VNPAY".equals(locked.getPaymentMethod())) {
+            if (current != OrderStatus.PENDING_PAYMENT) {
+                throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
+                        "Only an unpaid VNPAY order can be cancelled directly");
+            }
+            paymentClient.cancelUnpaidVnpay(orderId);
         }
         OffsetDateTime now = OffsetDateTime.now();
         if (updateStatus(orderId, current, OrderStatus.CANCELLED, customerId, reason, now) != 1) {
@@ -401,6 +427,10 @@ public class OrderServiceImpl implements OrderService {
         OrderSummary order = summary(orderRepository.findLockedByOrderId(orderId).orElseThrow(this::notFound));
         if (customerId == null || !customerId.equals(order.customerId())) {
             throw notFound();
+        }
+        if (cancellationRepository.existsByOrderId(orderId)) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_ALREADY_REQUESTED",
+                    "A cancellation request already exists for this order");
         }
         if (!List.of(OrderStatus.PLACED, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())) {
             throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_NOT_ALLOWED",
@@ -429,10 +459,11 @@ public class OrderServiceImpl implements OrderService {
                         "Cancellation is not allowed for this order state");
             }
             OffsetDateTime now = OffsetDateTime.now();
-            boolean qr = order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR;
-            if ((qr && (!List.of(OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())
+            boolean online = order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR
+                    || order.paymentMethod() == com.stylemind.commerce.enums.PaymentMethod.VNPAY;
+            if ((online && (!List.of(OrderStatus.PAID, OrderStatus.PROCESSING).contains(order.orderStatus())
                     || !cancellationRefunds.record(requestId, order.orderId(), now)))
-                    || (!qr && paymentEventRepository.hasAppliedPayment(order.orderId()))) {
+                    || (!online && paymentEventRepository.hasAppliedPayment(order.orderId()))) {
                 throw new ApiOperationException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED", "Payment and refund must be resolved before approving cancellation");
             }
             if (updateStatus(order.orderId(), order.orderStatus(), OrderStatus.CANCELLED, reviewerId,
@@ -449,6 +480,13 @@ public class OrderServiceImpl implements OrderService {
                     "Cancellation request was already reviewed");
         }
         return cancellationResponse(cancellationById(requestId).orElseThrow());
+    }
+
+    private void requireCancellationResolved(UUID orderId) {
+        if (cancellationRepository.existsByOrderIdAndRequestStatus(orderId, CancellationStatus.PENDING.name())) {
+            throw new ApiOperationException(HttpStatus.CONFLICT, "CANCELLATION_PENDING",
+                    "Resolve the pending cancellation request before continuing fulfillment");
+        }
     }
 
     private List<CartItem> refreshedItems(UUID cartId) {

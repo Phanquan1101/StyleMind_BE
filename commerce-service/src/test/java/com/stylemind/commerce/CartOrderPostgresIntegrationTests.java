@@ -332,7 +332,7 @@ class CartOrderPostgresIntegrationTests {
         var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
                 id, null, "SEPAY_VIETQR", "SMGUEST", 100000, Instant.now());
         assertThat(paymentEvents.receive(event, Instant.now()).outcome()).isEqualTo("APPLIED");
-        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PROCESSING");
     }
 
     @Test
@@ -427,7 +427,7 @@ class CartOrderPostgresIntegrationTests {
             jdbc.execute("DROP TRIGGER fail_paid_cancel ON public.order_status_history");
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation", Integer.class)).isZero();
-        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PROCESSING");
         assertThat(jdbc.queryForObject("SELECT request_status FROM cancellation_request WHERE cancellation_request_id=?", String.class, UUID.fromString(requestId))).isEqualTo("PENDING");
         assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(99);
     }
@@ -469,7 +469,7 @@ class CartOrderPostgresIntegrationTests {
         assertThat(paymentEvents.receive(event, Instant.now()).outcome()).isEqualTo("APPLIED");
         mockMvc.perform(get("/api/v1/qr-checkouts/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ORDER_CREATED"));
-        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PROCESSING");
         assertThat(postJson("/api/v1/qr-checkouts/" + id + "/cancel", customerToken(), "{}").getResponse().getStatus()).isEqualTo(409);
     }
 
@@ -515,7 +515,7 @@ class CartOrderPostgresIntegrationTests {
     }
 
     @Test
-    void qrPaymentConfirmationCreatesOnePaidOrderFromTrustedSnapshots() {
+    void qrPaymentConfirmationCreatesOneProcessingOrderFromTrustedSnapshots() {
         var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
                 "qr-paid-test-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.SEPAY_VIETQR);
         var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 2);
@@ -529,11 +529,85 @@ class CartOrderPostgresIntegrationTests {
                 checkout, CUSTOMER_ID, "SEPAY_VIETQR", "SMTEST", 200000, now.toInstant());
         assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("APPLIED");
         assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("APPLIED");
-        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("PROCESSING");
+        assertThat(jdbc.queryForObject("SELECT confirmation_state FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("AUTO_CONFIRMED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM order_status_history WHERE order_id=?", Integer.class, checkout)).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT to_status FROM order_status_history WHERE order_id=? ORDER BY changed_at, history_id", String.class, checkout))
+                .containsExactly("PAID", "PROCESSING");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM order_item WHERE order_id=?", Integer.class, checkout)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(98);
         assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(98);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM qr_checkout_item WHERE checkout_id=? AND reservation_status='CONSUMED'", Integer.class, checkout)).isEqualTo(1);
+    }
+
+    @Test
+    void vnpayCheckoutCreatesOrderOnlyAfterConfirmedPaymentAndCannotBeCancelledAfterward() {
+        var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "vnpay-paid-test-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.VNPAY);
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 1);
+        UUID checkout = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", command, selection);
+        var now = java.time.OffsetDateTime.now();
+        assertThat(jdbc.queryForObject("SELECT payment_method FROM qr_checkout WHERE checkout_id=?", String.class, checkout)).isEqualTo("VNPAY");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, checkout)).isZero();
+        assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(99);
+        UUID attemptId = UUID.randomUUID();
+        var attempt = new com.stylemind.commerce.client.payment.PaymentAttemptResponse(attemptId, checkout,
+                "VNPAY", 100000, "VNPTEST", "PENDING", now.plusMinutes(10).toInstant(), null, null);
+        assertThat(qrReservations.recordPaymentAttempt(checkout, CUSTOMER_ID, attempt, now)).isTrue();
+        var event = new com.stylemind.commerce.dto.order.PaymentConfirmedEvent(UUID.randomUUID(), "PaymentConfirmed", attemptId,
+                checkout, CUSTOMER_ID, "VNPAY", "VNPTEST", 100000, now.toInstant());
+        assertThat(paymentEvents.receive(event, now.toInstant()).outcome()).isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("PROCESSING");
+        assertThat(jdbc.queryForObject("SELECT payment_method FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("VNPAY");
+        assertThat(jdbc.queryForObject("SELECT confirmation_state FROM customer_order WHERE order_id=?", String.class, checkout)).isEqualTo("AUTO_CONFIRMED");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> qrReservations.cancel(checkout, CUSTOMER_ID, null, now))
+                .isInstanceOf(com.stylemind.commerce.errors.ApiOperationException.class);
+    }
+
+    @Test
+    void unpaidVnpayCheckoutCanBeCancelledAndReleasesStock() {
+        var command = new com.stylemind.commerce.validation.order.OrderRequestValidator.CheckoutCommand(
+                "vnpay-cancel-test-01", ADDRESS_ID, com.stylemind.commerce.enums.PaymentMethod.VNPAY);
+        var selection = new com.stylemind.commerce.dto.order.CheckoutSelection(List.of(), variantId, 1);
+        UUID checkout = orderService.prepareQrCheckout(CUSTOMER_ID, "Bearer test", command, selection);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(99);
+        qrReservations.cancel(checkout, CUSTOMER_ID, null, java.time.OffsetDateTime.now());
+        assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, checkout)).isZero();
+    }
+
+    @Test
+    void vnpayCheckoutApiCancelsOnlyTheOwnersUnpaidSession() throws Exception {
+        var prepared = postJson("/api/v1/qr-checkouts/buy-now", customerToken(),
+                "{\"checkout_key\":\"vnpay-api-cancel-01\",\"shipping_address_id\":\"" + ADDRESS_ID
+                        + "\",\"payment_method\":\"VNPAY\",\"variant_id\":\"" + variantId + "\",\"quantity\":1}");
+        assertThat(prepared.getResponse().getStatus()).isEqualTo(201);
+        UUID id = UUID.fromString(json(prepared).path("checkoutId").asText());
+        assertThat(json(prepared).path("paymentMethod").asText()).isEqualTo("VNPAY");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, id)).isZero();
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/cancel", otherCustomerToken(), "{}")
+                .getResponse().getStatus()).isEqualTo(404);
+        org.mockito.Mockito.verify(payment, org.mockito.Mockito.never()).cancelUnpaidVnpay(id);
+
+        org.mockito.Mockito.reset(payment);
+        org.mockito.Mockito.when(payment.create(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            com.stylemind.commerce.client.payment.OrderPaymentRequest request = invocation.getArgument(0);
+            assertThat(request.orderId()).isEqualTo(id);
+            assertThat(request.paymentMethod()).isEqualTo("VNPAY");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, id)).isZero();
+            return new com.stylemind.commerce.client.payment.PaymentAttemptResponse(UUID.randomUUID(), id,
+                    "VNPAY", request.acceptedTotalVnd(), "VNTEST", "PENDING", Instant.now().plusSeconds(800),
+                    null, null, "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html");
+        });
+        assertThat(postJson("/api/v1/qr-checkouts/" + id + "/payment-attempt", customerToken(), "{}")
+                .getResponse().getStatus()).isEqualTo(200);
+        org.mockito.Mockito.verify(payment).create(org.mockito.ArgumentMatchers.any());
+        var cancelled = postJson("/api/v1/qr-checkouts/" + id + "/cancel", customerToken(), "{}");
+        assertThat(cancelled.getResponse().getStatus()).isEqualTo(200);
+        assertThat(json(cancelled).path("status").asText()).isEqualTo("CANCELLED");
+        org.mockito.Mockito.verify(payment).cancelUnpaidVnpay(id);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order WHERE order_id=?", Integer.class, id)).isZero();
     }
 
     @Test
@@ -635,7 +709,26 @@ class CartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"order_status\":\"CANCELLED\",\"reason\":\"Khach yeu cau\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_RECONCILIATION_REQUIRED"));
-        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PROCESSING");
+    }
+
+    @Test
+    void autoConfirmedQrCanShipOnlyAfterPendingCancellationIsResolved() throws Exception {
+        UUID id = paidQrOrder();
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(),
+                "{\"reason\":\"Khong con nhu cau\"}"));
+        mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"order_status\":\"SHIPPED\",\"reason\":null}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_PENDING"));
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"REJECTED\",\"decision_reason\":\"Dang chuan bi hang\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"order_status\":\"SHIPPED\",\"reason\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("SHIPPED"));
     }
 
     @Test
@@ -707,7 +800,7 @@ class CartOrderPostgresIntegrationTests {
     }
 
     @Test
-    void confirmedCodRequiresReviewAndRejectedRequestCanBeResubmitted() throws Exception {
+    void confirmedCodRequiresReviewAndRejectedRequestCannotBeResubmitted() throws Exception {
         postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
         JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
                 {"checkout_key":"confirmed-cancel-001","shipping_address_id":"%s","payment_method":"COD"}
@@ -724,9 +817,86 @@ class CartOrderPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"request_status\":\"REJECTED\",\"decision_reason\":\"Dang chuan bi hang\"}"))
                 .andExpect(status().isOk());
-        JsonNode second = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"));
-        assertThat(second.path("cancellation_request_id").asText()).isNotEqualTo(request.path("cancellation_request_id").asText());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.cancellation_request WHERE order_id=?", Integer.class, UUID.fromString(id))).isEqualTo(2);
+        assertProblem(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Khong con nhu cau\"}"),
+                409, "CANCELLATION_ALREADY_REQUESTED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.cancellation_request WHERE order_id=?", Integer.class, UUID.fromString(id))).isEqualTo(1);
+    }
+
+    @Test
+    void pendingCancellationBlocksConfirmationProcessingAndShipping() throws Exception {
+        UUID id = UUID.fromString(json(createCod("pending-cancel-guard")).path("order_id").asText());
+        postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}");
+        mockMvc.perform(post("/api/v1/admin/orders/{id}/confirm", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_PENDING"));
+        jdbc.update("UPDATE customer_order SET confirmation_state='CONFIRMED',confirmed_by_user_id=?,confirmed_at=now() WHERE order_id=?", CUSTOMER_ID, id);
+        for (String next : List.of("PROCESSING", "SHIPPED")) {
+            if (next.equals("SHIPPED")) jdbc.update("UPDATE customer_order SET order_status='PROCESSING' WHERE order_id=?", id);
+            mockMvc.perform(put("/api/v1/admin/orders/{id}/status", id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"order_status\":\"" + next + "\",\"reason\":null}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_PENDING"));
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM order_status_history WHERE order_id=? AND to_status IN ('PROCESSING','SHIPPED')", Integer.class, id)).isZero();
+    }
+
+    @Test
+    void concurrentCancellationSubmissionsAfterRejectionCannotCreateAnotherRequest() throws Exception {
+        UUID id = UUID.fromString(json(createCod("cancel-lifetime-race")).path("order_id").asText());
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}"));
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"REJECTED\",\"decision_reason\":\"Already preparing\"}"))
+                .andExpect(status().isOk());
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Integer> submit = () -> {
+                start.await();
+                return postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}").getResponse().getStatus();
+            };
+            var first = pool.submit(submit);
+            var second = pool.submit(submit);
+            start.countDown();
+            assertThat(List.of(first.get(15, java.util.concurrent.TimeUnit.SECONDS), second.get(15, java.util.concurrent.TimeUnit.SECONDS)))
+                    .containsOnly(409);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_request WHERE order_id=?", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test
+    void paidVnpayCancellationCreatesFullRefundFromMatchingAppliedEvent() throws Exception {
+        UUID id = paidQrOrder();
+        jdbc.update("UPDATE customer_order SET payment_method='VNPAY' WHERE order_id=?", id);
+        jdbc.update("UPDATE payment_event_inbox SET payment_method='VNPAY' WHERE order_id=?", id);
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}"));
+        mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.refund_status").value("PENDING_REFUND"));
+        assertThat(jdbc.queryForObject("SELECT amount_vnd FROM cancellation_refund_obligation WHERE order_id=?", Long.class, id)).isEqualTo(100000L);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
+    }
+
+    @Test
+    void vnpayCancellationCannotApproveWithMismatchedOrUnappliedPayment() throws Exception {
+        UUID id = paidQrOrder();
+        jdbc.update("UPDATE customer_order SET payment_method='VNPAY' WHERE order_id=?", id);
+        jdbc.update("UPDATE payment_event_inbox SET payment_method='VNPAY' WHERE order_id=?", id);
+        mockMvc.perform(post("/api/v1/orders/{id}/cancellation-requests", id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherCustomerToken())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Changed plans\"}"))
+                .andExpect(status().isNotFound());
+        JsonNode request = json(postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}"));
+        for (String invalid : List.of("customer_id='" + OTHER_CUSTOMER_ID + "'", "payment_method='SEPAY_VIETQR'", "amount_vnd=99999", "outcome='RECONCILIATION_REQUIRED'")) {
+            jdbc.update("UPDATE payment_event_inbox SET " + invalid + " WHERE order_id=?", id);
+            mockMvc.perform(put("/api/v1/admin/cancellation-requests/{id}", request.path("cancellation_request_id").asText())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"request_status\":\"APPROVED\",\"decision_reason\":null}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_RECONCILIATION_REQUIRED"));
+            jdbc.update("UPDATE payment_event_inbox SET customer_id=?,payment_method='VNPAY',amount_vnd=100000,outcome='APPLIED' WHERE order_id=?", CUSTOMER_ID, id);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cancellation_refund_obligation WHERE order_id=?", Integer.class, id)).isZero();
+        assertThat(jdbc.queryForObject("SELECT order_status FROM customer_order WHERE order_id=?", String.class, id)).isEqualTo("PROCESSING");
     }
 
     @Test
@@ -756,7 +926,7 @@ class CartOrderPostgresIntegrationTests {
         UUID id = paidQrOrder();
         mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
-                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_NOT_ALLOWED"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANCELLATION_REVIEW_REQUIRED"));
     }
 
     @Test
@@ -772,6 +942,24 @@ class CartOrderPostgresIntegrationTests {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Khong con nhu cau\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_CHECK_UNAVAILABLE"));
         assertThat(jdbc.queryForObject("SELECT quantity FROM public.product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(98);
+    }
+
+    @Test
+    void unpaidVnpayCanBeCancelledDirectlyWithPendingRequest() throws Exception {
+        postJson("/api/v1/cart/items", customerToken(), "{\"variant_id\":\"" + variantId + "\",\"quantity\":1,\"guest_session_key\":null}");
+        // Existing unpaid VNPAY orders from before V19 still use the order cancellation endpoint.
+        JsonNode order = json(postJson("/api/v1/orders", customerToken(), """
+                {"checkout_key":"unpaid-vnpay-direct-cancel","shipping_address_id":"%s","payment_method":"COD"}
+                """.formatted(ADDRESS_ID)));
+        UUID id = UUID.fromString(order.path("order_id").asText());
+        jdbc.update("UPDATE customer_order SET payment_method='VNPAY',order_status='PENDING_PAYMENT' WHERE order_id=?", id);
+        postJson("/api/v1/orders/" + id + "/cancellation-requests", customerToken(), "{\"reason\":\"Changed plans\"}");
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", id).header(HttpHeaders.AUTHORIZATION, bearer(customerToken()))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Changed plans\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.order_status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancellation_request.request_status").value("APPROVED"));
+        org.mockito.Mockito.verify(payment).cancelUnpaidVnpay(id);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM product_variant WHERE variant_id=?", Integer.class, variantId)).isEqualTo(100);
     }
 
     @Test

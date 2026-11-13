@@ -72,6 +72,19 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
 
     @Transactional
     @Override
+    public void cancelUnpaidVnpay(UUID orderId) {
+        if (orderId == null) {
+            throw new PaymentApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Order ID is required");
+        }
+        repository.lockOrder(orderId);
+        if (!repository.cancelUnpaidVnpayAttempts(orderId)) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED",
+                    "Payment must be reconciled before cancellation");
+        }
+    }
+
+    @Transactional
+    @Override
     public PaymentAttemptResponse createAttempt(CreatePaymentAttemptRequest request, UUID customerId, Instant now) {
         validateCreateRequest(request);
         String requestKey = normalizeRequestKey(request, now);
@@ -79,6 +92,9 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
         validateOrderSnapshot(order, customerId);
         validateRequestedMethod(request, order);
         repository.lockOrder(order.orderId());
+        if (repository.hasCancelledVnpayAttempt(order.orderId())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_CANCELLED", "VNPAY payment was cancelled");
+        }
         repository.expireStaleOnlineAttempts(now);
         return repository.findByOrderAndRequestKey(request.orderId(), requestKey)
                 .map(existing -> existingAttemptResponse(existing, order, customerId))
@@ -93,6 +109,9 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
         }
         CommerceOrderPaymentSnapshot order = request.order();
         repository.lockOrder(order.orderId());
+        if (repository.hasCancelledVnpayAttempt(order.orderId())) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "PAYMENT_CANCELLED", "VNPAY payment was cancelled");
+        }
         repository.expireStaleOnlineAttempts(now);
         return repository.findByOrderAndRequestKey(order.orderId(), request.requestKey())
                 .map(existing -> existingAttemptResponse(existing, order, order.customerId()))
@@ -133,6 +152,18 @@ public class PaymentAttemptServiceImpl implements PaymentAttemptService {
         }
         outboxService.recordPaymentConfirmed(attempt, request.collectedAmountVnd(), collectedAt);
         return mapper.toResponse(attempt, PaymentAttemptStatus.SETTLED.name());
+    }
+
+    @Override
+    @Transactional
+    public PaymentAttemptResponse collectDeliveredCod(UUID orderId, Instant now) {
+        var order = commerceOrderClient.getPaymentSnapshot(orderId);
+        if (order == null || !orderId.equals(order.orderId()) || order.codCollectionActorId() == null
+                || order.codCollectionRequestedAt() == null) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "COD_COLLECTION_INTENT_REQUIRED",
+                    "COD collection requires the committed Commerce delivery command");
+        }
+        return confirmDeliveredCod(orderId, order.codCollectionActorId(), now);
     }
 
     @Override

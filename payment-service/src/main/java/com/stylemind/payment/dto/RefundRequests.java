@@ -3,6 +3,7 @@ package com.stylemind.payment.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.payment.errors.RefundErrorCode;
+import java.util.UUID;
 
 public final class RefundRequests {
 
@@ -30,6 +31,15 @@ public final class RefundRequests {
             requireObject(body, 2);
             return new Completion(requiredText(body, "transfer_reference", 160),
                     requiredText(body, "proof_reference", 160));
+        }
+    }
+
+    public record ReceiptCompletion(UUID refundId) {
+        public static ReceiptCompletion parse(String refundId, String transferConfirmed) {
+            if (!"true".equals(transferConfirmed)) {
+                throw RefundErrorCode.INVALID_REQUEST.exception();
+            }
+            return new ReceiptCompletion(RefundSourceType.parseId(refundId));
         }
     }
 

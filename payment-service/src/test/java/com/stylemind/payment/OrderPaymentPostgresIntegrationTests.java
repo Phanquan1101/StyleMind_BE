@@ -85,6 +85,28 @@ class OrderPaymentPostgresIntegrationTests {
     }
 
     @Test
+    void concurrentInternalDeliveryRecoverySettlesOnceAndRejectsMismatchedOwner() throws Exception {
+        UUID order = UUID.randomUUID(), owner = UUID.randomUUID(), actor = UUID.randomUUID();
+        var attempt = payments.createOrderAttempt(request(order, owner, 125000, "COD", "PLACED"), Instant.now());
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, UUID.randomUUID(),
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED", actor, Instant.now()));
+        assertThatThrownBy(() -> payments.collectDeliveredCod(order, Instant.now()))
+                .isInstanceOf(com.stylemind.payment.errors.PaymentApiException.class).hasMessage("COD order does not match the payment attempt");
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED", actor, Instant.now()));
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            var jobs = new ArrayList<java.util.concurrent.Future<String>>();
+            for (int i = 0; i < 4; i++) jobs.add(executor.submit(() -> payments.collectDeliveredCod(order, Instant.now()).status()));
+            for (var job : jobs) assertThat(job.get(30, TimeUnit.SECONDS)).isEqualTo("PAID");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM financial_transaction WHERE payment_attempt_id=?", Integer.class, attempt.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_outbox WHERE aggregate_id=?", Integer.class, attempt.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT recorded_by_user_id FROM financial_transaction WHERE payment_attempt_id=?", UUID.class, attempt.id())).isEqualTo(actor);
+    }
+
+    @Test
     void mismatchedReplaysCannotChangeCustomerAmountOrMethod() throws Exception {
         UUID order = UUID.randomUUID();
         UUID owner = UUID.randomUUID();

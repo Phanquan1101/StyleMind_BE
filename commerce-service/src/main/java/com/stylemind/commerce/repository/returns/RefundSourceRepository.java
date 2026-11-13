@@ -21,7 +21,7 @@ public class RefundSourceRepository {
             JOIN public.payment_event_inbox e ON e.event_id=r.payment_event_id AND e.order_id=o.order_id
             WHERE r.return_id=:id AND r.return_status IN ('PENDING_REFUND','REFUNDED')
                 AND o.order_status='COMPLETED' AND r.amount_vnd<=e.amount_vnd
-                AND e.payment_method IN ('COD','SEPAY_VIETQR')
+                AND e.payment_method IN ('COD','SEPAY_VIETQR','VNPAY')
             """;
 
     private static final String CANCELLATION_SOURCE = """
@@ -32,7 +32,7 @@ public class RefundSourceRepository {
             JOIN public.payment_event_inbox e ON e.event_id=c.payment_event_id AND e.order_id=o.order_id
             WHERE c.cancellation_request_id=:id AND c.obligation_status IN ('PENDING_REFUND','REFUNDED')
                 AND q.request_status='APPROVED' AND o.order_status='CANCELLED' AND c.amount_vnd=e.amount_vnd
-                AND e.payment_method='SEPAY_VIETQR'
+                AND e.payment_method IN ('SEPAY_VIETQR','VNPAY')
             """;
 
     private static final String VERIFIED_PAYMENT = """

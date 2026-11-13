@@ -21,6 +21,33 @@ class PaymentClientHttpTests {
             "PLACED", "initial-" + order);
 
     @Test
+    void codCollectionUsesFixedInternalPathAndServiceTokenWithRetryOwnedByDispatcher() throws Exception {
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        var calls = new AtomicInteger();
+        var code = new AtomicInteger(503);
+        server.createContext("/internal/v1/payments/orders/" + order + "/cod-collection", exchange -> {
+            calls.incrementAndGet();
+            assertThat(exchange.getRequestMethod()).isEqualTo("POST");
+            assertThat(exchange.getRequestHeaders().getFirst("X-StyleMind-Service-Token")).isEqualTo("test-only-service-token");
+            assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isNull();
+            assertThat(exchange.getRequestBody().readAllBytes()).isEmpty();
+            exchange.sendResponseHeaders(code.get(), -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var client = new PaymentClient(RestClient.builder(), "http://127.0.0.1:" + server.getAddress().getPort(), "test-only-service-token");
+            assertThatThrownBy(() -> client.collectDeliveredCod(order)).isInstanceOf(ApiOperationException.class);
+            assertThat(calls.get()).isEqualTo(1);
+            code.set(200);
+            client.collectDeliveredCod(order);
+            assertThat(calls.get()).isEqualTo(2);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void postsTrustedSnapshotAndServiceHeaderWithoutBearerAndDoesNotRetryFailures() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var calls = new AtomicInteger();

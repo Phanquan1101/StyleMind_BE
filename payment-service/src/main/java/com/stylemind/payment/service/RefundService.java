@@ -3,6 +3,7 @@ package com.stylemind.payment.service;
 import com.stylemind.payment.dto.RefundRequests.Completion;
 import com.stylemind.payment.dto.RefundRequests.Destination;
 import com.stylemind.payment.dto.RefundRequests.Failure;
+import com.stylemind.payment.dto.RefundRequests.ReceiptCompletion;
 import com.stylemind.payment.dto.RefundResponse;
 import com.stylemind.payment.dto.RefundSourceType;
 import com.stylemind.payment.service.PaymentAuthorizationService.RefundActor;
@@ -17,5 +18,7 @@ public interface RefundService {
     RefundResponse start(RefundSourceType type, UUID sourceId, UUID admin);
     Destination getDestination(RefundSourceType type, UUID sourceId, UUID admin);
     RefundResponse complete(RefundSourceType type, UUID sourceId, UUID admin, Completion evidence);
+    RefundResponse completeWithReceipt(RefundSourceType type, UUID sourceId, UUID admin,
+            ReceiptCompletion completion, org.springframework.web.multipart.MultipartFile image);
     RefundResponse fail(RefundSourceType type, UUID sourceId, UUID admin, Failure failure);
 }

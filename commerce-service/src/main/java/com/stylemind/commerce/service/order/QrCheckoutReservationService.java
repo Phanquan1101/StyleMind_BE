@@ -22,7 +22,7 @@ public class QrCheckoutReservationService {
     private record Checkout(UUID customer, String guestHash, String status) { }
     private record Reservation(UUID variantId, int quantity) { }
     public record PaymentContext(UUID checkoutId, UUID customerId, long totalVnd, String status,
-            OffsetDateTime expiresAt) { }
+            OffsetDateTime expiresAt, String paymentMethod) { }
 
     @Transactional(readOnly = true)
     public PaymentContext paymentContext(UUID checkoutId, UUID customerId) {
@@ -33,13 +33,13 @@ public class QrCheckoutReservationService {
     public PaymentContext paymentContext(UUID checkoutId, UUID customerId, String guestHash) {
         if ((customerId == null) == (guestHash == null)) throw notFound();
         return jdbc.sql("""
-                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at
+                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at,payment_method
                 FROM qr_checkout WHERE checkout_id=:id AND
                     ((CAST(:customer AS uuid) IS NOT NULL AND customer_id=CAST(:customer AS uuid)) OR
                      (CAST(:guest AS text) IS NOT NULL AND guest_session_hash=CAST(:guest AS text)))
                 """).param("id", checkoutId).param("customer", customerId).param("guest", guestHash)
                 .query((rs, row) -> new PaymentContext(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                        rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class)))
+                        rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class), rs.getString(6)))
                 .optional().orElseThrow(this::notFound);
     }
 
@@ -69,16 +69,16 @@ public class QrCheckoutReservationService {
             com.stylemind.commerce.client.payment.PaymentAttemptResponse attempt, OffsetDateTime now) {
         if ((customerId == null) == (guestHash == null)) throw notFound();
         var context = jdbc.sql("""
-                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at
+                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at,payment_method
                 FROM qr_checkout WHERE checkout_id=:id AND
                     ((CAST(:customer AS uuid) IS NOT NULL AND customer_id=CAST(:customer AS uuid)) OR
                      (CAST(:guest AS text) IS NOT NULL AND guest_session_hash=CAST(:guest AS text))) FOR UPDATE
                 """).param("id", checkoutId).param("customer", customerId).param("guest", guestHash)
                 .query((rs, row) -> new PaymentContext(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                        rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class)))
+                        rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class), rs.getString(6)))
                 .optional().orElseThrow(this::notFound);
         if (attempt == null || attempt.id() == null || attempt.reference() == null || attempt.reference().isBlank()
-                || !checkoutId.equals(attempt.orderId()) || !"SEPAY_VIETQR".equals(attempt.method())
+                || !checkoutId.equals(attempt.orderId()) || !context.paymentMethod().equals(attempt.method())
                 || context.totalVnd() != attempt.amountVnd()) {
             throw new ApiOperationException(HttpStatus.BAD_GATEWAY, "PAYMENT_DELIVERY_UNKNOWN", "Payment response does not match checkout");
         }
@@ -102,10 +102,10 @@ public class QrCheckoutReservationService {
     @Transactional
     public boolean createPaidOrder(UUID checkoutId, OffsetDateTime now) {
         var context = jdbc.sql("""
-                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at
+                SELECT checkout_id,customer_id,total_vnd,checkout_status,expires_at,payment_method
                 FROM qr_checkout WHERE checkout_id=:id FOR UPDATE
                 """).param("id", checkoutId).query((rs, row) -> new PaymentContext(rs.getObject(1, UUID.class),
-                        rs.getObject(2, UUID.class), rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class)))
+                        rs.getObject(2, UUID.class), rs.getLong(3), rs.getString(4), rs.getObject(5, OffsetDateTime.class), rs.getString(6)))
                 .optional().orElseThrow(this::notFound);
         if (!List.of("PREPARING", "AWAITING_PAYMENT").contains(context.status())) return false;
         if (!now.isBefore(context.expiresAt())) {
@@ -118,9 +118,9 @@ public class QrCheckoutReservationService {
         String number = "SM-" + checkoutId.toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
         jdbc.sql("""
                 INSERT INTO customer_order(order_id,order_number,customer_id,guest_session_hash,checkout_key,
-                    order_status,payment_method,accepted_total_vnd,placed_at,confirmation_state)
-                SELECT checkout_id,:number,customer_id,guest_session_hash,checkout_key,'PAID',
-                    'SEPAY_VIETQR',total_vnd,:now,'UNCONFIRMED' FROM qr_checkout WHERE checkout_id=:id
+                    order_status,payment_method,accepted_total_vnd,placed_at,confirmation_state,confirmed_at)
+                SELECT checkout_id,:number,customer_id,guest_session_hash,checkout_key,'PROCESSING',
+                    payment_method,total_vnd,:now,'AUTO_CONFIRMED',:now FROM qr_checkout WHERE checkout_id=:id
                 """).param("id", checkoutId).param("number", number).param("now", now).update();
         jdbc.sql("""
                 INSERT INTO order_address_snapshot(order_id,source_address_id,recipient_name,recipient_phone,address_line)
@@ -149,6 +149,10 @@ public class QrCheckoutReservationService {
                 INSERT INTO order_status_history(history_id,order_id,from_status,to_status,actor_user_id,changed_at,reason)
                 VALUES (:history,:id,NULL,'PAID',NULL,:now,'Payment confirmed before order creation')
                 """).param("history", UUID.randomUUID()).param("id", checkoutId).param("now", now).update();
+        jdbc.sql("""
+                INSERT INTO order_status_history(history_id,order_id,from_status,to_status,actor_user_id,changed_at,reason)
+                VALUES (:history,:id,'PAID','PROCESSING',NULL,:now,'Payment confirmed; preparation started automatically')
+                """).param("history", UUID.randomUUID()).param("id", checkoutId).param("now", now.plusNanos(1_000)).update();
         jdbc.sql("UPDATE qr_checkout SET checkout_status='ORDER_CREATED',order_id=:id,updated_at=:now WHERE checkout_id=:id")
                 .param("id", checkoutId).param("now", now).update();
         return true;
@@ -172,7 +176,14 @@ public class QrCheckoutReservationService {
     @Transactional
     public void reserve(UUID checkoutId, UUID customerId, String guestHash, String key, long total,
             String shippingSnapshot, List<Item> items, OffsetDateTime now) {
+        reserve(checkoutId, customerId, guestHash, key, "SEPAY_VIETQR", total, shippingSnapshot, items, now);
+    }
+
+    @Transactional
+    public void reserve(UUID checkoutId, UUID customerId, String guestHash, String key, String paymentMethod, long total,
+            String shippingSnapshot, List<Item> items, OffsetDateTime now) {
         if (checkoutId == null || (customerId == null) == (guestHash == null) || key == null || key.isBlank()
+                || !List.of("SEPAY_VIETQR", "VNPAY").contains(paymentMethod)
                 || total <= 0 || items == null || items.isEmpty() || now == null
                 || items.stream().anyMatch(item -> item.variantId() == null || item.quantity() <= 0 || item.unitPriceVnd() <= 0)) {
             throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid checkout");
@@ -183,11 +194,11 @@ public class QrCheckoutReservationService {
             throw new ApiOperationException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid checkout items");
         }
         jdbc.sql("""
-                INSERT INTO qr_checkout(checkout_id,customer_id,guest_session_hash,checkout_key,checkout_status,total_vnd,
+                INSERT INTO qr_checkout(checkout_id,customer_id,guest_session_hash,checkout_key,checkout_status,payment_method,total_vnd,
                     shipping_snapshot,payment_reference_id,created_at,expires_at,updated_at)
-                VALUES (:id,:customer,:guest,:key,'PREPARING',:total,CAST(:shipping AS jsonb),:id,:now,:expires,:now)
+                VALUES (:id,:customer,:guest,:key,'PREPARING',:method,:total,CAST(:shipping AS jsonb),:id,:now,:expires,:now)
                 """).param("id", checkoutId).param("customer", customerId).param("guest", guestHash)
-                .param("key", key).param("total", total).param("shipping", shippingSnapshot)
+                .param("key", key).param("method", paymentMethod).param("total", total).param("shipping", shippingSnapshot)
                 .param("now", now).param("expires", now.plusMinutes(15)).update();
         var requested = sorted.stream().collect(java.util.stream.Collectors.toMap(Item::variantId, Item::quantity));
         if (!quantityService.allocate(requested)) {
