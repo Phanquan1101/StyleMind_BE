@@ -62,7 +62,9 @@ public class SecurityConfiguration {
                                 "/api/v1/admin/variant-images", "/api/v1/admin/variant-images/**",
                                 "/api/v1/admin/orders", "/api/v1/admin/orders/**",
                                 "/api/v1/admin/cancellation-requests", "/api/v1/admin/cancellation-requests/**",
-                                "/api/v1/admin/returns", "/api/v1/admin/returns/**")
+                                "/api/v1/admin/returns", "/api/v1/admin/returns/**",
+                                "/api/v1/admin/dashboard",
+                                "/api/v1/admin/revenue", "/api/v1/admin/revenue/**")
                         .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

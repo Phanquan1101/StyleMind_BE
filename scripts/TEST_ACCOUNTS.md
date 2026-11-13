@@ -97,3 +97,19 @@ Webhook luôn trả `200 {"success":true}` kể cả khi sự kiện bị ghi th
 ## 5. Làm sạch
 
 `docker compose --project-name stylemind-task4 down` giữ lại dữ liệu. Muốn xóa toàn bộ dữ liệu test (kể cả tài khoản, đơn hàng) thì thêm `-v` — **lệnh này xóa volume Postgres**; admin bootstrap sẽ được tạo lại lần khởi động kế tiếp và cần chạy lại seed.
+
+## 6. Dữ liệu mẫu cho dashboard Tổng quan (CHỈ DÙNG LOCAL)
+
+Dashboard admin (`/admin`) cần đơn rải nhiều ngày mới có số liệu để xem. Script này tạo ~54 đơn mẫu trong 30 ngày qua cho `an@`, `binh@`, `chi@sm.test` (hoàn tất, đang giao, đang xử lý, chờ xác nhận, đã hủy; COD đã thu, VNPAY và VietQR đã trả; vài khoản hoàn tiền một phần):
+
+```powershell
+cd StyleMind_BE
+node scripts/seed-test-data.cjs            # cần tài khoản seed trước
+node scripts/seed-dashboard-demo.cjs       # tạo đơn mẫu (chạy lại thì bỏ qua, không tạo trùng)
+node scripts/seed-dashboard-demo.cjs --reset   # xóa đúng các đơn mẫu rồi chạy lại lệnh trên nếu muốn tạo mới
+```
+
+- Vì phải lùi ngày tạo đơn / ngày nhận tiền (API không cho phép), script **ghi thẳng vào DB commerce** qua `docker exec <postgres> psql` (container mặc định `stylemind-postgres-1`, đổi bằng `POSTGRES_CONTAINER`). Không dùng cho môi trường thật.
+- Đơn mẫu được đánh dấu bằng `checkout_key = 'demo-dashboard-NN'`. `--reset` chỉ xóa các đơn đó (kèm dòng hàng, địa chỉ, lịch sử trạng thái, sự kiện thanh toán, hoàn tiền của chúng); đơn thật không bị đụng.
+- Không đổi tồn kho, giỏ hàng hay dữ liệu của payment-service. Ở trang Thanh toán/Đơn hàng của admin sẽ thấy các đơn mẫu lẫn với đơn thật.
+- Muốn dashboard "sạch" như cửa hàng mới: chạy `--reset`.
