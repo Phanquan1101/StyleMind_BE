@@ -118,6 +118,8 @@ class ProductCatalogPostgresIntegrationTests {
         JsonNode created = json(postJson("/api/v1/admin/products", adminToken(), productBody("ACTIVE")));
         UUID productId = UUID.fromString(created.path("product_id").asText());
         assertThat(created.path("category_id").asText()).isEqualTo(categoryId.toString());
+        assertProblem(postJson("/api/v1/admin/products", adminToken(), productBody("DELETED")),
+                400, "INVALID_REQUEST");
 
         mockMvc.perform(put("/api/v1/admin/products/{id}", productId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
@@ -179,15 +181,26 @@ class ProductCatalogPostgresIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("SELECT product_status FROM public.product WHERE product_id = ?",
-                String.class, productId)).isEqualTo("INACTIVE");
+                String.class, productId)).isEqualTo("DELETED");
         mockMvc.perform(get("/api/v1/products/{id}", productId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(customerToken())))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/admin/products/{id}", productId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/products")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.product_status").value("INACTIVE"))
-                .andExpect(jsonPath("$.variants[0].variant_status").value("INACTIVE"));
+                .andExpect(jsonPath("$.total_elements").value(1))
+                .andExpect(jsonPath("$.items[0].product_id").value(productId.toString()))
+                .andExpect(jsonPath("$.items[0].product_status").value("DELETED"));
+        mockMvc.perform(put("/api/v1/admin/products/{id}", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(productBody("ACTIVE")))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT product_status FROM public.product WHERE product_id = ?",
+                String.class, productId)).isEqualTo("DELETED");
     }
 
     @Test

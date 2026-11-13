@@ -100,7 +100,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/api/v1/admin/products/{productId}")
-    @Operation(summary = "Soft-delete product by marking it inactive (ADMIN only)")
+    @Operation(summary = "Permanently retire a product with non-restorable soft delete (ADMIN only)")
     public ResponseEntity<Void> deleteProduct(@PathVariable String productId) {
         productService.deleteProduct(validator.pathId(productId));
         return ResponseEntity.noContent().build();
