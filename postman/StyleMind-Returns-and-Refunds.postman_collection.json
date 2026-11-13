@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "StyleMind — Returns and Manual Refunds",
-    "description": "Local fixture workflow. Select a folder to run. All mutation requests require allowRefundMutations=true in the environment. Payment completion records a manual transfer; use synthetic references in a test database.",
+    "description": "Local fixture workflow. Select a folder to run. Mutation requests require allowRefundMutations=true. Assigned admin completes a manual refund with one private JPEG/PNG and explicit transfer confirmation. completion_id is an internal audit identifier.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -40,6 +40,10 @@
     {
       "key": "refundSourceType",
       "value": "RETURN"
+    },
+    {
+      "key": "refundId",
+      "value": ""
     }
   ],
   "item": [
@@ -384,7 +388,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP status\", function () { pm.expect([200,201]).to.include(pm.response.code); });",
-                  "if (pm.response.code < 300) { pm.test('Server supplied a refund amount', function () { pm.expect(pm.response.json().amount_vnd).to.be.above(0); }); }"
+                  "if (pm.response.code < 300) { pm.test('Server supplied a refund amount', function () { pm.expect(pm.response.json().amount_vnd).to.be.above(0); }); }",
+                  "if (pm.response.code === 200) { pm.collectionVariables.set('refundId', pm.response.json().refund_id); }"
                 ]
               }
             }
@@ -522,7 +527,7 @@
           }
         },
         {
-          "name": "Admin records a completed manual transfer",
+          "name": "Admin confirms transferred refund with one receipt photo",
           "event": [
             {
               "listen": "prerequest",
@@ -539,7 +544,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
-                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REFUNDED'); }); }"
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REFUNDED'); }); }",
+                  "if (pm.response.code === 200) { pm.test('Private receipt and internal completion', function () { const b=pm.response.json(); pm.expect(b.has_receipt).to.eql(true); pm.expect(b.completion_id).to.be.a('string').and.not.empty; pm.expect(b.transfer_reference).to.eql(null); }); }"
                 ]
               }
             }
@@ -556,17 +562,29 @@
               ]
             },
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transfer_reference\": \"{{transferReference}}\",\n  \"proof_reference\": \"{{proofReference}}\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "{{refundId}}"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "true"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
             },
-            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete"
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
           }
         },
         {
@@ -699,6 +717,55 @@
             },
             "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/fail"
           }
+        },
+        {
+          "name": "Legacy JSON completion compatibility (run separately)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code < 300) { pm.test(\"Persisted state\", function () { pm.expect(pm.response.json().status).to.eql('REFUNDED'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transfer_reference\": \"{{transferReference}}\",\n  \"proof_reference\": \"{{proofReference}}\"\n}"
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete",
+            "description": "Existing client compatibility. Run separately on an isolated fixture. The current admin workflow uses complete-with-receipt."
+          }
         }
       ]
     },
@@ -798,6 +865,301 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/payment/api/v1/refunds/{{refundSourceType}}/{{refundSourceId}}/receipt"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Receipt completion negative checks (run individually on a PROCESSING fixture)",
+      "item": [
+        {
+          "name": "Missing receipt is rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rejected request',function(){pm.response.to.have.status(400);});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "{{refundId}}"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "true"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
+          }
+        },
+        {
+          "name": "Transfer not confirmed is rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rejected request',function(){pm.response.to.have.status(400);});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "{{refundId}}"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "false"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
+          }
+        },
+        {
+          "name": "Wrong refund case identity is rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rejected request',function(){pm.response.to.have.status(409);});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "true"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
+          }
+        },
+        {
+          "name": "Different assigned admin is rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rejected request',function(){pm.response.to.have.status(403);});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "{{refundId}}"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "true"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
+          }
+        },
+        {
+          "name": "Customer cannot complete refund",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('allowRefundMutations') !== 'true') { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rejected request',function(){pm.response.to.have.status(403);});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "refund_id",
+                  "type": "text",
+                  "value": "{{refundId}}"
+                },
+                {
+                  "key": "transfer_confirmed",
+                  "type": "text",
+                  "value": "true"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/payment/api/v1/admin/refunds/{{refundSourceType}}/{{refundSourceId}}/complete-with-receipt",
+            "description": "Select exactly one private JPEG/PNG receipt, <=5 MiB and <=16 megapixels. Set transfer_confirmed=true only after manual transfer succeeds. refundId must belong to this source. Identical retry replays without a second completion. Different photo returns 409. completion_id identifies the internal record."
           }
         }
       ]

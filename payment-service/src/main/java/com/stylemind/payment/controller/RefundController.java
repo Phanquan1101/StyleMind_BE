@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.stylemind.payment.dto.RefundRequests.Completion;
 import com.stylemind.payment.dto.RefundRequests.Destination;
 import com.stylemind.payment.dto.RefundRequests.Failure;
+import com.stylemind.payment.dto.RefundRequests.ReceiptCompletion;
+import com.stylemind.payment.errors.RefundErrorCode;
 import com.stylemind.payment.dto.RefundResponse;
 import com.stylemind.payment.dto.RefundSourceType;
 import com.stylemind.payment.service.PaymentAuthorizationService;
@@ -18,7 +20,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 @RestController
 public class RefundController {
@@ -70,6 +76,19 @@ public class RefundController {
             @AuthenticationPrincipal Jwt jwt, @RequestBody JsonNode body) {
         return noStore(refunds.complete(sourceType, RefundSourceType.parseId(sourceId), authorization.adminSubject(jwt),
                 Completion.parse(body)));
+    }
+
+    @PostMapping(path = ADMIN + "/complete-with-receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<RefundResponse> completeWithReceipt(@PathVariable RefundSourceType sourceType,
+            @PathVariable String sourceId, @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("refund_id") String refundId, @RequestParam("transfer_confirmed") String transferConfirmed,
+            @RequestPart("image") List<MultipartFile> images) {
+        var admin = authorization.adminSubject(jwt);
+        if (images.size() != 1) {
+            throw RefundErrorCode.INVALID_REFUND_RECEIPT.exception();
+        }
+        return noStore(refunds.completeWithReceipt(sourceType, RefundSourceType.parseId(sourceId), admin,
+                ReceiptCompletion.parse(refundId, transferConfirmed), images.getFirst()));
     }
 
     @PostMapping(path = ADMIN + "/fail", consumes = MediaType.APPLICATION_JSON_VALUE)

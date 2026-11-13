@@ -349,6 +349,154 @@ class RefundWorkflowPostgresTests {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_result_outbox WHERE refund_id=?", Integer.class, UUID.fromString(id))).isZero();
     }
 
+    @Test
+    void receiptCompletionCommitsOnceAndKeepsThePhotoPrivate() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepareProcessing(refund, processing, customer, admin);
+        byte[] image = receiptImage(1);
+        for (int retry = 0; retry < 2; retry++) {
+            mvc.perform(auth(receiptCompletion(processing, id, image), admin)).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.has_receipt").value(true))
+                    .andExpect(jsonPath("$.completion_id").isNotEmpty())
+                    .andExpect(jsonPath("$.transfer_reference").isEmpty());
+        }
+        mvc.perform(auth(get(refund + "/receipt"), customer)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store, private"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(content().bytes(image));
+        mvc.perform(auth(get(refund + "/receipt"), user(UUID.randomUUID(), "ROLE_CUSTOMER")))
+                .andExpect(status().isNotFound());
+        mvc.perform(auth(receiptCompletion(processing, id, receiptImage(2)), admin))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REFUND_RECEIPT_CONFLICT"));
+        assertCompletionCounts(id, 1);
+        assertThat(dispatcher.dispatchPending()).isZero();
+        assertThat(RESULT_BODY.get()).doesNotContain("completion_id", "transfer_reference", "000112233", "receipt");
+    }
+
+    @Test
+    void receiptCompletionRequiresTheAssignedAdminAndMatchingCaseIdentity() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("CANCELLATION", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("CANCELLATION", source), processing = adminPath("CANCELLATION", source);
+        String id = prepare(refund, customer);
+        byte[] image = receiptImage(1);
+        mvc.perform(receiptCompletion(processing, id, image)).andExpect(status().isUnauthorized());
+        mvc.perform(auth(receiptCompletion(processing, id, image), customer)).andExpect(status().isForbidden());
+        mvc.perform(auth(put(refund + "/destination"), customer, DESTINATION)).andExpect(status().isOk());
+        mvc.perform(auth(receiptCompletion(processing, id, image), admin)).andExpect(status().isConflict());
+        mvc.perform(auth(post(processing + "/start"), admin)).andExpect(status().isOk());
+        String otherAdmin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        mvc.perform(auth(receiptCompletion(processing, id, image), otherAdmin)).andExpect(status().isForbidden());
+        mvc.perform(auth(receiptCompletion(processing, UUID.randomUUID().toString(), image), admin))
+                .andExpect(status().isConflict());
+        assertCompletionCounts(id, 0);
+        mvc.perform(auth(receiptCompletion(processing, id, image), admin)).andExpect(status().isOk());
+        mvc.perform(auth(receiptCompletion(processing, id, image), otherAdmin)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void receiptCompletionRejectsMissingConfirmationAndInvalidOrMultiplePhotos() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepareProcessing(refund, processing, customer, admin);
+        for (String confirmation : java.util.List.of("false", "TRUE", "yes", "")) {
+            mvc.perform(auth(multipart(processing + "/complete-with-receipt").file(receiptFile(receiptImage(1)))
+                    .param("refund_id", id).param("transfer_confirmed", confirmation), admin)).andExpect(status().isBadRequest());
+        }
+        mvc.perform(auth(multipart(processing + "/complete-with-receipt").file(receiptFile(receiptImage(1)))
+                .param("refund_id", id), admin)).andExpect(status().isBadRequest());
+        mvc.perform(auth(multipart(processing + "/complete-with-receipt").file(receiptFile(receiptImage(1)))
+                .param("transfer_confirmed", "true"), admin)).andExpect(status().isBadRequest());
+        mvc.perform(auth(multipart(processing + "/complete-with-receipt")
+                .param("refund_id", id).param("transfer_confirmed", "true"), admin)).andExpect(status().isBadRequest());
+        for (byte[] image : java.util.List.of(new byte[0], new byte[]{1, 2, 3}, new byte[5242881])) {
+            mvc.perform(auth(receiptCompletion(processing, id, image), admin)).andExpect(status().isBadRequest());
+        }
+        for (String mime : java.util.List.of("image/jpeg", "text/plain")) {
+            mvc.perform(auth(multipart(processing + "/complete-with-receipt")
+                    .file(new org.springframework.mock.web.MockMultipartFile("image", "fake.jpg", mime, receiptImage(1)))
+                    .param("refund_id", id).param("transfer_confirmed", "true"), admin)).andExpect(status().isBadRequest());
+        }
+        mvc.perform(auth(receiptCompletion(processing, id, receiptImage(1)).file(receiptFile(receiptImage(2))), admin))
+                .andExpect(status().isBadRequest());
+        assertCompletionCounts(id, 0);
+        mvc.perform(auth(get(refund), customer)).andExpect(jsonPath("$.status").value("PROCESSING"));
+    }
+
+    @Test
+    void receiptCompletionRollsBackPhotoAuditAndStateWhenOutboxInsertFails() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepareProcessing(refund, processing, customer, admin);
+        jdbc.execute("CREATE FUNCTION reject_refund_outbox_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'isolated rollback test'; END $$");
+        jdbc.execute("CREATE TRIGGER reject_refund_outbox_test BEFORE INSERT ON public.refund_result_outbox FOR EACH ROW EXECUTE FUNCTION reject_refund_outbox_test()");
+        try {
+            mvc.perform(auth(receiptCompletion(processing, id, receiptImage(1)), admin)).andExpect(status().isInternalServerError());
+            assertCompletionCounts(id, 0);
+            mvc.perform(auth(get(refund), customer)).andExpect(jsonPath("$.status").value("PROCESSING"))
+                    .andExpect(jsonPath("$.has_receipt").value(false)).andExpect(jsonPath("$.completion_id").isEmpty());
+        } finally {
+            jdbc.execute("DROP TRIGGER reject_refund_outbox_test ON public.refund_result_outbox");
+            jdbc.execute("DROP FUNCTION reject_refund_outbox_test()");
+        }
+        mvc.perform(auth(receiptCompletion(processing, id, receiptImage(1)), admin)).andExpect(status().isOk());
+        assertCompletionCounts(id, 1);
+    }
+
+    @Test
+    void concurrentReceiptCompletionRetriesCommitOnlyOnce() throws Exception {
+        var ledger = settled(100_000);
+        UUID source = source("RETURN", ledger, 50_000);
+        String customer = user(ledger.customer, "ROLE_CUSTOMER"), admin = user(UUID.randomUUID(), "ROLE_ADMIN");
+        String refund = path("RETURN", source), processing = adminPath("RETURN", source);
+        String id = prepareProcessing(refund, processing, customer, admin);
+        byte[] image = receiptImage(1);
+        var together = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(3)) {
+            var jobs = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int attempt = 0; attempt < 3; attempt++) {
+                jobs.add(executor.submit(() -> {
+                    together.await();
+                    return mvc.perform(auth(receiptCompletion(processing, id, image), admin)).andReturn().getResponse().getStatus();
+                }));
+            }
+            together.countDown();
+            for (var job : jobs) assertThat(job.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+        }
+        assertCompletionCounts(id, 1);
+    }
+
+    private String prepareProcessing(String refund, String processing, String customer, String admin) throws Exception {
+        String id = prepare(refund, customer);
+        mvc.perform(auth(put(refund + "/destination"), customer, DESTINATION)).andExpect(status().isOk());
+        mvc.perform(auth(post(processing + "/start"), admin)).andExpect(status().isOk());
+        return id;
+    }
+
+    private void assertCompletionCounts(String id, int expected) {
+        UUID refundId = UUID.fromString(id);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_transfer_receipt WHERE refund_id=?", Integer.class, refundId)).isEqualTo(expected);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_audit WHERE refund_id=? AND action='REFUNDED'", Integer.class, refundId)).isEqualTo(expected);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refund_result_outbox WHERE refund_id=?", Integer.class, refundId)).isEqualTo(expected);
+    }
+
+    private static org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder receiptCompletion(
+            String processing, String id, byte[] image) {
+        var request = multipart(processing + "/complete-with-receipt").file(receiptFile(image));
+        request.param("refund_id", id).param("transfer_confirmed", "true");
+        return request;
+    }
+
     private static byte[] receiptImage(int color) throws Exception {
         var image = new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB);
         image.setRGB(0, 0, color);

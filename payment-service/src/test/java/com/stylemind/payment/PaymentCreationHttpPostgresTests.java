@@ -153,6 +153,32 @@ class PaymentCreationHttpPostgresTests {
         assertThat(jdbc.queryForObject("SELECT recorded_by_user_id FROM financial_transaction", UUID.class)).isEqualTo(admin);
     }
 
+    @Test
+    void internalCodCollectionRequiresServiceTokenAndCommittedDeliveryIntent() {
+        UUID order = UUID.randomUUID(), owner = UUID.randomUUID(), actor = UUID.randomUUID();
+        var attempt = push(order, owner, "COD");
+        String path = "/internal/v1/payments/orders/" + order + "/cod-collection";
+        assertThat(post(path, null, null, null).getStatusCode().value()).isEqualTo(401);
+        assertThat(post(path, null, "X-StyleMind-Service-Token", "incorrect-test-only").getStatusCode().value()).isEqualTo(401);
+        assertThat(post(path, null, "Authorization", "Bearer " + token(actor, "ADMIN")).getStatusCode().value()).isEqualTo(401);
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED"));
+        assertThat(post(path, null, "X-StyleMind-Service-Token", "runtime-test-only-handoff").getStatusCode().value()).isEqualTo(409);
+        assertThat(count("financial_transaction")).isZero();
+        org.mockito.Mockito.when(commerce.getPaymentSnapshot(order)).thenReturn(
+                new com.stylemind.payment.client.CommerceOrderPaymentSnapshot(order, owner,
+                        com.stylemind.payment.model.PaymentMethod.COD, 125000, "COMPLETED", actor, Instant.now()));
+        for (int i = 0; i < 2; i++) {
+            var response = post(path, null, "X-StyleMind-Service-Token", "runtime-test-only-handoff");
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody().path("id").asText()).isEqualTo(attempt.path("id").asText());
+        }
+        assertThat(count("financial_transaction")).isEqualTo(1);
+        assertThat(count("payment_outbox")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT recorded_by_user_id FROM financial_transaction", UUID.class)).isEqualTo(actor);
+    }
+
     private JsonNode push(UUID order, UUID customer, String method) {
         var body = Map.of("order_id", order, "customer_id", customer, "accepted_total_vnd", 125000,
                 "payment_method", method, "order_status", method.equals("COD") ? "PLACED" : "PENDING_PAYMENT",

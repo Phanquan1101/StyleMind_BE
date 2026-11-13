@@ -31,7 +31,8 @@ public class CommerceHandoffSecurity {
     @Order(1)
     SecurityFilterChain commerceHandoffFilterChain(HttpSecurity http, ObjectMapper mapper,
             @Value("${stylemind.payment.handoff-token:}") String token) throws Exception {
-        return http.securityMatcher("/internal/v1/payments/order-attempts")
+        return http.securityMatcher("/internal/v1/payments/order-attempts", "/internal/v1/payments/orders/*/cod-collection",
+                        "/internal/v1/payments/orders/*/cancel-unpaid-vnpay")
                 .csrf(AbstractHttpConfigurer::disable).requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(new TokenFilter(token, mapper), AnonymousAuthenticationFilter.class)

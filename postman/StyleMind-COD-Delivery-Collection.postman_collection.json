@@ -1,8 +1,51 @@
 {
-  "info": { "name": "StyleMind COD Delivery Collection", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
-  "variable": [ { "key": "gateway_url", "value": "http://localhost:8080" }, { "key": "order_id", "value": "" }, { "key": "admin_token", "value": "" }, { "key": "customer_token", "value": "" } ],
+  "info": { "name": "StyleMind COD Delivery Collection", "description": "One admin delivery command persists COD collection intent. Existing PaymentConfirmed outbox/inbox delivers payment progress.", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "variable": [
+    { "key": "gateway_url", "value": "http://localhost:8080" },
+    { "key": "payment_base_url", "value": "http://localhost:8083" },
+    { "key": "order_id", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "customer_token", "value": "" },
+    { "key": "handoff_token", "value": "" }
+  ],
   "item": [
-    { "name": "Admin confirms actual COD collection for completed order (safe replay)", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{admin_token}}" } ], "url": "{{gateway_url}}/payment/api/v1/admin/orders/{{order_id}}/cod-collection" }, "event": [ { "listen": "test", "script": { "exec": [ "pm.test('COD is paid', () => { pm.response.to.have.status(200); const p = pm.response.json(); pm.expect(p.status).to.eql('PAID'); pm.expect(p.method).to.eql('COD'); pm.expect(p.orderId).to.eql(pm.variables.get('order_id')); });" ] } } ] },
-    { "name": "Owner checks return eligibility after payment event delivery", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{customer_token}}" } ], "url": "{{gateway_url}}/commerce/api/v1/orders/{{order_id}}/returns" } }
+    {
+      "name": "Admin delivers and collects COD in one command (safe replay)",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{admin_token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "url": "{{gateway_url}}/commerce/api/v1/admin/orders/{{order_id}}/status",
+        "body": { "mode": "raw", "raw": "{\"order_status\":\"COMPLETED\",\"reason\":\"Delivered and cash received\"}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Delivery is committed and payment progress is explicit', () => { pm.response.to.have.status(200); const p = pm.response.json(); pm.expect(p.order_status).to.eql('COMPLETED'); pm.expect(p.payment_method).to.eql('COD'); pm.expect(['PENDING','PAID']).to.include(p.payment_status); });"
+      ] }}]
+    },
+    {
+      "name": "Owner checks delivery and payment synchronization",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }], "url": "{{gateway_url}}/commerce/api/v1/orders/{{order_id}}" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Owner sees delivered state and honest payment status', () => { pm.response.to.have.status(200); const p = pm.response.json(); pm.expect(p.order_status).to.eql('COMPLETED'); pm.expect(['PENDING','PAID']).to.include(p.payment_status); });"
+      ] }}]
+    },
+    {
+      "name": "Owner checks return eligibility after payment event delivery",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }], "url": "{{gateway_url}}/commerce/api/v1/orders/{{order_id}}/returns" }
+    },
+    {
+      "name": "Internal transport checks (private isolated runtime)",
+      "item": [
+        {
+          "name": "Internal collection denies missing service credential",
+          "request": { "method": "POST", "header": [], "url": "{{payment_base_url}}/internal/v1/payments/orders/{{order_id}}/cod-collection" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Service authentication required', () => pm.response.to.have.status(401));"] }}]
+        },
+        {
+          "name": "Internal recovery replays committed delivery intent",
+          "request": { "method": "POST", "header": [{ "key": "X-StyleMind-Service-Token", "value": "{{handoff_token}}" }], "url": "{{payment_base_url}}/internal/v1/payments/orders/{{order_id}}/cod-collection" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Existing COD attempt is paid', () => { pm.response.to.have.status(200); const p = pm.response.json(); pm.expect(p.status).to.eql('PAID'); pm.expect(p.method).to.eql('COD'); });"] }}]
+        }
+      ]
+    }
   ]
 }

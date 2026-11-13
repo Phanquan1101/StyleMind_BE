@@ -58,7 +58,7 @@ public class GuestQrCheckoutController {
             if (!now.isBefore(context.expiresAt())) checkouts.expire(checkoutId, now);
             throw unavailable();
         }
-        var attempt = payments.create(new OrderPaymentRequest(checkoutId, null, "SEPAY_VIETQR", context.totalVnd(), "PENDING_PAYMENT", "initial-" + checkoutId));
+        var attempt = payments.create(new OrderPaymentRequest(checkoutId, null, context.paymentMethod(), context.totalVnd(), "PENDING_PAYMENT", "initial-" + checkoutId));
         if (!checkouts.recordPaymentAttempt(checkoutId, null, hash, attempt, OffsetDateTime.now())) throw unavailable();
         var expires = attempt.expiresAt().isBefore(context.expiresAt().toInstant()) ? attempt.expiresAt() : context.expiresAt().toInstant();
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(new PaymentAttemptResponse(attempt.id(), attempt.orderId(), attempt.method(), attempt.amountVnd(), attempt.reference(), attempt.status(), expires, attempt.transferContent(), attempt.qrPayload(), attempt.paymentUrl()));
@@ -67,6 +67,10 @@ public class GuestQrCheckoutController {
     @PostMapping("/api/v1/guest/qr-checkouts/{id}/cancel")
     public ResponseEntity<QrCheckoutReservationService.PaymentContext> cancel(@RequestHeader(name = "X-Guest-Session-Key", required = false) String guest, @PathVariable String id) {
         String hash = hash(guest); UUID checkoutId = ids.pathId(id);
+        var context = checkouts.paymentContext(checkoutId, null, hash);
+        if ("VNPAY".equals(context.paymentMethod()) && Set.of("PREPARING", "AWAITING_PAYMENT").contains(context.status())) {
+            payments.cancelUnpaidVnpay(checkoutId);
+        }
         checkouts.cancel(checkoutId, null, hash, OffsetDateTime.now());
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(checkouts.paymentContext(checkoutId, null, hash));
     }

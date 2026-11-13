@@ -61,6 +61,10 @@ public class RefundCaseEntity {
     public byte[] getDestinationCiphertext() { return destinationCiphertext; }
     public UUID getAssignedAdminId() { return assignedAdminId; }
     public String getTransferReference() { return transferReference; }
+    public String getCompletionId() {
+        return ("internal-refund-completion:" + id).equals(transferReference) && proofReference != null
+                && proofReference.startsWith("receipt-sha256:" + id + ":") ? transferReference : null;
+    }
     public String getFailureReason() { return failureReason; }
     public Instant getRefundedAt() { return refundedAt; }
     public Instant getUpdatedAt() { return updatedAt; }
@@ -73,6 +77,15 @@ public class RefundCaseEntity {
 
     public boolean matchesEvidence(String transfer, String proof) {
         return transfer.equals(transferReference) && proof.equals(proofReference);
+    }
+
+    public boolean matchesReceiptCompletion(String hash) {
+        return matchesEvidence("internal-refund-completion:" + id, "receipt-sha256:" + id + ":" + hash);
+    }
+
+    public void completeWithReceipt(String hash, Instant now) {
+        // V3 fields hold an internal completion identifier and case-bound receipt digest, never a bank reference.
+        complete("internal-refund-completion:" + id, "receipt-sha256:" + id + ":" + hash, now);
     }
 
     public void saveDestination(byte[] ciphertext, Instant now) {

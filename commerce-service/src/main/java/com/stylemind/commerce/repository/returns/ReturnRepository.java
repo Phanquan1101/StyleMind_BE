@@ -39,7 +39,7 @@ public class ReturnRepository {
                 FROM public.customer_order o
                 LEFT JOIN public.payment_event_inbox e ON e.order_id=o.order_id AND e.outcome='APPLIED'
                     AND e.customer_id=o.customer_id AND e.payment_method=o.payment_method
-                    AND e.amount_vnd=o.accepted_total_vnd AND e.payment_method IN ('COD','SEPAY_VIETQR')
+                    AND e.amount_vnd=o.accepted_total_vnd AND e.payment_method IN ('COD','SEPAY_VIETQR','VNPAY')
                 WHERE o.order_id=:order AND o.customer_id=:owner
                 """ + (lock ? " FOR UPDATE OF o" : ""))
                 .param("order", orderId).param("owner", owner)
@@ -82,6 +82,11 @@ public class ReturnRepository {
                 """).param("order", orderId).param("key", requestKey)
                 .query((rs, row) -> new ExistingRequest(rs.getObject("return_id", UUID.class),
                         rs.getString("request_fingerprint"))).optional();
+    }
+
+    public boolean hasRequest(UUID orderId) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM public.return_request WHERE order_id=:order)")
+                .param("order", orderId).query(Boolean.class).single();
     }
 
     public void insert(UUID id, UUID orderId, UUID paymentEvent, UUID requestKey, String fingerprint,
@@ -131,7 +136,7 @@ public class ReturnRepository {
                 SELECT r.return_status FROM public.return_request r
                 JOIN public.customer_order o ON o.order_id=r.order_id
                 WHERE r.return_id=:id AND (:admin OR o.customer_id=:actor)
-                FOR UPDATE OF r
+                FOR UPDATE OF o,r
                 """).param("id", id).param("actor", actor).param("admin", admin)
                 .query((rs, row) -> Status.valueOf(rs.getString("return_status"))).optional();
     }

@@ -16,7 +16,7 @@ public class PaymentEventRepository {
     public PaymentEventRepository(JdbcClient jdbc) { this.jdbc = jdbc; }
     public record Stored(String fingerprint, PaymentEventReceipt receipt) { }
     public record Order(UUID customer, String method, long amount, String status) { }
-    public record Checkout(UUID customer, long amount, String status, String attemptId, String reference, String guestHash) { }
+    public record Checkout(UUID customer, long amount, String status, String attemptId, String reference, String guestHash, String method) { }
     public void lockEvent(UUID id) {
         jdbc.sql("SELECT pg_advisory_xact_lock(:key)")
                 .param("key", id.getMostSignificantBits() ^ id.getLeastSignificantBits())
@@ -34,10 +34,10 @@ public class PaymentEventRepository {
     public Optional<Checkout> lockCheckout(UUID id) {
         return jdbc.sql("""
                 SELECT customer_id,total_vnd,checkout_status,shipping_snapshot->'paymentAttempt'->>'id',
-                       shipping_snapshot->'paymentAttempt'->>'reference',guest_session_hash
+                       shipping_snapshot->'paymentAttempt'->>'reference',guest_session_hash,payment_method
                 FROM public.qr_checkout WHERE payment_reference_id=:id FOR UPDATE
                 """).param("id", id).query((rs, row) -> new Checkout(rs.getObject(1, UUID.class), rs.getLong(2),
-                        rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6))).optional();
+                        rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7))).optional();
     }
     public void markCheckoutForReconciliation(UUID id, Instant now) {
         jdbc.sql("""

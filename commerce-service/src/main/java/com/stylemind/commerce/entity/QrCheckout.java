@@ -27,6 +27,9 @@ public class QrCheckout {
     @Column(name = "checkout_status", nullable = false)
     private String checkoutStatus;
 
+    @Column(name = "payment_method", nullable = false)
+    private String paymentMethod;
+
     @Column(name = "total_vnd", nullable = false)
     private long totalVnd;
 

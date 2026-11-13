@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface PaymentAttemptService {
+    void cancelUnpaidVnpay(java.util.UUID orderId);
+    PaymentAttemptResponse collectDeliveredCod(UUID orderId, Instant now);
     PaymentAttemptResponse confirmDeliveredCod(UUID orderId, UUID adminUserId, Instant now);
     PaymentAttemptResponse createAttempt(CreatePaymentAttemptRequest request, UUID customerId, Instant now);
     PaymentAttemptResponse createOrderAttempt(com.stylemind.payment.dto.OrderPaymentRequest request, Instant now);

@@ -44,14 +44,14 @@ public class PaymentEventServiceImpl implements PaymentEventService {
                 var value = checkout.get();
                 if (value.attemptId() == null || value.reference() == null) {
                     var recovered = paymentClient.create(new com.stylemind.commerce.client.payment.OrderPaymentRequest(
-                            event.order_id(), value.customer(), "SEPAY_VIETQR", value.amount(),
+                            event.order_id(), value.customer(), value.method(), value.amount(),
                             "PENDING_PAYMENT", "initial-" + event.order_id()));
                     qrCheckouts.recordPaymentAttempt(event.order_id(), value.customer(), value.guestHash(), recovered,
                             OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
                     value = repository.lockCheckout(event.order_id()).orElseThrow();
                 }
                 String checkoutReason = !java.util.Objects.equals(event.customer_id(), value.customer()) ? "OWNER_MISMATCH"
-                        : !"SEPAY_VIETQR".equals(event.payment_method()) ? "METHOD_MISMATCH"
+                        : !value.method().equals(event.payment_method()) ? "METHOD_MISMATCH"
                         : event.amount_vnd() != value.amount() ? "AMOUNT_MISMATCH"
                         : !event.payment_attempt_id().toString().equals(value.attemptId())
                                 || !event.payment_reference().equals(value.reference()) ? "PAYMENT_REFERENCE_MISMATCH"

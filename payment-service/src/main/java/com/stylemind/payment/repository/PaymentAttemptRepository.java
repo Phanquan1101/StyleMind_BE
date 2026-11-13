@@ -72,6 +72,30 @@ public class PaymentAttemptRepository {
                 .setParameter("id", orderId).getSingleResult() > 0;
     }
 
+    public boolean hasCancelledVnpayAttempt(UUID orderId) {
+        return entityManager.createQuery("SELECT count(a) FROM PaymentAttemptEntity a WHERE a.orderId=:id AND a.paymentMethod='VNPAY' AND a.attemptStatus='CANCELLED'", Long.class)
+                .setParameter("id", orderId).getSingleResult() > 0;
+    }
+
+    public boolean cancelUnpaidVnpayAttempts(UUID orderId) {
+        // The IPN also locks the attempt row before settling it. A concurrent settlement
+        // therefore finishes first or sees CANCELLED and enters reconciliation.
+        executeUpdate(entityManager.createNativeQuery("""
+                UPDATE public.payment_attempt SET attempt_status='CANCELLED'
+                WHERE order_id=:id AND payment_method='VNPAY' AND attempt_status='PENDING'
+                """).setParameter("id", orderId));
+        Number total = (Number) entityManager.createNativeQuery("""
+                SELECT count(*) FROM public.payment_attempt WHERE order_id=:id AND payment_method='VNPAY'
+                """).setParameter("id", orderId).getSingleResult();
+        Number unsafe = (Number) entityManager.createNativeQuery("""
+                SELECT count(*) FROM public.payment_attempt a
+                WHERE a.order_id=:id AND a.payment_method='VNPAY'
+                  AND (a.attempt_status NOT IN ('CANCELLED','EXPIRED')
+                       OR EXISTS (SELECT 1 FROM public.financial_transaction t WHERE t.payment_attempt_id=a.payment_attempt_id))
+                """).setParameter("id", orderId).getSingleResult();
+        return total.longValue() > 0 && unsafe.longValue() == 0;
+    }
+
     public boolean insert(PaymentAttemptCreation attempt) {
         return executeUpdate(entityManager.createNativeQuery("""
                         INSERT INTO public.payment_attempt (

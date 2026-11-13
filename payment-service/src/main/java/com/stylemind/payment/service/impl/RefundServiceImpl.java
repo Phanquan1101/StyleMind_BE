@@ -5,6 +5,9 @@ import com.stylemind.payment.client.RestCommerceRefundClient;
 import com.stylemind.payment.dto.RefundRequests.Completion;
 import com.stylemind.payment.dto.RefundRequests.Destination;
 import com.stylemind.payment.dto.RefundRequests.Failure;
+import com.stylemind.payment.dto.RefundRequests.ReceiptCompletion;
+import com.stylemind.payment.dto.RefundReceiptImage;
+import com.stylemind.payment.entity.RefundTransferReceiptEntity;
 import com.stylemind.payment.dto.RefundResponse;
 import com.stylemind.payment.dto.RefundSourceType;
 import com.stylemind.payment.entity.RefundAuditEntity;
@@ -179,6 +182,44 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     @Transactional
+    public RefundResponse completeWithReceipt(RefundSourceType type, UUID sourceId, UUID admin,
+            ReceiptCompletion completion, org.springframework.web.multipart.MultipartFile image) {
+        var refund = lock(type, sourceId);
+        if (refund.getStatus() != Status.REFUNDED) {
+            requireProcessing(refund);
+        }
+        requireAssigned(refund, admin);
+        if (!refund.getId().equals(completion.refundId())) {
+            throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+        }
+        var validated = receiptValidator.validate(image);
+        String hash = receiptHash(validated);
+        if (refund.getStatus() == Status.REFUNDED) {
+            var existing = receipts.findById(refund.getId())
+                    .orElseThrow(RefundErrorCode.REFUND_STATE_CONFLICT::exception);
+            if (!hash.equals(existing.getContentSha256())) {
+                throw RefundErrorCode.REFUND_RECEIPT_CONFLICT.exception();
+            }
+            if (!refund.matchesReceiptCompletion(hash)) {
+                throw RefundErrorCode.REFUND_STATE_CONFLICT.exception();
+            }
+            return response(refund);
+        }
+        Instant now = now();
+        storeReceipt(refund, validated, hash, admin, now);
+        String completionId = "internal-refund-completion:" + refund.getId();
+        refunds.lockTransferReference(completionId);
+        if (refunds.existsByTransferReference(completionId)) {
+            throw RefundErrorCode.REFUND_TRANSFER_REFERENCE_IN_USE.exception();
+        }
+        refund.completeWithReceipt(hash, now);
+        record(refund, admin, Action.REFUNDED, null, now);
+        outbox.save(new RefundResultOutboxEntity(refund, now));
+        return response(refund);
+    }
+
+    @Override
+    @Transactional
     public RefundResponse fail(RefundSourceType type, UUID sourceId, UUID admin, Failure failure) {
         var refund = lock(type, sourceId);
         if (refund.getStatus() == Status.FAILED) {
@@ -207,17 +248,27 @@ public class RefundServiceImpl implements RefundService {
         }
         requireAssigned(refund, admin);
         var validated = receiptValidator.validate(image);
-        String hash;
-        try { hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(validated.content())); }
-        catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        storeReceipt(refund, validated, receiptHash(validated), admin, now());
+        return response(refund);
+    }
+
+    private String receiptHash(RefundReceiptImage validated) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(validated.content()));
+        } catch (java.security.NoSuchAlgorithmException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private void storeReceipt(RefundCaseEntity refund, RefundReceiptImage image, String hash, UUID admin, Instant now) {
         var existing = receipts.findById(refund.getId());
         if (existing.isPresent()) {
             if (!hash.equals(existing.get().getContentSha256())) throw RefundErrorCode.REFUND_RECEIPT_CONFLICT.exception();
         } else {
-            receipts.saveAndFlush(new com.stylemind.payment.entity.RefundTransferReceiptEntity(
-                    refund.getId(), validated.contentType(), validated.content(), hash, admin, now()));
+            receipts.saveAndFlush(new RefundTransferReceiptEntity(
+                    refund.getId(), image.contentType(), image.content(), hash, admin, now));
         }
-        return response(refund);
     }
 
     @Override

@@ -19,7 +19,7 @@ public class CancellationRefundRepository {
                     (cancellation_request_id,order_id,payment_event_id,amount_vnd,obligation_status,created_at)
                 SELECT :request,o.order_id,e.event_id,e.amount_vnd,'PENDING_REFUND',:now
                 FROM public.customer_order o JOIN public.payment_event_inbox e ON e.order_id=o.order_id
-                WHERE o.order_id=:order AND e.outcome='APPLIED' AND e.payment_method='SEPAY_VIETQR'
+                WHERE o.order_id=:order AND e.outcome='APPLIED' AND e.payment_method IN ('SEPAY_VIETQR','VNPAY')
                     AND o.payment_method=e.payment_method AND o.customer_id=e.customer_id
                     AND o.accepted_total_vnd=e.amount_vnd
                 """).param("request", requestId).param("order", orderId).param("now", now).update() == 1;

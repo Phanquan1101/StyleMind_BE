@@ -75,7 +75,7 @@ public class QrCheckoutController {
             if (!now.isBefore(context.expiresAt())) checkouts.expire(checkoutId, now);
             throw unavailable();
         }
-        var attempt = payments.create(new OrderPaymentRequest(checkoutId, owner, "SEPAY_VIETQR",
+        var attempt = payments.create(new OrderPaymentRequest(checkoutId, owner, context.paymentMethod(),
                 context.totalVnd(), "PENDING_PAYMENT", "initial-" + checkoutId));
         if (!checkouts.recordPaymentAttempt(checkoutId, owner, attempt, OffsetDateTime.now())) throw unavailable();
         var expiresAt = attempt.expiresAt().isBefore(context.expiresAt().toInstant())
@@ -88,6 +88,10 @@ public class QrCheckoutController {
     @PostMapping("/api/v1/qr-checkouts/{id}/cancel")
     public ResponseEntity<QrCheckoutReservationService.PaymentContext> cancel(Authentication auth, @PathVariable String id) {
         UUID owner = subject(auth), checkoutId = validator.pathId(id);
+        var context = checkouts.paymentContext(checkoutId, owner);
+        if ("VNPAY".equals(context.paymentMethod()) && Set.of("PREPARING", "AWAITING_PAYMENT").contains(context.status())) {
+            payments.cancelUnpaidVnpay(checkoutId);
+        }
         checkouts.cancel(checkoutId, owner, null, OffsetDateTime.now());
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(checkouts.paymentContext(checkoutId, owner));
     }

@@ -62,6 +62,41 @@ public class PaymentClient {
         }
     }
 
+    public void collectDeliveredCod(java.util.UUID orderId) {
+        if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(token)) {
+            throw failure(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_UNAVAILABLE");
+        }
+        try {
+            client.post().uri(URI.create(baseUrl + "/internal/v1/payments/orders/" + orderId + "/cod-collection"))
+                    .header("X-StyleMind-Service-Token", token).retrieve()
+                    .onStatus(status -> status.value() != 200, (request, response) -> {
+                        throw failure(HttpStatus.BAD_GATEWAY, "PAYMENT_DELIVERY_UNKNOWN");
+                    }).toBodilessEntity();
+        } catch (RestClientException | IllegalArgumentException exception) {
+            throw failure(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_DELIVERY_UNKNOWN");
+        }
+    }
+
+    public void cancelUnpaidVnpay(java.util.UUID orderId) {
+        if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(token)) {
+            throw failure(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_UNAVAILABLE");
+        }
+        try {
+            client.post().uri(URI.create(baseUrl + "/internal/v1/payments/orders/" + orderId + "/cancel-unpaid-vnpay"))
+                    .header("X-StyleMind-Service-Token", token).retrieve()
+                    .onStatus(status -> status.value() == 409, (request, response) -> {
+                        throw failure(HttpStatus.CONFLICT, "PAYMENT_RECONCILIATION_REQUIRED");
+                    })
+                    .onStatus(status -> status.value() != 200, (request, response) -> {
+                        throw failure(HttpStatus.BAD_GATEWAY, "PAYMENT_CHECK_UNAVAILABLE");
+                    }).toBodilessEntity();
+        } catch (ResourceAccessException exception) {
+            throw failure(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_CHECK_UNAVAILABLE");
+        } catch (RestClientException | IllegalArgumentException exception) {
+            throw failure(HttpStatus.BAD_GATEWAY, "PAYMENT_CHECK_UNAVAILABLE");
+        }
+    }
+
     private ApiOperationException failure(HttpStatus status, String code) {
         return new ApiOperationException(status, code,
                 "Payment could not be confirmed; the order remains saved. Retry using the order payment endpoint.");

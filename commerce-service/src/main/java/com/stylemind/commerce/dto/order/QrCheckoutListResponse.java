@@ -11,6 +11,6 @@ public record QrCheckoutListResponse(
         int size,
         @JsonProperty("total_elements") long totalElements,
         @JsonProperty("total_pages") int totalPages) {
-    public record Item(UUID checkoutId, String status, long totalVnd, OffsetDateTime createdAt,
+    public record Item(UUID checkoutId, String status, String paymentMethod, long totalVnd, OffsetDateTime createdAt,
                        OffsetDateTime expiresAt) { }
 }
