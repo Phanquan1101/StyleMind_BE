@@ -170,6 +170,14 @@
           }
         },
         {
+          "name": "Permanently Delete Unused Category (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/categories/{{categoryId}}?permanent=true"
+          }
+        },
+        {
           "name": "Duplicate Category Slug (ADMIN, expect 409)",
           "request": {
             "method": "POST",
@@ -332,6 +340,14 @@
                 "{{brandId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "Permanently Delete Unused Brand (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/brands/{{brandId}}?permanent=true"
           }
         },
         {

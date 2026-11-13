@@ -240,6 +240,54 @@ class CatalogReferencePostgresIntegrationTests {
     }
 
     @Test
+    void permanentBrandDeleteRemovesUnusedBrandAndTombstonesReferencedBrandForSlugReuse() throws Exception {
+        JsonNode unusedBrand = create("/api/v1/admin/brands",
+                "{\"name\":\"Unused\",\"slug\":\"unused\",\"is_active\":true}");
+        UUID unusedBrandId = UUID.fromString(unusedBrand.path("id").asText());
+
+        mockMvc.perform(delete("/api/v1/admin/brands/{id}", unusedBrandId)
+                        .queryParam("permanent", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM public.brand WHERE brand_id = ?",
+                Integer.class, unusedBrandId)).isZero();
+
+        JsonNode category = create("/api/v1/admin/categories",
+                "{\"name\":\"Tops\",\"slug\":\"tops\",\"is_active\":true}");
+        JsonNode usedBrand = create("/api/v1/admin/brands",
+                "{\"name\":\"Used\",\"slug\":\"used\",\"is_active\":true}");
+        UUID categoryId = UUID.fromString(category.path("id").asText());
+        UUID usedBrandId = UUID.fromString(usedBrand.path("id").asText());
+        jdbc.update("""
+                INSERT INTO public.product (
+                    product_id, category_id, brand_id, name, product_status
+                ) VALUES (?, ?, ?, ?, ?)
+                """, UUID.randomUUID(), categoryId, usedBrandId, "Referenced product", "ACTIVE");
+
+        mockMvc.perform(delete("/api/v1/admin/brands/{id}", usedBrandId)
+                        .queryParam("permanent", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT is_active FROM public.brand WHERE brand_id = ?",
+                Boolean.class, usedBrandId)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT deleted_at IS NOT NULL FROM public.brand WHERE brand_id = ?",
+                Boolean.class, usedBrandId)).isTrue();
+
+        mockMvc.perform(get("/api/v1/admin/brands/{id}", usedBrandId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/v1/admin/brands/{id}", usedBrandId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Used\",\"slug\":\"used\",\"is_active\":true}"))
+                .andExpect(status().isNotFound());
+
+        JsonNode recreated = create("/api/v1/admin/brands",
+                "{\"name\":\"Used\",\"slug\":\"used\",\"is_active\":true}");
+        assertThat(UUID.fromString(recreated.path("id").asText())).isNotEqualTo(usedBrandId);
+    }
+
+    @Test
     void openApiDocumentsCatalogRoutesAndSwaggerUiIsPublic() throws Exception {
         MvcResult result = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())

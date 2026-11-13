@@ -22,4 +22,5 @@ public interface CatalogReferenceService {
 
     void delete(CatalogReferenceType type, UUID id);
     void deleteCategoryPermanently(java.util.UUID id);
+    void deleteBrandPermanently(java.util.UUID id);
 }
