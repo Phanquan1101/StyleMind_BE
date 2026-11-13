@@ -1,4 +1,4 @@
-ALTER TABLE public.product
+﻿ALTER TABLE public.product
     DROP CONSTRAINT IF EXISTS product_status_check;
 
 ALTER TABLE public.product
